@@ -5,8 +5,8 @@ import json
 import uuid
 from pathlib import Path
 
-from samaya.codex.service import CodexService
 from samaya.config import Settings
+from samaya.runtime import Runtime
 from samaya.store import Store
 
 BASE = Path("/workspace/apps/samaya/.samaya/acceptance")
@@ -22,12 +22,12 @@ async def main():
         )
     config = Settings(data_dir=BASE / "state")
     store = Store(config.data_dir)
-    service = CodexService(config, store)
+    service = Runtime(config, store)
     await service.start()
-    await asyncio.wait_for(service.ready.wait(), 20)
+    await asyncio.wait_for(service.connection.ready.wait(), 20)
 
     async def op(action, body):
-        result = await service.execute(uuid.uuid4().hex, action, body)
+        result = await service.operations.execute(uuid.uuid4().hex, action, body)
         print(action, json.dumps(result, ensure_ascii=False), flush=True)
         if result["state"] != "succeeded":
             raise RuntimeError(result)
@@ -36,7 +36,7 @@ async def main():
     async def wait(tid):
         for _ in range(120):
             await asyncio.sleep(2)
-            thread = (await service.read(tid))["thread"]
+            thread = (await service.sessions.read(tid))["thread"]
             if thread.get("turns") and thread["turns"][-1]["status"] != "inProgress":
                 print("completed", json.dumps(thread, ensure_ascii=False), flush=True)
                 return thread

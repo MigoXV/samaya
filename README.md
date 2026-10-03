@@ -85,19 +85,25 @@ codex app-server daemon version
 ```text
 src/samaya/
   commands/app.py       Typer 命令、基础日志
-  web/app.py            FastAPI、身份验证、API、SSE、静态托管
-  codex/adapter.py      SDK 唯一兼容边界
-  codex/bridge.py       JSONL ↔ 常驻 Unix WebSocket
-  codex/service.py      会话、轮次、审批和生命周期
-  codex/monitor.py      原生会话的内存只读汇总、快照与增量
-  codex/mcp.py          MCP 表单校验、响应与请求生命周期边界
+  web/app.py            FastAPI 应用装配、生命周期、静态托管
+  web/auth.py           登录、Cookie、CSRF 与访问边界
+  web/routes.py         HTTP API
+  web/events.py         浏览器 SSE、事件重放与监控增量
+  codex/               SDK 适配、传输桥接与共享连接；不依赖业务包
+  sessions/            会话查询、历史、执行、目录切换与清理
+  decisions/           审批、输入请求、MCP 表单与响应校验
+  monitoring/          异步状态同步与独立的同步事件投影
+  operations.py        操作去重、会话级串行化、持久回执
+  runtime.py           服务装配、事件分发与统一启停
   config.py            环境变量与目录边界
-  store.py             SQLite 操作回执、收到的事件、已查看 ID
+  store.py             SQLite 操作回执、事件记录、已查看 ID
 src/web/               React / TypeScript / Vite / pnpm
 src/web/dist/          构建产物，由后端托管（Git 忽略）
 tests/                 不调用真实模型的风险测试
 scripts/               明确运行才调用真实 Codex 的验收脚本
 ```
+
+业务服务共享同一个连接，`runtime.py` 只装配服务、分发事件和管理生命周期。HTTP 路由分别调用会话、监控和操作服务；状态投影不访问网络或数据库。内部依赖及重构验证见 [Python 包职责说明](docs/python-architecture.md)。
 
 固定 `openai-codex==0.160.0`，SDK 依赖的 CLI runtime 包也是 0.160.0；实际使用现有 daemon 0.160.0，**不是** SDK 默认启动的独立执行实例。SDK 公开 `launch_args_override` 启动 Samaya 桥接；桥接只负责传输，关闭它不会关闭 daemon。少量 SDK 高层缺口通过官方协议补齐，集中在集成模块；内部 `_client` 访问仅在 adapter.py，升级必须重新验证。
 

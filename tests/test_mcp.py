@@ -4,9 +4,9 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from samaya.codex import mcp
-from samaya.codex.service import CodexService
 from samaya.config import Settings
+from samaya.decisions import mcp
+from samaya.runtime import Runtime
 from samaya.store import Store
 
 SCHEMA = {
@@ -154,9 +154,9 @@ def test_mcp_identity_is_independent_of_turn():
 @pytest.mark.asyncio
 async def test_multiple_pages_and_uncertain_response_do_not_resubmit(tmp_path):
     store = Store(tmp_path)
-    service = CodexService(Settings(data_dir=tmp_path), store)
-    service.connection = "connected"
-    service.adapter = object()
+    service = Runtime(Settings(data_dir=tmp_path), store)
+    service.connection.state = "connected"
+    service.connection.adapter = object()
     request = {
         "id": 7,
         "method": mcp.METHOD,
@@ -168,20 +168,28 @@ async def test_multiple_pages_and_uncertain_response_do_not_resubmit(tmp_path):
         "requestKey": request["key"],
         "response": {"action": "accept", "content": VALUES},
     }
-    service.pending[request["key"]] = request
-    service.rpc = AsyncMock(return_value={"sent": True})
+    service.decisions.pending[request["key"]] = request
+    service.connection.rpc = AsyncMock(return_value={"sent": True})
     result = await asyncio.gather(
-        service.execute("a", "respond", body), service.execute("b", "respond", body)
+        service.operations.execute("a", "respond", body),
+        service.operations.execute("b", "respond", body),
     )
     assert sorted(r["state"] for r in result) == ["failed", "succeeded"]
-    assert service.rpc.await_count == 1
-    assert service.pending[request["key"]]["responseState"] == "sent"
-    assert (await service.execute("a", "respond", body))["state"] == "succeeded"
-    service.pending[request["key"]] = {**request, "responseState": None}
-    service.rpc = AsyncMock(side_effect=TimeoutError("response lost"))
-    assert (await service.execute("c", "respond", body))["state"] == "uncertain"
-    assert (await service.execute("d", "respond", body))["state"] == "failed"
-    assert service.rpc.await_count == 1
+    assert service.connection.rpc.await_count == 1
+    assert service.decisions.pending[request["key"]]["responseState"] == "sent"
+    assert (await service.operations.execute("a", "respond", body))[
+        "state"
+    ] == "succeeded"
+    service.decisions.pending[request["key"]] = {
+        **request,
+        "responseState": None,
+    }
+    service.connection.rpc = AsyncMock(side_effect=TimeoutError("response lost"))
+    assert (await service.operations.execute("c", "respond", body))[
+        "state"
+    ] == "uncertain"
+    assert (await service.operations.execute("d", "respond", body))["state"] == "failed"
+    assert service.connection.rpc.await_count == 1
     await service.publish(
         {
             "id": 8,
