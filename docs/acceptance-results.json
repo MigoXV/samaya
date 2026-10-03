@@ -1,0 +1,89 @@
+{
+  "workspace_auto_instructions": {
+    "passed": true,
+    "text": "\n\nI’ll run only `pwd`.\n\n\nReady\n\nSAMAYA_ALPHA",
+    "cwd": "/workspace/apps/samaya/.samaya/acceptance/project-a"
+  },
+  "duplicate_send": {
+    "passed": true,
+    "turnId": "01a10093-6b26-7240-9b9f-7f7e5128de01"
+  },
+  "targeted_terminate": {
+    "passed": true,
+    "remaining": [
+      {
+        "itemId": "exec-45623190-0076-403c-8c51-d28c6c885efa",
+        "processId": "71508",
+        "command": "sleep 240",
+        "cwd": "/workspace/apps/samaya/.samaya/acceptance/project-a",
+        "osPid": null,
+        "cpuPercent": null,
+        "rssKb": null
+      }
+    ]
+  },
+  "old_process_cwd": [
+    {
+      "itemId": "exec-45623190-0076-403c-8c51-d28c6c885efa",
+      "processId": "71508",
+      "command": "sleep 240",
+      "cwd": "/workspace/apps/samaya/.samaya/acceptance/project-a",
+      "osPid": null,
+      "cpuPercent": null,
+      "rssKb": null
+    }
+  ],
+  "browser_approval": {
+    "passed": true
+  },
+  "browser_input": {
+    "passed": true
+  },
+  "interrupt_isolated": {
+    "result": {
+      "operationId": "f8ff24f28e754e2a8885cab317c43e9c",
+      "state": "succeeded",
+      "result": {}
+    },
+    "otherBefore": {
+      "type": "active",
+      "activeFlags": []
+    },
+    "otherAfter": {
+      "type": "active",
+      "activeFlags": []
+    },
+    "otherTurn": "01a10095-9159-79a1-a044-765e6fda7e9c"
+  },
+  "browser_batch_partial": {
+    "passed": true
+  },
+  "archived_correct": true,
+  "unarchive_visible": true,
+  "delete_absent": true,
+  "python_restart_final": {
+    "sameTurn": true,
+    "status": "completed",
+    "text": "\nI’ll run `sleep 60`, wait for it to finish, then run `pwd`. No files will be changed.\n\n\n\n\n`sleep 60` completed. Directory: `/workspace/apps/samaya/.samaya/acceptance/project-a`\n\nSAMAYA_RESTART_OK\n\nSAMAYA_ALPHA"
+  },
+  "bridge_reconnect": {
+    "states": [
+      "disconnected",
+      "disconnected",
+      "disconnected",
+      "disconnected",
+      "disconnected",
+      "reconnecting",
+      "connected"
+    ],
+    "generation": 2,
+    "passed": true
+  },
+  "archived_history_fixed": true,
+  "sdk_typed_turn": {
+    "sameTurn": true,
+    "status": "completed",
+    "text": "\n\nSAMAYA_SDK_FINAL_OK\nSAMAYA_ALPHA"
+  },
+  "existing_hierarchy_verified": true
+}

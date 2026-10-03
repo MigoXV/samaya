@@ -1,0 +1,16 @@
+{
+  "isolated": true,
+  "cases": [
+    "empty",
+    "initial-loading",
+    "catalog-failure-not-empty",
+    "no-search-results",
+    "disconnect-preserves-state",
+    "uncertain-operation-is-scoped-and-survives-refresh",
+    "mcp-typed-fields-and-unspecified-boolean",
+    "identity-expired",
+    "sent-request-awaits-native-resolution",
+    "terminate-only-selected-background-command",
+    "batch-partial-failure-is-itemized"
+  ]
+}

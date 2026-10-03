@@ -1,0 +1,52 @@
+{
+  "desktop": [],
+  "contrast": [
+    {
+      "selector": ".brand",
+      "foreground": "rgb(37, 42, 42)",
+      "background": "rgb(243, 241, 234)",
+      "ratio": 12.87
+    },
+    {
+      "selector": ".session-row.selected strong",
+      "foreground": "rgb(37, 42, 42)",
+      "background": "rgb(227, 233, 229)",
+      "ratio": 11.82
+    },
+    {
+      "selector": ".session-row.selected small",
+      "foreground": "rgb(37, 42, 42)",
+      "background": "rgb(227, 233, 229)",
+      "ratio": 11.82
+    },
+    {
+      "selector": ".muted",
+      "foreground": "rgb(101, 108, 105)",
+      "background": "rgb(248, 247, 242)",
+      "ratio": 5.02
+    },
+    {
+      "selector": ".composer-bottom small",
+      "foreground": "rgb(101, 108, 105)",
+      "background": "rgb(252, 251, 248)",
+      "ratio": 5.2
+    },
+    {
+      "selector": "button.primary",
+      "foreground": "rgb(248, 247, 242)",
+      "background": "rgb(37, 42, 42)",
+      "ratio": 13.56
+    },
+    {
+      "selector": ".workspace-path code",
+      "foreground": "rgb(101, 108, 105)",
+      "background": "rgb(248, 247, 242)",
+      "ratio": 5.02
+    }
+  ],
+  "dialog": [],
+  "drawerFocus": "项目与会话",
+  "sessions": [],
+  "overflow": false,
+  "settings": []
+}

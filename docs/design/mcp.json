@@ -1,0 +1,15 @@
+{
+  "fileKey": "qaGSrQhakH253tizxKkoae",
+  "root": "4:43",
+  "form": "4:97",
+  "urlMobile": "4:122",
+  "tool": "4:136",
+  "states": "4:141",
+  "approvalNote": "5:55",
+  "font": "Noto Sans SC",
+  "theme": "vallum",
+  "implementation": [
+    "src/web/src/mcp.tsx",
+    "src/web/src/mcp-schema.ts"
+  ]
+}

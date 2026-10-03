@@ -7,6 +7,11 @@ import tseslint from 'typescript-eslint'
 export default tseslint.config(
   { ignores: ['dist'] },
   {
+    files: ['public/theme-init.js'],
+    languageOptions: { ecmaVersion: 2022, globals: globals.browser },
+    rules: js.configs.recommended.rules,
+  },
+  {
     files: ['**/*.{ts,tsx}'],
     extends: [js.configs.recommended, ...tseslint.configs.recommended],
     languageOptions: {

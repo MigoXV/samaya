@@ -1,0 +1,11 @@
+{
+  "fileKey": "qaGSrQhakH253tizxKkoae",
+  "pages": ["22:12", "22:13"],
+  "prototypeEntrypoints": {"vallum":"27:74", "abyssus":"27:714"},
+  "latestCreatedNodeIds": ["31:813", "I31:813;2:60", "31:816", "I31:816;2:60"],
+  "nestedRequestEntries": ["I27:158;23:97", "I27:798;23:97"],
+  "contrastAdjustedNodes": ["23:85", "23:86", "23:88", "23:89", "23:91", "23:92", "25:1102", "25:1103", "25:1105", "25:1106", "25:1108", "25:1109", "25:1111", "25:1112", "25:1113", "25:1114"],
+  "sharedSemanticCollection": "VariableCollectionId:2:7",
+  "modes": {"vallum":"2:1","abyssus":"8:0"},
+  "notes": "桌面请求入口使用 OVERLAY，同一覆盖流程内使用 SWAP；不跨主题。所有任务与请求均为演示。"
+}

@@ -1,0 +1,19 @@
+{
+  "durationMs": 60107.7000002861,
+  "rawEvents": 6000,
+  "patchBatches": 240,
+  "selectionPreserved": true,
+  "scrollBefore": 544,
+  "scrollAfter": 544,
+  "draft": "压力测试期间保留草稿 keyboard responsiveness",
+  "renderedRows": 20,
+  "selectedTask": "[演示] 修复重复提交并补全回归测试",
+  "selectionCheckedAfterMs": 40000,
+  "inputMeasuredDuringLoad": true,
+  "keyEventP95Ms": 60,
+  "inputP95Ms": 15.5,
+  "longTaskCount": 8,
+  "maxLongTaskMs": 77,
+  "productionData": false,
+  "submissions": 0
+}
