@@ -1,0 +1,103 @@
+{
+  "date": "2026-10-03",
+  "sdk": "0.160.0",
+  "daemon": "0.160.0",
+  "browser": {
+    "threadId": "01a100b3-741c-7ba2-bb30-75cde520b4c6",
+    "invalidFocus": true,
+    "desktopAxe": [],
+    "refreshPending": true,
+    "mobileAxe": [],
+    "mobileOverflow": false,
+    "multiPageResolved": true,
+    "formResult": true,
+    "urlAxe": [],
+    "openNotComplete": true,
+    "urlResult": true,
+    "errors": []
+  },
+  "standalone": {
+    "cases": [
+      {
+        "action": "decline",
+        "noTurn": true,
+        "duplicateReceipt": true,
+        "result": {
+          "content": [
+            {
+              "type": "text",
+              "text": "MCP_REAL_RESULT {\"action\": \"decline\", \"mode\": \"form\", \"content\": null, \"authorized\": false}"
+            },
+            {
+              "type": "resource",
+              "resource": {
+                "uri": "test://report",
+                "mimeType": "text/plain",
+                "text": "只读验收资源"
+              }
+            }
+          ],
+          "structuredContent": {
+            "action": "decline",
+            "mode": "form",
+            "content": null,
+            "authorized": false
+          }
+        }
+      },
+      {
+        "action": "cancel",
+        "noTurn": true,
+        "duplicateReceipt": true,
+        "result": {
+          "content": [
+            {
+              "type": "text",
+              "text": "MCP_REAL_RESULT {\"action\": \"cancel\", \"mode\": \"form\", \"content\": null, \"authorized\": false}"
+            },
+            {
+              "type": "resource",
+              "resource": {
+                "uri": "test://report",
+                "mimeType": "text/plain",
+                "text": "只读验收资源"
+              }
+            }
+          ],
+          "structuredContent": {
+            "action": "cancel",
+            "mode": "form",
+            "content": null,
+            "authorized": false
+          }
+        }
+      }
+    ],
+    "threadId": "01a100b3-419f-7242-a3a2-dc4081e7c138",
+    "disconnect": {
+      "reconnected": true,
+      "staleRequestRejected": true,
+      "toolCalls": 3,
+      "replayed": false
+    }
+  },
+  "limitations": [
+    "第三方 OAuth 未验证",
+    "MCP progress 通知未实测",
+    "扩展表单、加密验证及嵌入式 MCP App UI 不支持"
+  ],
+  "checks": {
+    "pytest": {
+      "passed": 33
+    },
+    "frontendSchemaTests": {
+      "passed": 3
+    },
+    "ruff": "passed",
+    "frontendLint": "passed",
+    "typecheck": "passed",
+    "build": "passed",
+    "poetryInstall": "passed",
+    "poetryCheck": "passed with existing scripts deprecation warning"
+  }
+}

@@ -1,0 +1,142 @@
+[
+  {
+    "theme": "vallum",
+    "ratios": {
+      "text": [
+        {
+          "selector": ".task-row.is-selected .task-identity small",
+          "ratio": 11.815550174094204
+        },
+        {
+          "selector": ".task-row.is-selected .fact",
+          "ratio": 11.815550174094204
+        },
+        {
+          "selector": ".request-action small",
+          "ratio": 11.815550174094204
+        },
+        {
+          "selector": ".detail-status",
+          "ratio": 14.060607418262387
+        },
+        {
+          "selector": ".monitor-brand",
+          "ratio": 12.874238574406666
+        },
+        {
+          "selector": ".task-row:not(.is-selected) .fact",
+          "ratio": 5.01691591105987
+        },
+        {
+          "selector": ".task-row:not(.is-selected) .task-identity small",
+          "ratio": 5.01691591105987
+        },
+        {
+          "selector": ".detail-scroll small",
+          "ratio": 5.200309343878673
+        },
+        {
+          "selector": ".recent-scope span",
+          "ratio": 12.308777079384754
+        },
+        {
+          "selector": ".recent-requirement p",
+          "ratio": 14.060607418262387
+        },
+        {
+          "selector": ".task-composer > small",
+          "ratio": 5.200309343878673
+        }
+      ],
+      "controls": [
+        {
+          "selector": ".monitor-filters input",
+          "ratio": 3.1738341312481704
+        },
+        {
+          "selector": ".monitor-filters select",
+          "ratio": 3.1738341312481704
+        },
+        {
+          "selector": ".global-actions .request-action",
+          "ratio": 4.894878528388426
+        },
+        {
+          "selector": ".task-composer textarea",
+          "ratio": 3.2898536832689493
+        }
+      ]
+    },
+    "axe": []
+  },
+  {
+    "theme": "abyssus",
+    "ratios": {
+      "text": [
+        {
+          "selector": ".task-row.is-selected .task-identity small",
+          "ratio": 12.34303036890194
+        },
+        {
+          "selector": ".task-row.is-selected .fact",
+          "ratio": 12.34303036890194
+        },
+        {
+          "selector": ".request-action small",
+          "ratio": 12.34303036890194
+        },
+        {
+          "selector": ".detail-status",
+          "ratio": 15.258443929030474
+        },
+        {
+          "selector": ".monitor-brand",
+          "ratio": 16.423577099269963
+        },
+        {
+          "selector": ".task-row:not(.is-selected) .fact",
+          "ratio": 9.69336173130228
+        },
+        {
+          "selector": ".task-row:not(.is-selected) .task-identity small",
+          "ratio": 9.69336173130228
+        },
+        {
+          "selector": ".detail-scroll small",
+          "ratio": 8.73839899099287
+        },
+        {
+          "selector": ".recent-scope span",
+          "ratio": 14.382907101525173
+        },
+        {
+          "selector": ".recent-requirement p",
+          "ratio": 15.258443929030474
+        },
+        {
+          "selector": ".task-composer > small",
+          "ratio": 8.73839899099287
+        }
+      ],
+      "controls": [
+        {
+          "selector": ".monitor-filters input",
+          "ratio": 5.66603522419148
+        },
+        {
+          "selector": ".monitor-filters select",
+          "ratio": 5.66603522419148
+        },
+        {
+          "selector": ".global-actions .request-action",
+          "ratio": 12.586379286927334
+        },
+        {
+          "selector": ".task-composer textarea",
+          "ratio": 5.107833366634618
+        }
+      ]
+    },
+    "axe": []
+  }
+]

@@ -8,6 +8,12 @@ authors = [
 readme = "README.md"
 requires-python = ">=3.10,<3.13"
 dependencies = [
+    "openai-codex (==0.160.0)",
+    "fastapi[standard] (==0.142.2)",
+    "typer (==0.27.2)",
+    "websockets (==15.0.1)",
+    "python-dotenv (==1.2.4)",
+    "jsonschema[format-nongpl] (==4.26.0)"
 ]
 
 [tool.poetry]
@@ -16,9 +22,32 @@ packages = [{include = "samaya", from = "src"}]
 [tool.poetry.scripts]
 samaya = "samaya.commands.app:app"
 
+[tool.poetry.dependencies]
+openai-codex = {source = "PyPI"}
+fastapi = {source = "PyPI"}
+typer = {source = "PyPI"}
+websockets = {source = "PyPI"}
+python-dotenv = {source = "PyPI"}
+jsonschema = {source = "PyPI"}
+
+[tool.poetry.group.dev.dependencies]
+pytest = {source = "PyPI"}
+pytest-asyncio = {source = "PyPI"}
+httpx = {source = "PyPI"}
+ruff = {source = "PyPI"}
+
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
+asyncio_default_fixture_loop_scope = "function"
+
+[dependency-groups]
+dev = [
+    "pytest (==8.4.2)",
+    "pytest-asyncio (==0.26.0)",
+    "httpx (>=0.28.1,<0.29.0)",
+    "ruff (>=0.16.10,<0.17.0)"
+]
 
 [[tool.poetry.source]]
 name = "tuna"

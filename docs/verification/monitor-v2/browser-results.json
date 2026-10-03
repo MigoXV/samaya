@@ -1,0 +1,25 @@
+{
+  "demo": true,
+  "errors": [],
+  "visible1440": 10,
+  "visible1366": 8,
+  "layouts": [
+    {
+      "width": 390,
+      "overflow": false
+    },
+    {
+      "width": 320,
+      "overflow": false
+    }
+  ],
+  "operations": [
+    "respond",
+    "steer",
+    "interrupt",
+    "create",
+    "send"
+  ],
+  "axe": [],
+  "darkAxe": []
+}
