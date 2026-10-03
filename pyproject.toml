@@ -1,0 +1,35 @@
+[project]
+name = "samaya"
+version = "0.1.0"
+description = "连接常驻 Codex app-server 的单用户网页工作台"
+authors = [
+    {name = "migo",email = "1695587905@qq.com"}
+]
+readme = "README.md"
+requires-python = ">=3.10,<3.13"
+dependencies = [
+]
+
+[tool.poetry]
+packages = [{include = "samaya", from = "src"}]
+
+[tool.poetry.scripts]
+samaya = "samaya.commands.app:app"
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+
+[[tool.poetry.source]]
+name = "tuna"
+url = "https://pypi.tuna.tsinghua.edu.cn/simple"
+priority = "primary"
+
+
+[[tool.poetry.source]]
+name = "PyPI"
+priority = "supplemental"
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"

@@ -1,0 +1,55 @@
+{
+  "fileKey": "qaGSrQhakH253tizxKkoae",
+  "pages": {
+    "foundations": "0:1",
+    "workbench": "2:2",
+    "sessions": "2:3",
+    "settings": "2:4",
+    "flows": "2:5"
+  },
+  "variables": {
+    "bgPrimary": "VariableID:2:10",
+    "bgSecondary": "VariableID:2:12",
+    "surface": "VariableID:2:14",
+    "surfaceSubtle": "VariableID:2:16",
+    "selected": "VariableID:2:18",
+    "hover": "VariableID:2:20",
+    "border": "VariableID:2:22",
+    "borderStrong": "VariableID:2:24",
+    "textPrimary": "VariableID:2:26",
+    "textSecondary": "VariableID:2:28",
+    "textTertiary": "VariableID:2:30",
+    "accent": "VariableID:2:32",
+    "accentStrong": "VariableID:2:34",
+    "accentMuted": "VariableID:2:36",
+    "onAccent": "VariableID:2:37",
+    "focus": "VariableID:2:39",
+    "space8": "VariableID:2:40",
+    "space16": "VariableID:2:41",
+    "space24": "VariableID:2:42",
+    "space32": "VariableID:2:43",
+    "radius6": "VariableID:2:44",
+    "radius8": "VariableID:2:45",
+    "control40": "VariableID:2:46",
+    "control32": "VariableID:2:47"
+  },
+  "styles": {
+    "Body": "S:54ba7eb2a40b34b4026e6d46adf5b14f3384ac95,",
+    "Small": "S:4bfe5c490da7ce566de2d87de5b9c43b82f930fc,",
+    "Label": "S:aad551bfb5c39970e0d623d66dc05a62cefc1099,",
+    "Heading": "S:bf5725162f2c07457990799273cefaec6c31f98c,",
+    "Title": "S:1922db15ba9073b0e66327558483aba19bffe3bc,"
+  },
+  "createdNodeIds": [
+    "0:1",
+    "2:2",
+    "2:3",
+    "2:4",
+    "2:5"
+  ],
+  "collections": [
+    "VariableCollectionId:2:6",
+    "VariableCollectionId:2:7",
+    "VariableCollectionId:2:8"
+  ]
+}
