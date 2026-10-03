@@ -54,7 +54,7 @@ Samaya 页面间通过持久化操作 ID、会话锁和提交前的最新 turnId
 
 `mcpServer/elicitation/request` 由同一个常驻 SDK 连接处理，响应 `{action, content}` 经现有桥接返回。未新增执行 MCP 工具的业务引擎或服务管理 API。`POST /api/operations` 的 `respond` 复用原操作编号；`GET /api/threads/{id}` 增加 `pendingRequests[].mcp` 展示联合类型（form/url/unsupported）、`responseState` 与 `toolProgress`。
 
-标准表单 Schema 真源为安装的 0.160.0 runtime 导出的 `McpServerElicitationRequestParams.json` definitions，快照在 `src/samaya/codex/mcp_form_schema.json`；`jsonschema[format-nongpl]==4.26.0` 执行服务端类型、边界和格式校验。仅支持标准类型，不加载远程 Schema 引用。不声明 OpenAI 扩展表单能力；未知模式可拒绝／取消，不伪造加密验证。Codex 实际也用空 form 加 `_meta.codex_approval_kind=mcp_tool_call` 发起工具审批，界面以“允许本次”区分。
+标准表单 Schema 真源为安装的 0.160.0 runtime 导出的 `McpServerElicitationRequestParams.json` definitions，快照在 `src/samaya/decisions/mcp_form_schema.json`；`jsonschema[format-nongpl]==4.26.0` 执行服务端类型、边界和格式校验。仅支持标准类型，不加载远程 Schema 引用。不声明 OpenAI 扩展表单能力；未知模式可拒绝／取消，不伪造加密验证。Codex 实际也用空 form 加 `_meta.codex_approval_kind=mcp_tool_call` 发起工具审批，界面以“允许本次”区分。
 
 请求身份包含连接代次及原始 ID 类型；MCP 请求不随轮次结束清除，支持 `turnId: null`。同 ID 重复事件保留原有提交状态。服务端 resolved 通知或确定的响应提交会清除请求；响应丢失后保留 uncertain，后端拒绝再次响应。浏览器刷新读取内存快照；Python／桥接重连后的旧请求不能重放。
 

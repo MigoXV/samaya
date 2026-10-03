@@ -4,19 +4,19 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from samaya.codex.service import CodexService
 from samaya.config import Settings
+from samaya.runtime import Runtime
 from samaya.store import Store
 
 
 @pytest.fixture
 def service(tmp_path):
     store = Store(tmp_path)
-    s = CodexService(Settings(data_dir=tmp_path, roots=[tmp_path]), store)
-    s.connection = "connected"
-    s.generation = 1
-    s.connection_id = "connection-one"
-    s.adapter = object()
+    s = Runtime(Settings(data_dir=tmp_path, roots=[tmp_path]), store)
+    s.connection.state = "connected"
+    s.connection.generation = 1
+    s.connection.connection_id = "connection-one"
+    s.connection.adapter = object()
     yield s
     store.close()
 
@@ -39,8 +39,8 @@ def record(turn="current", status="inProgress"):
 
 def test_old_turn_events_cannot_resurrect_completed_task(service):
     m = service.monitor
-    m.records["a"] = record(status="completed")
-    before = copy.deepcopy(m.records["a"])
+    m.projection.records["a"] = record(status="completed")
+    before = copy.deepcopy(m.projection.records["a"])
     for turn in ["old", "current"]:
         m.event(
             {
@@ -57,12 +57,12 @@ def test_old_turn_events_cannot_resurrect_completed_task(service):
             "params": {"threadId": "a", "status": {"type": "active"}},
         }
     )
-    assert m.records["a"] == before
+    assert m.projection.records["a"] == before
 
 
 def test_duplicate_completion_has_one_change(service):
     m = service.monitor
-    m.records["a"] = record()
+    m.projection.records["a"] = record()
     event = {
         "method": "turn/completed",
         "params": {
@@ -72,26 +72,26 @@ def test_duplicate_completion_has_one_change(service):
     }
     m.event(event)
     m.event(event)
-    assert len(m.changes) == 1
-    assert m.records["a"]["turn"]["status"] == "completed"
+    assert len(m.projection.changes) == 1
+    assert m.projection.records["a"]["turn"]["status"] == "completed"
 
 
 def test_disconnect_preserves_execution_and_unknown_request(service):
     m = service.monitor
-    m.records["a"] = record()
-    service.pending["private"] = {
+    m.projection.records["a"] = record()
+    service.decisions.pending["private"] = {
         "params": {"threadId": "a", "secret": "not journaled"}
     }
-    service.connection = "disconnected"
+    service.connection.state = "disconnected"
     m.event({"method": "samaya/connection"})
-    assert m.records["a"]["turn"]["status"] == "inProgress"
-    assert m.records["a"]["requestsUnknown"] == 1
-    assert m.records["a"]["error"]
+    assert m.projection.records["a"]["turn"]["status"] == "inProgress"
+    assert m.projection.records["a"]["requestsUnknown"] == 1
+    assert m.projection.records["a"]["error"]
 
 
 async def test_poll_snapshot_cannot_overwrite_newer_completion(service):
     m = service.monitor
-    m.records["a"] = record()
+    m.projection.records["a"] = record()
     started, release = asyncio.Event(), asyncio.Event()
 
     async def rpc(method, params):
@@ -101,8 +101,8 @@ async def test_poll_snapshot_cannot_overwrite_newer_completion(service):
             return {"thread": record()["thread"]}
         return {"data": []}
 
-    service.rpc = AsyncMock(side_effect=rpc)
-    service.turns = AsyncMock(return_value={"data": [record()["turn"]]})
+    service.connection.rpc = AsyncMock(side_effect=rpc)
+    service.sessions.turns = AsyncMock(return_value={"data": [record()["turn"]]})
     task = asyncio.create_task(m.refresh("a"))
     await started.wait()
     m.event(
@@ -116,32 +116,32 @@ async def test_poll_snapshot_cannot_overwrite_newer_completion(service):
     )
     release.set()
     await task
-    assert m.records["a"]["turn"]["status"] == "interrupted"
+    assert m.projection.records["a"]["turn"]["status"] == "interrupted"
 
 
 async def test_catalog_includes_loaded_ephemeral_and_no_filter(service):
     m = service.monitor
-    service.threads = AsyncMock(
+    service.sessions.threads = AsyncMock(
         side_effect=[
             {"data": [record()["thread"]], "nextCursor": "page2"},
             {"data": [{"id": "b", "cwd": "/different", "status": {"type": "idle"}}]},
         ]
     )
-    service.rpc = AsyncMock(
+    service.connection.rpc = AsyncMock(
         side_effect=[{"data": ["a"], "nextCursor": "loaded2"}, {"data": ["ephemeral"]}]
     )
     ids = await m.catalog()
     assert ids == {"a", "b", "ephemeral"}
     assert m.initialized
-    assert service.threads.await_count == 2
+    assert service.sessions.threads.await_count == 2
     assert m.loaded == {"a", "ephemeral"}
 
 
 async def test_monitor_cache_and_private_requests_never_enter_database(service):
     m = service.monitor
-    m.records["a"] = record()
-    m.dirty.add("a")
-    service.pending["private"] = {"params": {"url": "secret-url"}}
+    m.projection.records["a"] = record()
+    m.projection.dirty.add("a")
+    service.decisions.pending["private"] = {"params": {"url": "secret-url"}}
     task = asyncio.create_task(m.flush())
     await asyncio.sleep(0.3)
     task.cancel()
@@ -152,7 +152,7 @@ async def test_monitor_cache_and_private_requests_never_enter_database(service):
 
 
 async def test_steer_rejects_changed_turn_without_resubmission(service, tmp_path):
-    service.read = AsyncMock(
+    service.sessions.read = AsyncMock(
         return_value={
             "thread": {
                 **record()["thread"],
@@ -161,20 +161,20 @@ async def test_steer_rejects_changed_turn_without_resubmission(service, tmp_path
             }
         }
     )
-    service.rpc = AsyncMock()
-    r = await service.execute(
+    service.connection.rpc = AsyncMock()
+    r = await service.operations.execute(
         "steer-once",
         "steer",
         {"threadId": "a", "text": "extra instruction", "expectedTurnId": "old"},
     )
     assert r["state"] == "failed"
-    service.rpc.assert_not_called()
-    r = await service.execute(
+    service.connection.rpc.assert_not_called()
+    r = await service.operations.execute(
         "steer-current",
         "steer",
         {"threadId": "a", "text": "extra instruction", "expectedTurnId": "current"},
     )
-    service.rpc.assert_awaited_once_with(
+    service.connection.rpc.assert_awaited_once_with(
         "turn/steer",
         {
             "threadId": "a",
@@ -187,10 +187,10 @@ async def test_steer_rejects_changed_turn_without_resubmission(service, tmp_path
 async def test_legacy_item_history_uses_official_read_fallback(service):
     from openai_codex.errors import JsonRpcError
 
-    service.rpc = AsyncMock(
+    service.connection.rpc = AsyncMock(
         side_effect=JsonRpcError(-32601, "thread/items/list is not supported yet")
     )
-    service.read = AsyncMock(
+    service.sessions.read = AsyncMock(
         return_value={
             "thread": {
                 "turns": [
@@ -205,18 +205,18 @@ async def test_legacy_item_history_uses_official_read_fallback(service):
             }
         }
     )
-    first = await service.items("a", "current", limit=2)
+    first = await service.sessions.items("a", "current", limit=2)
     assert [r["item"]["id"] for r in first["data"]] == ["3", "2"]
-    second = await service.items("a", "current", first["nextCursor"], limit=2)
+    second = await service.sessions.items("a", "current", first["nextCursor"], limit=2)
     assert [r["item"]["id"] for r in second["data"]] == ["1", "0"]
     assert second["nextCursor"] is None
-    assert service.rpc.await_count == 1
-    assert service.read.await_count == 2
+    assert service.connection.rpc.await_count == 1
+    assert service.sessions.read.await_count == 2
 
 
 def test_turn_summary_keeps_native_plan_and_isolates_old_events(service):
     m = service.monitor
-    m.records["a"] = record()
+    m.projection.records["a"] = record()
     m.event(
         {
             "method": "turn/plan/updated",
@@ -228,7 +228,7 @@ def test_turn_summary_keeps_native_plan_and_isolates_old_events(service):
             },
         }
     )
-    before = copy.deepcopy(m.records["a"])
+    before = copy.deepcopy(m.projection.records["a"])
     m.event(
         {
             "method": "turn/plan/updated",
@@ -239,7 +239,7 @@ def test_turn_summary_keeps_native_plan_and_isolates_old_events(service):
             },
         }
     )
-    assert m.records["a"] == before
+    assert m.projection.records["a"] == before
     assert (
         m.turn_summary("a", "current")["plan"]["steps"][0]["step"] == "run regression"
     )
@@ -248,7 +248,7 @@ def test_turn_summary_keeps_native_plan_and_isolates_old_events(service):
 
 async def test_full_diff_on_demand_only_and_disconnect_invalidates(service):
     m = service.monitor
-    m.records["a"] = record()
+    m.projection.records["a"] = record()
     await service.publish(
         {
             "method": "turn/diff/updated",
@@ -259,26 +259,28 @@ async def test_full_diff_on_demand_only_and_disconnect_invalidates(service):
             },
         }
     )
-    summary = await service.turn_summary("a", "current")
+    summary = service.monitor.turn_summary("a", "current")
     assert summary["diff"] == "private-diff" * 1000
     assert "private-diff" not in str(m.snapshot())
     assert "private-diff" not in str(service.store.events(0))
     summary["diff"] = "modified"
     assert m.turn_summary("a", "current")["diff"] != "modified"
-    service.connection = "disconnected"
+    service.connection.state = "disconnected"
     m.event({"method": "samaya/connection"})
     assert m.turn_summary("a", "current")["diff"] is None
-    assert m.records["a"]["turn"]["status"] == "inProgress"
+    assert m.projection.records["a"]["turn"]["status"] == "inProgress"
 
 
 def test_summary_cache_is_bounded_and_oversize_is_explicitly_unavailable(service):
     m = service.monitor
     for i in range(110):
-        m.observe_summary("a", str(i), "turn/diff/updated", {"diff": "x"})
-    assert len(m.summaries) == 100
+        m.projection.observe_summary("a", str(i), "turn/diff/updated", {"diff": "x"})
+    assert len(m.projection.summaries) == 100
     assert m.turn_summary("a", "0")["notice"]
-    m.observe_summary("a", "huge", "turn/diff/updated", {"diff": "x" * 8_000_001})
-    assert not m.summaries
+    m.projection.observe_summary(
+        "a", "huge", "turn/diff/updated", {"diff": "x" * 8_000_001}
+    )
+    assert not m.projection.summaries
     assert m.turn_summary("a", "huge")["notice"]
 
 
@@ -286,7 +288,7 @@ async def test_first_plan_before_new_turn_read_is_retained_without_reviving_old_
     service,
 ):
     m = service.monitor
-    m.records["a"] = record(status="completed")
+    m.projection.records["a"] = record(status="completed")
     m.event(
         {
             "method": "turn/plan/updated",
@@ -297,11 +299,13 @@ async def test_first_plan_before_new_turn_read_is_retained_without_reviving_old_
             },
         }
     )
-    assert m.records["a"]["turn"]["id"] == "current"
-    assert m.records["a"]["turn"]["status"] == "completed"
-    service.rpc = AsyncMock(return_value={"thread": record()["thread"]})
-    service.turns = AsyncMock(return_value={"data": [record(turn="new")["turn"]]})
-    service.items = AsyncMock(return_value={"data": []})
+    assert m.projection.records["a"]["turn"]["id"] == "current"
+    assert m.projection.records["a"]["turn"]["status"] == "completed"
+    service.connection.rpc = AsyncMock(return_value={"thread": record()["thread"]})
+    service.sessions.turns = AsyncMock(
+        return_value={"data": [record(turn="new")["turn"]]}
+    )
+    service.sessions.items = AsyncMock(return_value={"data": []})
     await m.refresh("a")
-    assert m.records["a"]["turn"]["id"] == "new"
-    assert m.records["a"]["plan"]["steps"][0]["step"] == "verify"
+    assert m.projection.records["a"]["turn"]["id"] == "new"
+    assert m.projection.records["a"]["plan"]["steps"][0]["step"] == "verify"

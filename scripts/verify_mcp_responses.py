@@ -6,8 +6,8 @@ import sys
 import uuid
 from pathlib import Path
 
-from samaya.codex.service import CodexService
 from samaya.config import Settings
+from samaya.runtime import Runtime
 from samaya.store import Store
 
 BASE = Path(__file__).resolve().parents[1] / ".samaya/acceptance/mcp-responses"
@@ -17,12 +17,12 @@ async def main():
     BASE.mkdir(parents=True, exist_ok=True)
     (BASE / "calls.jsonl").unlink(missing_ok=True)
     store = Store(BASE / "state")
-    service = CodexService(Settings(data_dir=BASE / "state"), store)
+    service = Runtime(Settings(data_dir=BASE / "state"), store)
     report = {"cases": []}
     await service.start()
     try:
-        await asyncio.wait_for(service.ready.wait(), 20)
-        r = await service.rpc(
+        await asyncio.wait_for(service.connection.ready.wait(), 20)
+        r = await service.connection.rpc(
             "thread/start",
             {
                 "cwd": str(BASE),
@@ -42,13 +42,13 @@ async def main():
         )
         tid = r["thread"]["id"]
         report["threadId"] = tid
-        await service.rpc(
+        await service.connection.rpc(
             "thread/name/set",
             {"threadId": tid, "name": "Samaya MCP 独立请求验收 · 可删除"},
         )
         for action in ["decline", "cancel"]:
             call = asyncio.create_task(
-                service.rpc(
+                service.connection.rpc(
                     "mcpServer/tool/call",
                     {
                         "threadId": tid,
@@ -63,7 +63,7 @@ async def main():
             for _ in range(200):
                 if call.done():
                     break
-                for key, req in list(service.pending.items()):
+                for key, req in list(service.decisions.pending.items()):
                     if key in seen or req["params"]["threadId"] != tid:
                         continue
                     seen.add(key)
@@ -81,9 +81,11 @@ async def main():
                         },
                     }
                     opid = uuid.uuid4().hex
-                    result = await service.execute(opid, "respond", body)
+                    result = await service.operations.execute(opid, "respond", body)
                     assert result["state"] == "succeeded", result
-                    assert (await service.execute(opid, "respond", body)) == result
+                    assert (
+                        await service.operations.execute(opid, "respond", body)
+                    ) == result
                     if business:
                         answered = True
                 await asyncio.sleep(0.1)
@@ -100,9 +102,9 @@ async def main():
                 }
             )
         # Drop only this test client's bridge while a standalone input is pending.
-        generation = service.generation
+        generation = service.connection.generation
         call = asyncio.create_task(
-            service.rpc(
+            service.connection.rpc(
                 "mcpServer/tool/call",
                 {
                     "threadId": tid,
@@ -114,11 +116,11 @@ async def main():
         )
         stale = None
         for _ in range(200):
-            for key, req in list(service.pending.items()):
+            for key, req in list(service.decisions.pending.items()):
                 if req["params"].get("requestedSchema", {}).get("properties"):
                     stale = key
                     break
-                await service.execute(
+                await service.operations.execute(
                     uuid.uuid4().hex,
                     "respond",
                     {
@@ -131,14 +133,17 @@ async def main():
                 break
             await asyncio.sleep(0.1)
         assert stale
-        await service.adapter.close()
+        await service.connection.adapter.close()
         await asyncio.gather(call, return_exceptions=True)
         for _ in range(200):
-            if service.generation > generation and service.connection == "connected":
+            if (
+                service.connection.generation > generation
+                and service.connection.state == "connected"
+            ):
                 break
             await asyncio.sleep(0.1)
-        assert service.generation > generation
-        result = await service.execute(
+        assert service.connection.generation > generation
+        result = await service.operations.execute(
             uuid.uuid4().hex,
             "respond",
             {
