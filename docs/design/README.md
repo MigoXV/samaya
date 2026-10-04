@@ -1,3 +1,5 @@
+当前 Figma 按功能整理为 16 页，同类界面白垣在左、苍渊在右，交互状态纵向排列。总览任务入口采用「进入对话」文字控件。最新 [页面与画板索引](figma-paired-themes.json) 和 [界面说明](../chat-workspace-v5.md) 已更新。下文保留历史设计演进记录。
+
 # Samaya 设计交付
 
 先完成 [Figma 设计文件](https://www.figma.com/design/qaGSrQhakH253tizxKkoae)，再开始产品代码。

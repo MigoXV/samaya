@@ -1,0 +1,34 @@
+{
+  "demonstration": true,
+  "projects": 3,
+  "topLevelTasks": 32,
+  "checks": [
+    "recent20",
+    "pin-scope",
+    "outside-request",
+    "stable-order",
+    "manual-update",
+    "selected-outside-scope",
+    "recent10-persistence",
+    "filter-before-limit",
+    "continuous-item-identity",
+    "completion-replaces-stream",
+    "duplicate-event-sequence",
+    "IME",
+    "keyboard-submit",
+    "fixed-footer",
+    "refresh-no-resubmit"
+  ],
+  "layout": [
+    {
+      "width": 390,
+      "overflow": false,
+      "composerVisible": true
+    },
+    {
+      "width": 320,
+      "overflow": false,
+      "composerVisible": true
+    }
+  ]
+}

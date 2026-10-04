@@ -1,0 +1,11 @@
+{
+  "connection": "connected",
+  "records": 550,
+  "confirmed": 550,
+  "previousActivePresent": true,
+  "activeStatuses": [
+    "inProgress",
+    "inProgress"
+  ],
+  "outsideDirectory": "/tmp"
+}

@@ -1,0 +1,11 @@
+{
+  "http": 200,
+  "connection": "connected",
+  "sdkVersion": "0.160.0",
+  "catalogReferences": 56,
+  "catalogCommands": 62,
+  "catalogErrors": [
+    "应用目录当前不可用（服务端访问失败）；技能和普通输入仍可使用。"
+  ],
+  "monitorAvailable": true
+}

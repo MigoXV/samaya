@@ -1,5 +1,5 @@
 import { chromium } from "@playwright/test";
-import { fixture, install } from "./monitor-fixture.mjs";
+import { fixture, install, returnToOverview } from "./monitor-fixture.mjs";
 import { mkdirSync } from "node:fs";
 const b = await chromium.launch({ args: ["--no-sandbox"] }),
   c = await b.newContext({ viewport: { width: 1440, height: 900 } });
@@ -10,11 +10,11 @@ await p.getByRole("list").waitFor();
 const dir = "../../docs/design/previews/workflow-v3";
 mkdirSync(dir, { recursive: true });
 for (const theme of ["vallum", "abyssus"]) {
-  await p.getByLabel("界面主题", { exact: true }).selectOption(theme);
+  await p.evaluate((value) => window.samayaTheme.setPreference(value), theme);
   await p.screenshot({ path: `${dir}/desktop-${theme}.png` });
   await p.locator('[data-task-id="demo-0"] .task-open').click();
   await p.screenshot({ path: `${dir}/detail-${theme}.png` });
-  await p.getByRole("button", { name: "返回列表", exact: true }).click();
+  await returnToOverview(p);
   await p.setViewportSize({ width: 390, height: 844 });
   await p.screenshot({ path: `${dir}/mobile-${theme}.png` });
   await p

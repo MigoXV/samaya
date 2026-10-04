@@ -1,0 +1,107 @@
+.inline-decision {
+  margin: 24px 0;
+}
+.decision-request {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+.decision-request .decision-status {
+  margin: 0;
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--text-secondary);
+}
+.decision-request form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.decision-request fieldset {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.decision-request legend {
+  width: 100%;
+  margin: 0 0 12px;
+  padding: 0;
+  font-size: 16px;
+  font-weight: 500;
+  line-height: 24px;
+}
+.decision-request .decision-option {
+  display: flex;
+  flex-direction: row;
+  align-items: start;
+  gap: 10px;
+  min-height: 48px;
+  margin: 0;
+  padding: 6px 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  cursor: pointer;
+}
+.decision-option input {
+  position: absolute;
+  opacity: 0;
+  width: 18px;
+  height: 18px;
+  margin: 0;
+}
+.decision-option:has(input:focus-visible) {
+  outline: 2px solid var(--accent-strong);
+  outline-offset: 2px;
+}
+.decision-option:has(input:disabled) {
+  opacity: 0.6;
+  cursor: default;
+}
+.decision-option:hover {
+  background: var(--hover);
+}
+.decision-option img {
+  flex: none;
+}
+.decision-option .decision-label {
+  display: block;
+  font-size: 14px;
+  line-height: 20px;
+}
+.decision-option:has(input:checked) .decision-label {
+  font-weight: 500;
+}
+.monitor-shell .decision-option small {
+  display: block;
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 16px;
+}
+.decision-custom {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-top: 8px;
+}
+.monitor-shell .decision-confirm {
+  align-self: start;
+  width: 88px;
+  min-height: 36px;
+  height: 36px;
+  padding: 4px 0;
+  border: 0;
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 14px;
+  text-align: left;
+}
+[data-theme="abyssus"] .decision-option img {
+  filter: invert(1);
+}
+.decision-request {
+  max-width: 560px;
+}

@@ -1,0 +1,35 @@
+{
+  "catalog": {
+    "skills": 57,
+    "errors": [
+      "应用目录当前不可用（服务端访问失败）；技能和普通输入仍可使用。"
+    ]
+  },
+  "model_context": "ok",
+  "reasoning_context": "ok",
+  "fast_context": "ok",
+  "plan_context": "ok",
+  "permissions_context": "ok",
+  "memories_context": "ok",
+  "rename_context": "ok",
+  "goal_context": "ok",
+  "mcp_context": "ok",
+  "hooks_context": "ok",
+  "plugins_context": "ok",
+  "review_context": "ok",
+  "fork_context": "ok",
+  "side_context": "ok",
+  "rename_execute": "ok",
+  "memories_execute": "ok",
+  "fast_execute": "ok",
+  "plan_execute": "ok",
+  "permissions_execute": "ok",
+  "skill_turn": {
+    "status": "completed",
+    "messages": [
+      "SAMAYA_SKILL_OK"
+    ]
+  },
+  "fork_execute": "ok",
+  "side_execute": "ok"
+}

@@ -1,0 +1,10 @@
+{
+  "logCharacters": 181005,
+  "events": 1000,
+  "durationMs": 10001,
+  "selectedTextPreserved": true,
+  "scrollPreserved": true,
+  "renderedRows": 20,
+  "compactRowHeight": 128,
+  "overflow": false
+}

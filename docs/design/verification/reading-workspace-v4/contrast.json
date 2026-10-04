@@ -1,0 +1,134 @@
+[
+  {
+    "theme": "vallum",
+    "ratios": {
+      "text": [
+        {
+          "selector": ".task-row.is-selected .task-identity small",
+          "ratio": 11.815550174094204
+        },
+        {
+          "selector": ".task-row.is-selected .fact",
+          "ratio": 11.815550174094204
+        },
+        {
+          "selector": ".request-action small",
+          "ratio": 11.815550174094204
+        },
+        {
+          "selector": ".detail-state",
+          "ratio": 5.01691591105987
+        },
+        {
+          "selector": ".task-heading h1",
+          "ratio": 13.564747866178628
+        },
+        {
+          "selector": ".task-row:not(.is-selected) .fact",
+          "ratio": 4.761531359367399
+        },
+        {
+          "selector": ".task-row:not(.is-selected) .task-identity small",
+          "ratio": 4.761531359367399
+        },
+        {
+          "selector": ".history-view .eyebrow",
+          "ratio": 13.564747866178628
+        },
+        {
+          "selector": ".history-view .tool summary",
+          "ratio": 12.308777079384754
+        },
+        {
+          "selector": ".message.user .prose",
+          "ratio": 13.564747866178628
+        },
+        {
+          "selector": ".composer-shortcut",
+          "ratio": 5.01691591105987
+        }
+      ],
+      "controls": [
+        {
+          "selector": ".monitor-filters input",
+          "ratio": 3.012271087114181
+        },
+        {
+          "selector": ".monitor-filters select",
+          "ratio": 3.012271087114181
+        },
+        {
+          "selector": ".task-heading .global-pending",
+          "ratio": 4.894878528388426
+        }
+      ]
+    },
+    "axe": []
+  },
+  {
+    "theme": "abyssus",
+    "ratios": {
+      "text": [
+        {
+          "selector": ".task-row.is-selected .task-identity small",
+          "ratio": 12.34303036890194
+        },
+        {
+          "selector": ".task-row.is-selected .fact",
+          "ratio": 12.34303036890194
+        },
+        {
+          "selector": ".request-action small",
+          "ratio": 12.34303036890194
+        },
+        {
+          "selector": ".detail-state",
+          "ratio": 9.69336173130228
+        },
+        {
+          "selector": ".task-heading h1",
+          "ratio": 16.92593993629036
+        },
+        {
+          "selector": ".task-row:not(.is-selected) .fact",
+          "ratio": 9.405662216951455
+        },
+        {
+          "selector": ".task-row:not(.is-selected) .task-identity small",
+          "ratio": 9.405662216951455
+        },
+        {
+          "selector": ".history-view .eyebrow",
+          "ratio": 16.92593993629036
+        },
+        {
+          "selector": ".history-view .tool summary",
+          "ratio": 14.382907101525173
+        },
+        {
+          "selector": ".message.user .prose",
+          "ratio": 16.92593993629036
+        },
+        {
+          "selector": ".composer-shortcut",
+          "ratio": 9.69336173130228
+        }
+      ],
+      "controls": [
+        {
+          "selector": ".monitor-filters input",
+          "ratio": 5.497866984164855
+        },
+        {
+          "selector": ".monitor-filters select",
+          "ratio": 5.497866984164855
+        },
+        {
+          "selector": ".task-heading .global-pending",
+          "ratio": 12.586379286927334
+        }
+      ]
+    },
+    "axe": []
+  }
+]

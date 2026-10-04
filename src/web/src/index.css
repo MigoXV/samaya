@@ -1,7 +1,9 @@
 @import "./tokens.css";
 :root {
-  font-family:
-    "Noto Sans SC", "Microsoft YaHei", "PingFang SC", system-ui, sans-serif;
+  --font-ui:
+    "Microsoft YaHei", "微软雅黑", "Microsoft YaHei UI", "PingFang SC",
+    "Noto Sans SC", system-ui, sans-serif;
+  font-family: var(--font-ui);
   font-synthesis: none;
   font-size: 14px;
   line-height: 1.7;

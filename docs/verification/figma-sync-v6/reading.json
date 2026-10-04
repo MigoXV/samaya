@@ -1,0 +1,68 @@
+{
+  "demonstration": true,
+  "layouts": [
+    {
+      "theme": "vallum",
+      "width": 1440,
+      "mode": "work",
+      "readingHeight": 604
+    },
+    {
+      "theme": "vallum",
+      "width": 1440,
+      "mode": "focus",
+      "readingHeight": 604
+    },
+    {
+      "theme": "vallum",
+      "width": 1366,
+      "mode": "work",
+      "readingHeight": 604
+    },
+    {
+      "theme": "vallum",
+      "width": 1366,
+      "mode": "focus",
+      "readingHeight": 604
+    },
+    {
+      "theme": "abyssus",
+      "width": 1440,
+      "mode": "work",
+      "readingHeight": 604
+    },
+    {
+      "theme": "abyssus",
+      "width": 1440,
+      "mode": "focus",
+      "readingHeight": 604
+    },
+    {
+      "theme": "abyssus",
+      "width": 1366,
+      "mode": "work",
+      "readingHeight": 604
+    },
+    {
+      "theme": "abyssus",
+      "width": 1366,
+      "mode": "focus",
+      "readingHeight": 604
+    }
+  ],
+  "noMutations": true,
+  "errors": [],
+  "checks": [
+    "recent-scope-not-monitor-scope",
+    "no-duplicate-requirement",
+    "command-collapsed",
+    "same-reader-and-subscriptions",
+    "draft-and-scroll-restore",
+    "dialog-focus-return",
+    "drawer-escape",
+    "dual-theme-axe",
+    "320-390-overflow",
+    "reduced-viewport-editor",
+    "disconnect-no-resubmit"
+  ]
+}

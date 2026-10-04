@@ -5,6 +5,7 @@ export function useMonitor() {
   const [data, setData] = useState<MonitorSnapshot | null>(null),
     [records, setRecords] = useState(new Map<string, Observation>()),
     [online, setOnline] = useState(false),
+    [disconnected, setDisconnected] = useState(false),
     [recovering, setRecovering] = useState(true),
     [error, setError] = useState("");
   const current = useRef<MonitorSnapshot | null>(null),
@@ -93,8 +94,12 @@ export function useMonitor() {
     alive.current = true;
     queueMicrotask(() => void refresh());
     const es = new EventSource("/api/events");
-    es.onopen = () => setOnline(true);
+    es.onopen = () => {
+      setOnline(true);
+      setDisconnected(false);
+    };
     es.onerror = () => {
+      setDisconnected(true);
       setOnline(false);
       setRecovering(true);
     };
@@ -139,5 +144,12 @@ export function useMonitor() {
       clearInterval(timer);
     };
   }, [refresh, install]);
-  return { data, records, online: online && !recovering, error, refresh };
+  return {
+    data,
+    records,
+    online: online && !recovering,
+    disconnected,
+    error,
+    refresh,
+  };
 }

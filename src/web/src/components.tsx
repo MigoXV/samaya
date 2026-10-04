@@ -2,9 +2,11 @@ import { useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import { ToolSummary } from "./ToolSummary";
 import { api } from "./api";
 import type { Item, Pending } from "./types";
 import { McpRequest, McpTool } from "./mcp";
+import "./decision.css";
 
 export function Modal({
   title,
@@ -18,8 +20,10 @@ export function Modal({
   const ref = useRef<HTMLDialogElement>(null);
   useEffect(() => {
     const previous = document.activeElement as HTMLElement | null;
-    ref.current?.showModal();
+    const dialog = ref.current;
+    dialog?.showModal();
     return () => {
+      dialog?.close();
       previous?.focus();
     };
   }, []);
@@ -110,6 +114,46 @@ export function DirectoryPicker({
     </div>
   );
 }
+function MarkdownPre({ children }: { children?: ReactNode }) {
+  return (
+    <pre tabIndex={0} aria-label="代码">
+      {children}
+    </pre>
+  );
+}
+function MarkdownTable({ children }: { children?: ReactNode }) {
+  return <table tabIndex={0}>{children}</table>;
+}
+const markdownComponents = { pre: MarkdownPre, table: MarkdownTable };
+function AgentReply({ item }: { item: Item }) {
+  const [notice, setNotice] = useState("");
+  return (
+    <section className="message">
+      <div className="eyebrow">Codex</div>
+      <div className="markdown">
+        <Markdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
+          {item.text || ""}
+        </Markdown>
+      </div>
+      <div className="response-actions">
+        <button
+          className="quiet"
+          aria-label="复制这条回复"
+          onClick={() => {
+            void navigator.clipboard
+              .writeText(item.text || "")
+              .then(() => setNotice("已复制"))
+              .catch(() => setNotice("复制失败，请选择正文复制"));
+          }}
+        >
+          <img src="/figma/copy.svg" alt="" />
+        </button>
+        <small role="status">{notice}</small>
+      </div>
+    </section>
+  );
+}
+
 export function ItemView({
   item,
   progress,
@@ -124,46 +168,13 @@ export function ItemView({
       <section className="message user">
         <div className="eyebrow">你</div>
         <div className="prose">
-          {item.content?.map((c) => c.text || "").join("\n")}
+          {item.content?.map((c) => c.text || "").join("\n") || item.text}
         </div>
       </section>
     );
-  if (item.type === "agentMessage")
-    return (
-      <section className="message">
-        <div className="eyebrow">Codex</div>
-        <div className="markdown">
-          <Markdown remarkPlugins={[remarkGfm]}>{item.text || ""}</Markdown>
-        </div>
-      </section>
-    );
+  if (item.type === "agentMessage") return <AgentReply item={item} />;
   if (item.type === "reasoning") return null;
-  if (item.type === "commandExecution")
-    return (
-      <details
-        className="tool"
-        open={
-          item.status === "inProgress" ||
-          (item.exitCode != null && item.exitCode !== 0)
-            ? true
-            : undefined
-        }
-      >
-        <summary>
-          <span>命令</span>
-          <code>{item.command}</code>
-          <small>
-            {item.status === "inProgress"
-              ? "执行中"
-              : item.exitCode === 0
-                ? "已完成"
-                : item.status || "状态未知"}
-          </small>
-        </summary>
-        <p className="muted">{item.cwd}</p>
-        <pre>{item.aggregatedOutput || "尚无可用输出"}</pre>
-      </details>
-    );
+  if (item.type === "commandExecution") return <CommandRecord item={item} />;
   if (item.type === "fileChange")
     return (
       <details className="tool">
@@ -171,7 +182,7 @@ export function ItemView({
         {item.changes?.map((c) => (
           <div key={c.path}>
             <p>{c.path}</p>
-            <pre>{c.diff || "服务端未提供结构化差异"}</pre>
+            <pre tabIndex={0}>{c.diff || "服务端未提供结构化差异"}</pre>
           </div>
         ))}
       </details>
@@ -181,7 +192,9 @@ export function ItemView({
       <details className="tool">
         <summary>执行计划</summary>
         <div className="markdown">
-          <Markdown remarkPlugins={[remarkGfm]}>{item.text || ""}</Markdown>
+          <Markdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
+            {item.text || ""}
+          </Markdown>
         </div>
       </details>
     );
@@ -237,8 +250,17 @@ export function RequestForm({
       "item/fileChange/requestApproval",
     ].includes(request.method);
   return (
-    <section className="request-panel" aria-label="等待你的输入">
-      <h3>{questions ? "Codex 需要你的输入" : "等待审批"}</h3>
+    <section
+      className={questions ? "decision-request" : "request-panel"}
+      aria-label={
+        questions?.map((q) => q.question).join("；") || "等待你的输入"
+      }
+    >
+      {questions ? (
+        <p className="decision-status">◌ 等待你的决定</p>
+      ) : (
+        <h3>等待审批</h3>
+      )}
       {request.params.reason && <p>{request.params.reason}</p>}
       {request.params.command && <pre>{request.params.command}</pre>}
       {request.params.cwd && <p className="muted">{request.params.cwd}</p>}
@@ -260,34 +282,51 @@ export function RequestForm({
             <fieldset key={q.id} disabled={busy}>
               <legend>{q.question}</legend>
               {q.options?.map((o) => (
-                <label className="option" key={o.label}>
+                <label className="decision-option" key={o.label}>
                   <input
                     type="radio"
                     name={q.id}
                     checked={answers[q.id] === o.label}
                     onChange={() => setAnswers({ ...answers, [q.id]: o.label })}
                   />
+                  <img
+                    src={
+                      answers[q.id] === o.label
+                        ? "/figma/decision-check.svg"
+                        : "/figma/decision-circle.svg"
+                    }
+                    alt=""
+                  />
                   <span>
-                    {o.label}
+                    <span className="decision-label">{o.label}</span>
                     <small>{o.description}</small>
                   </span>
                 </label>
               ))}
-              <label>
-                你的回答
-                <input
-                  type={q.isSecret ? "password" : "text"}
-                  value={answers[q.id] || ""}
-                  onChange={(e) =>
-                    setAnswers({ ...answers, [q.id]: e.target.value })
-                  }
-                  required
-                />
-              </label>
+              <details
+                className="decision-custom"
+                open={!q.options?.length || q.isSecret}
+              >
+                <summary>其他回答</summary>
+                <label>
+                  你的回答
+                  <input
+                    type={q.isSecret ? "password" : "text"}
+                    value={answers[q.id] || ""}
+                    onChange={(e) =>
+                      setAnswers({ ...answers, [q.id]: e.target.value })
+                    }
+                    required={!answers[q.id]}
+                  />
+                </label>
+              </details>
             </fieldset>
           ))}
-          <button className="primary" disabled={busy}>
-            提交回答
+          <button
+            className="decision-confirm"
+            disabled={busy || questions.some((q) => !answers[q.id]?.trim())}
+          >
+            确认 →
           </button>
         </form>
       ) : supported ? (
@@ -338,5 +377,39 @@ export function RequestForm({
         </p>
       )}
     </section>
+  );
+}
+
+function CommandRecord({ item }: { item: Item }) {
+  const key = "samaya.tool." + item.id;
+  const [open, setOpen] = useState(
+    () => sessionStorage.getItem(key) === "open",
+  );
+  return (
+    <details
+      className="tool command-record"
+      open={open}
+      onToggle={(e) => {
+        const next = e.currentTarget.open;
+        setOpen(next);
+        sessionStorage.setItem(key, next ? "open" : "closed");
+      }}
+    >
+      <summary>
+        <ToolSummary
+          item={item}
+          label={item.command?.replace(/\s+/g, " ").trim() || "命令执行"}
+        />
+      </summary>
+      <div className="tool-output">
+        <pre tabIndex={0} className="command-source" aria-label="完整命令">
+          {item.command || "服务端未提供命令"}
+        </pre>
+        {item.cwd && <p className="muted">启动目录：{item.cwd}</p>}
+        <pre tabIndex={0} aria-label="命令输出">
+          {item.aggregatedOutput || "尚无可用输出"}
+        </pre>
+      </div>
+    </details>
   );
 }

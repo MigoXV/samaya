@@ -1,0 +1,11 @@
+{
+  "realRuntime": true,
+  "connection": "connected",
+  "records": 550,
+  "confirmed": 550,
+  "nativeParentLinks": 25,
+  "historyVisible": true,
+  "selectionRestored": true,
+  "operationsSubmitted": 0,
+  "errors": []
+}

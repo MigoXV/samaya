@@ -1,0 +1,87 @@
+{
+  "errors": [],
+  "dimensions": [
+    {
+      "height": 56,
+      "status": true
+    },
+    {
+      "height": 56,
+      "status": true
+    },
+    {
+      "height": 56,
+      "status": true
+    },
+    {
+      "height": 56,
+      "status": true
+    },
+    {
+      "height": 56,
+      "status": true
+    },
+    {
+      "height": 56,
+      "status": true
+    },
+    {
+      "height": 56,
+      "status": true
+    },
+    {
+      "height": 56,
+      "status": true
+    },
+    {
+      "height": 36,
+      "status": false
+    },
+    {
+      "height": 56,
+      "status": true
+    },
+    {
+      "height": 56,
+      "status": true
+    },
+    {
+      "height": 56,
+      "status": true
+    },
+    {
+      "height": 36,
+      "status": false
+    },
+    {
+      "height": 56,
+      "status": true
+    },
+    {
+      "height": 36,
+      "status": false
+    },
+    {
+      "height": 56,
+      "status": true
+    },
+    {
+      "height": 56,
+      "status": true
+    },
+    {
+      "height": 56,
+      "status": true
+    },
+    {
+      "height": 56,
+      "status": true
+    },
+    {
+      "height": 56,
+      "status": true
+    }
+  ],
+  "violations": [],
+  "operationCount": 3
+}

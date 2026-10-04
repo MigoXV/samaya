@@ -1,0 +1,102 @@
+[
+  {
+    "theme": "vallum",
+    "ratios": {
+      "text": [
+        {
+          "selector": ".compact-task.is-selected strong",
+          "ratio": 11.815550174094204
+        },
+        {
+          "selector": ".compact-task.is-selected small",
+          "ratio": 11.815550174094204
+        },
+        {
+          "selector": ".task-reading-heading h1",
+          "ratio": 13.564747866178628
+        },
+        {
+          "selector": ".history-view .eyebrow",
+          "ratio": 12.308777079384754
+        },
+        {
+          "selector": ".history-view .tool summary",
+          "ratio": 5.01691591105987
+        },
+        {
+          "selector": ".message.user .prose",
+          "ratio": 12.308777079384754
+        },
+        {
+          "selector": ".composer-actions small",
+          "ratio": 5.200309343878673
+        }
+      ],
+      "controls": [
+        {
+          "selector": ".composer-input textarea",
+          "ratio": 14.060607418262387
+        },
+        {
+          "selector": ".sidebar-shortcuts select",
+          "ratio": 3.012271087114181
+        },
+        {
+          "selector": ".task-heading .global-pending",
+          "ratio": 4.894878528388426
+        }
+      ]
+    },
+    "axe": []
+  },
+  {
+    "theme": "abyssus",
+    "ratios": {
+      "text": [
+        {
+          "selector": ".compact-task.is-selected strong",
+          "ratio": 12.34303036890194
+        },
+        {
+          "selector": ".compact-task.is-selected small",
+          "ratio": 12.34303036890194
+        },
+        {
+          "selector": ".task-reading-heading h1",
+          "ratio": 16.92593993629036
+        },
+        {
+          "selector": ".history-view .eyebrow",
+          "ratio": 14.382907101525173
+        },
+        {
+          "selector": ".history-view .tool summary",
+          "ratio": 9.69336173130228
+        },
+        {
+          "selector": ".message.user .prose",
+          "ratio": 14.382907101525173
+        },
+        {
+          "selector": ".composer-actions small",
+          "ratio": 8.73839899099287
+        }
+      ],
+      "controls": [
+        {
+          "selector": ".composer-input textarea",
+          "ratio": 15.258443929030474
+        },
+        {
+          "selector": ".sidebar-shortcuts select",
+          "ratio": 5.497866984164855
+        },
+        {
+          "selector": ".task-heading .global-pending",
+          "ratio": 12.586379286927334
+        }
+      ]
+    },
+    "axe": []
+  }
+]

@@ -1,0 +1,34 @@
+{
+  "/": {
+    "status": 200,
+    "type": "text/html; charset=utf-8"
+  },
+  "/api/status": {
+    "status": 200,
+    "type": "application/json"
+  },
+  "/api/monitor": {
+    "status": 200,
+    "type": "application/json"
+  },
+  "/tasks/check": {
+    "status": 200,
+    "type": "text/html; charset=utf-8"
+  },
+  "/api/no-such-route": {
+    "status": 404,
+    "type": "application/json"
+  },
+  "/assets/no-such-file.js": {
+    "status": 404,
+    "type": "application/json"
+  },
+  "/assets/index-DspxP2oA.js": {
+    "status": 200
+  },
+  "/assets/index-DP4Dz-R6.css": {
+    "status": 200
+  },
+  "daemonUnchanged": true,
+  "samayaPid": "3710203"
+}

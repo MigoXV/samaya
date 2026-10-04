@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "./api";
 import { ItemView } from "./components";
+import { preserveReadingPosition } from "./reading-position";
 import type { Item, Turn } from "./types";
 
 type Live = { text: string; kind: string };
@@ -9,6 +10,15 @@ type Summary = {
   notice?: string | null;
   observedAt?: number | null;
 };
+const historyCache = new Map<
+  string,
+  { turns: Turn[]; cursor: string | null; visible: number }
+>();
+const itemCache = new Map<string, { items: Item[]; cursor: string | null }>();
+function remember<T>(cache: Map<string, T>, key: string, value: T) {
+  cache.set(key, value);
+  if (cache.size > 24) cache.delete(cache.keys().next().value!);
+}
 export function ExecutionHistory({
   tid,
   turnId,
@@ -20,16 +30,37 @@ export function ExecutionHistory({
   turnStatus?: string;
   tab: string;
 }) {
-  const [turns, setTurns] = useState<Turn[]>([]),
-    [cursor, setCursor] = useState<string | null>(null),
-    [visible, setVisible] = useState(3),
+  const [turns, setTurns] = useState<Turn[]>(() => {
+      const cached = historyCache.get(tid)?.turns || [];
+      return turnId
+        ? [
+            {
+              ...(cached.find((t) => t.id === turnId) || {
+                id: turnId,
+                items: [],
+              }),
+              status: turnStatus || "inProgress",
+            },
+            ...cached.filter((t) => t.id !== turnId),
+          ]
+        : cached;
+    }),
+    [cursor, setCursor] = useState<string | null>(
+      () => historyCache.get(tid)?.cursor || null,
+    ),
+    [visible, setVisible] = useState(1),
+    [loadingOlder, setLoadingOlder] = useState(false),
     [error, setError] = useState("");
-  const version = useRef(0);
+  const version = useRef(0),
+    region = useRef<HTMLElement>(null);
+  useEffect(() => {
+    if (turns.length) remember(historyCache, tid, { turns, cursor, visible });
+  }, [tid, turns, cursor, visible]);
   useEffect(() => {
     const request = ++version.current;
     let active = true;
     void api<{ data: Turn[]; nextCursor: string | null }>(
-      `/threads/${encodeURIComponent(tid)}/turns`,
+      `/threads/${encodeURIComponent(tid)}/turns?limit=1`,
     )
       .then((r) => {
         if (!active || request !== version.current) return;
@@ -49,14 +80,19 @@ export function ExecutionHistory({
   }, [tid, turnId, turnStatus]);
   async function older() {
     if (visible < turns.length) {
+      preserveReadingPosition(region.current);
       setVisible((n) => n + 3);
       return;
     }
-    if (!cursor) return;
+    if (!cursor || loadingOlder) return;
+    setLoadingOlder(true);
+    const request = version.current;
     try {
       const r = await api<{ data: Turn[]; nextCursor: string | null }>(
-        `/threads/${encodeURIComponent(tid)}/turns?cursor=${encodeURIComponent(cursor)}`,
+        `/threads/${encodeURIComponent(tid)}/turns?limit=3&cursor=${encodeURIComponent(cursor)}`,
       );
+      if (request !== version.current) return;
+      preserveReadingPosition(region.current);
       setTurns((old) => [
         ...old,
         ...r.data.filter((t) => !old.some((o) => o.id === t.id)),
@@ -65,11 +101,14 @@ export function ExecutionHistory({
       setVisible((n) => n + 3);
     } catch (e) {
       setError(String(e));
+    } finally {
+      setLoadingOlder(false);
     }
   }
   return (
     <section
       className="history-view"
+      ref={region}
       aria-label={tab === "work" ? "连续执行记录" : "改动与结果"}
     >
       {tab === "result" && (
@@ -79,7 +118,9 @@ export function ExecutionHistory({
       )}
       {error && <p role="alert">执行记录加载失败：{error}</p>}
       {(cursor || visible < turns.length) && (
-        <button onClick={() => void older()}>加载更早轮次</button>
+        <button disabled={loadingOlder} onClick={() => void older()}>
+          加载更早轮次
+        </button>
       )}
       {[...turns.slice(0, visible)].reverse().map((t) => (
         <TurnHistory
@@ -107,17 +148,23 @@ function TurnHistory({
   tab: string;
   latest: boolean;
 }) {
-  const [items, setItems] = useState<Item[]>([]),
-    [cursor, setCursor] = useState<string | null>(null),
+  const cacheKey = `${tid}:${turn.id}`;
+  const [items, setItems] = useState<Item[]>(
+      () => itemCache.get(cacheKey)?.items || [],
+    ),
+    [cursor, setCursor] = useState<string | null>(
+      () => itemCache.get(cacheKey)?.cursor || null,
+    ),
     [error, setError] = useState(""),
-    [loaded, setLoaded] = useState(false),
+    [loaded, setLoaded] = useState(() => itemCache.has(cacheKey)),
+    [loadingOlderItems, setLoadingOlderItems] = useState(false),
     [streamCursor, setStreamCursor] = useState<number | null>(null),
     [live, setLive] = useState<Record<string, Live>>({}),
     [summary, setSummary] = useState<Summary | null>(null);
-  const end = useRef<HTMLDivElement>(null),
+  const region = useRef<HTMLElement>(null),
     version = useRef(0),
     alive = useRef(true),
-    hasLoaded = useRef(false),
+    hasLoaded = useRef(itemCache.has(cacheKey)),
     completed = useRef(new Map<string, Item>()),
     chunks = useRef<Record<string, Live>>({});
   useEffect(() => {
@@ -126,6 +173,9 @@ function TurnHistory({
       alive.current = false;
     };
   }, []);
+  useEffect(() => {
+    if (loaded) remember(itemCache, cacheKey, { items, cursor });
+  }, [cacheKey, loaded, items, cursor]);
   const base = `/threads/${encodeURIComponent(tid)}/turns/${encodeURIComponent(turn.id)}`;
   const load = useCallback(
     async (more?: string) => {
@@ -136,12 +186,15 @@ function TurnHistory({
           nextCursor: string | null;
           samayaCursor?: number;
         }>(
-          base + "/items" + (more ? "?cursor=" + encodeURIComponent(more) : ""),
+          base +
+            "/items?limit=20" +
+            (more ? "&cursor=" + encodeURIComponent(more) : ""),
         );
         if (!alive.current || request !== version.current) return;
         const page = r.data
           .map((x) => completed.current.get(x.item.id) || x.item)
           .reverse();
+        if (more) preserveReadingPosition(region.current);
         setItems((old) =>
           more
             ? [...page.filter((i) => !old.some((o) => o.id === i.id)), ...old]
@@ -285,7 +338,7 @@ function TurnHistory({
     (i) => i.changes?.map((c) => ({ path: c.path, id: i.id })) || [],
   );
   return (
-    <section className="turn-history" data-turn-id={turn.id}>
+    <section ref={region} className="turn-history" data-turn-id={turn.id}>
       <div className="turn-divider">
         本轮 ·{" "}
         {(
@@ -296,22 +349,12 @@ function TurnHistory({
             failed: "失败",
           } as Record<string, string>
         )[turn.status] || turn.status}
-        <small> {turn.id.slice(0, 8)}</small>
+        <span className="sr-only">轮次 {turn.id}</span>
       </div>
       {tab === "work" && latest && loaded && !requirement && (
         <small>
           本页尚未读取到用户要求{cursor ? "；可加载更早记录核对。" : "。"}
         </small>
-      )}
-      {tab === "work" && requirement && (
-        <div className="recent-requirement">
-          <strong>最近要求</strong>
-          <p>
-            {requirement.content?.map((c) => c.text || "").join("\n") ||
-              requirement.text ||
-              "此要求未提供文本"}
-          </p>
-        </div>
       )}
       {error && (
         <p role="alert">
@@ -320,7 +363,19 @@ function TurnHistory({
       )}
       {!loaded && !error && <p>加载执行记录…</p>}
       {cursor && (
-        <button onClick={() => void load(cursor)}>加载更早记录</button>
+        <button
+          disabled={loadingOlderItems}
+          onClick={async () => {
+            setLoadingOlderItems(true);
+            try {
+              await load(cursor);
+            } finally {
+              setLoadingOlderItems(false);
+            }
+          }}
+        >
+          加载更早记录
+        </button>
       )}
       {tab === "result" && (
         <>
@@ -381,11 +436,14 @@ function TurnHistory({
             }
             data-item-id={item.id}
           >
-            {fragment && fragment.kind !== "mcpToolCall" && (
-              <small className="stream-notice">
-                当前连接的流式片段，最多保留 100,000
-                字符；与历史衔接未确认，完成后以完整记录替换。
-              </small>
+            {fragment?.kind === "agentMessage" && (
+              <details className="stream-notice">
+                <summary>正在接收输出</summary>
+                <small>
+                  当前连接的流式片段，最多保留 100,000
+                  字符；与历史衔接未确认，完成后以完整记录替换。
+                </small>
+              </details>
             )}
             <ItemView
               item={observed}
@@ -396,15 +454,6 @@ function TurnHistory({
           </div>
         );
       })}
-      {latest && (
-        <button
-          className="latest-position"
-          onClick={() => end.current?.scrollIntoView({ block: "end" })}
-        >
-          返回最新位置
-        </button>
-      )}
-      <div ref={end} />
     </section>
   );
 }
