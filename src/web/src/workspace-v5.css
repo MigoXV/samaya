@@ -1,0 +1,1037 @@
+/* v5: one continuous conversation, compact task navigation. */
+.task-is-open .task-navigation {
+  width: 272px;
+  flex-basis: 272px;
+  border-right: 0;
+}
+.task-is-open .monitor-filters {
+  display: none;
+}
+.sidebar-toolbar {
+  height: 56px;
+  padding: 12px 20px;
+  justify-content: space-between;
+}
+.sidebar-toolbar strong {
+  font-size: 20px;
+  font-weight: 500;
+}
+.sidebar-shortcuts {
+  display: flex;
+  flex-direction: column;
+  padding: 0 12px 8px;
+  gap: 4px;
+}
+.sidebar-shortcuts > button {
+  text-align: left;
+  background: transparent;
+  border: 0;
+  min-height: 36px;
+  padding: 6px 12px;
+}
+.sidebar-shortcuts select {
+  min-height: 32px;
+  max-width: 100%;
+  margin: 4px 0;
+  background: transparent;
+}
+.sidebar-status-filters {
+  display: flex;
+  gap: 4px;
+  margin: 8px 0;
+}
+.sidebar-status-filters button {
+  flex: 1;
+  padding: 4px;
+  min-height: 28px;
+  border: 0;
+  background: transparent;
+  font-size: 12px;
+}
+.sidebar-status-filters button[aria-pressed="true"] {
+  background: var(--surface);
+}
+.sidebar-footer {
+  padding: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.sidebar-footer .theme-select {
+  max-width: 116px;
+}
+.task-is-open .monitor-list {
+  padding: 0 12px;
+}
+.task-is-open .task-row.compact-task {
+  position: relative;
+  display: flex;
+  height: 36px;
+  margin: 0 0 4px;
+  padding: 6px 12px;
+  gap: 4px;
+  border: 0;
+  border-radius: 8px;
+}
+.task-is-open .task-row.compact-task.has-status {
+  height: 56px;
+}
+.task-is-open .compact-task.is-selected {
+  box-shadow: none;
+}
+.task-is-open .compact-task .task-open {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: center;
+  gap: 2px;
+  min-height: 0 !important;
+  overflow: hidden;
+}
+.compact-task strong,
+.compact-task small {
+  display: block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-weight: 400;
+}
+.compact-task strong {
+  font-size: 14px;
+  line-height: 22px;
+}
+.compact-task small {
+  font-size: 12px;
+  line-height: 18px;
+}
+.compact-task .compact-request,
+.compact-task .compact-pin {
+  min-height: 24px;
+  min-width: 24px;
+  padding: 0;
+  margin: 0;
+  align-self: center;
+}
+.compact-task .compact-pin {
+  display: none;
+}
+.compact-task:hover .compact-pin,
+.compact-task:focus-within .compact-pin {
+  display: block;
+}
+.task-heading {
+  border: 0;
+  height: 64px;
+  min-height: 64px;
+  padding: 12px 24px;
+}
+.task-heading h1 {
+  font-size: 14px;
+  font-weight: 500;
+}
+.task-heading .task-sidebar-toggle {
+  display: block;
+}
+.task-detail {
+  position: relative;
+}
+.detail-tabs {
+  position: absolute;
+  right: 24px;
+  top: 64px;
+  z-index: 2;
+  border: 0;
+  height: 32px;
+  min-height: 32px;
+  background: var(--bg-primary);
+  padding: 0;
+}
+.detail-tabs button {
+  font-size: 12px;
+  padding: 4px 8px;
+}
+.detail-scroll {
+  padding: 40px 24px 24px;
+}
+.detail-scroll .message,
+.task-context,
+.turn-divider,
+.detail-scroll > .reading-content > details,
+.history-view .tool {
+  max-width: 720px;
+  margin-left: auto;
+  margin-right: auto;
+}
+.history-view .message.user {
+  max-width: 544px;
+  margin-left: auto;
+  margin-right: max(0px, calc((100% - 720px) / 2));
+  background: var(--surface-subtle);
+  border-radius: 12px;
+  padding: 12px 16px;
+  margin-bottom: 20px;
+}
+.history-view .tool summary {
+  background: transparent;
+  color: var(--text-secondary);
+}
+.history-view .tool {
+  border: 0;
+}
+.detail-footer {
+  border: 0;
+  padding: 12px 24px 20px;
+}
+.task-composer {
+  max-width: 720px;
+  margin: 0 auto;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  padding: 0;
+}
+.search-results {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.search-results button {
+  text-align: left;
+}
+.search-results small {
+  display: block;
+}
+@media (max-width: 1099px) {
+  .task-is-open.task-nav-open .task-navigation {
+    width: 272px;
+  }
+  .task-heading .workspace-exceptions {
+    display: block;
+  }
+}
+@media (max-width: 799px) {
+  .task-heading .task-sidebar-toggle {
+    display: block;
+  }
+  .task-heading {
+    padding: 8px;
+    gap: 4px;
+  }
+  .task-heading .project-context {
+    display: none;
+  }
+  .task-heading .global-pending {
+    max-width: 110px;
+    overflow: hidden;
+    white-space: nowrap;
+  }
+  .detail-scroll {
+    padding: 40px 16px 16px;
+  }
+  .detail-footer {
+    padding: 8px 12px max(12px, env(safe-area-inset-bottom));
+  }
+  .detail-tabs {
+    right: 12px;
+  }
+  .task-composer {
+    padding: 8px;
+  }
+}
+
+/* Figma overview: only actionable previews; the full list remains on demand. */
+.overview-mode {
+  grid-template-columns: 272px minmax(0, 1fr);
+}
+.overview-mode .monitor-nav {
+  padding: 24px 12px 16px;
+  gap: 12px;
+  border: 0;
+}
+.overview-mode .monitor-brand {
+  padding: 0 12px 12px;
+}
+.overview-mode .monitor-nav button {
+  min-height: 36px;
+  padding: 6px 12px;
+}
+.overview-mode .monitor-nav-items {
+  gap: 4px;
+}
+.overview-mode .monitor-toolbar {
+  display: none;
+}
+.task-overview {
+  width: 100%;
+  max-width: 1168px;
+  padding: 64px clamp(24px, 8.9vw, 128px) 32px;
+  margin: 0 auto;
+  overflow-y: auto;
+}
+.task-overview header,
+.task-overview footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+.task-overview > header {
+  margin-bottom: 32px;
+}
+.task-overview h1 {
+  font-size: 32px;
+  line-height: 44px;
+  font-weight: 500;
+}
+.task-overview h2 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 500;
+}
+.task-overview > section {
+  margin-bottom: 40px;
+}
+.task-overview section[aria-label="待我处理预览"] h2 {
+  font-size: 14px;
+}
+.task-overview section > header {
+  min-height: 32px;
+}
+.overview-task {
+  display: flex;
+  width: 100%;
+  min-height: 80px;
+  align-items: center;
+  justify-content: space-between;
+  text-align: left;
+  gap: 24px;
+  padding: 12px 0;
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  border-radius: 0;
+  background: transparent;
+}
+.overview-task > span:first-child {
+  min-width: 0;
+}
+.overview-task strong,
+.overview-task small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.overview-task strong {
+  font-size: 16px;
+  line-height: 28px;
+  font-weight: 400;
+}
+.overview-task small {
+  margin-top: 4px;
+}
+.overview-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  height: 32px;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 13px;
+  line-height: 20px;
+  color: var(--text-secondary);
+}
+.overview-task:hover .overview-action,
+.overview-task:focus-visible .overview-action {
+  border-color: var(--border-strong);
+  background: var(--hover);
+  color: var(--text-primary);
+}
+.attention-preview {
+  min-height: 72px;
+}
+.overview-ended summary {
+  min-height: 48px;
+  cursor: pointer;
+  color: var(--text-secondary);
+}
+.task-overview footer {
+  min-height: 64px;
+}
+.overview-empty {
+  color: var(--text-secondary);
+  font-size: 14px;
+}
+@media (max-width: 1099px) {
+  .overview-mode {
+    grid-template-columns: 1fr;
+  }
+  .overview-mode .monitor-toolbar {
+    display: flex;
+  }
+  .overview-mode .monitor-toolbar h1,
+  .overview-mode .global-actions {
+    display: none;
+  }
+}
+@media (max-width: 799px) {
+  .task-overview {
+    padding: 24px 20px;
+  }
+  .task-overview h1 {
+    font-size: 28px;
+  }
+  .task-overview footer small {
+    display: none;
+  }
+  .overview-task {
+    gap: 12px;
+  }
+}
+
+/* Shared reading axis: header, body, composer all use the same gutters. */
+.task-detail {
+  --reading-width: 880px;
+  --reading-gutter: max(20px, calc((100% - var(--reading-width)) / 2));
+}
+.task-heading {
+  height: 40px;
+  min-height: 40px;
+  padding: 4px 24px;
+}
+.toolbar-space {
+  flex: 1;
+}
+.task-reading-heading {
+  flex-shrink: 0;
+  padding: 0 var(--reading-gutter);
+  display: flex;
+  flex-direction: column;
+  height: 72px;
+  gap: 4px;
+}
+.task-title-status {
+  display: flex;
+  align-items: center;
+  height: 40px;
+  min-height: 40px;
+  gap: 20px;
+}
+.task-reading-heading h1 {
+  font-size: 20px;
+  line-height: 28px;
+  flex: 1;
+  min-width: 0;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.task-live-status {
+  display: flex;
+  gap: 8px;
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--text-secondary);
+  min-width: 0;
+  max-width: 45%;
+}
+.task-live-status > span {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.task-live-status time {
+  flex-shrink: 0;
+}
+.task-reading-heading .detail-tabs {
+  position: static;
+  height: 28px;
+  min-height: 28px;
+  gap: 24px;
+  padding: 0;
+  align-items: stretch;
+}
+.task-reading-heading .detail-tabs button {
+  padding: 2px 0;
+  font-size: 14px;
+  line-height: 22px;
+}
+.task-reading-heading .detail-tabs button[aria-current="page"] {
+  border-bottom-color: var(--text-primary);
+}
+.task-detail .detail-scroll {
+  padding: 16px var(--reading-gutter);
+  scrollbar-gutter: stable;
+}
+.task-detail .detail-footer {
+  padding: 12px var(--reading-gutter) 20px;
+  min-height: 88px;
+}
+.task-detail .task-composer {
+  width: 100%;
+  max-width: none;
+}
+.task-detail .history-view .message.user {
+  max-width: min(544px, 88%);
+  margin-right: 0;
+}
+.task-heading .project-context {
+  display: inline-flex;
+  width: 36px;
+  align-items: center;
+  justify-content: center;
+}
+.task-heading img {
+  display: block;
+}
+[data-theme="abyssus"] .task-heading img,
+[data-theme="abyssus"] .response-actions img {
+  filter: invert(1);
+}
+.response-actions {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  margin-top: 12px;
+}
+.response-actions button {
+  height: 32px;
+  min-height: 32px;
+  padding: 6px 8px;
+}
+.response-actions img {
+  display: block;
+}
+@media (max-width: 799px) {
+  .task-reading-heading h1 {
+    font-size: 18px;
+  }
+  .task-live-status {
+    max-width: min(130px, 40%);
+  }
+  .task-heading {
+    padding: 4px 12px;
+  }
+  .task-heading .global-pending {
+    max-width: none;
+    font-size: 12px;
+  }
+  .task-live-status time {
+    display: none;
+  }
+  .task-detail .detail-footer {
+    padding-bottom: max(20px, env(safe-area-inset-bottom));
+  }
+}
+.task-composer {
+  padding: 0;
+  min-height: 0;
+}
+.task-composer .composer-input textarea {
+  padding: 0;
+  min-height: 28px;
+  max-height: min(168px, 33dvh);
+  line-height: 28px;
+}
+.task-heading .global-pending,
+.task-heading .workspace-exceptions {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.command-record > summary {
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.command-record > summary::-webkit-details-marker {
+  display: none;
+}
+.command-record[open] .tool-chevron {
+  transform: rotate(90deg);
+}
+[data-theme="abyssus"] .tool-chevron {
+  filter: invert(1);
+}
+/* Focus belongs to the integrated editor rather than a second nested box. */
+.composer-input:focus-within {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+.task-composer textarea:focus-visible {
+  outline: none;
+}
+.command-record:not([open]) > summary::before {
+  content: none;
+}
+.task-detail .command-record:not([open]) > summary::before {
+  display: none;
+}
+.task-overview .overview-task {
+  border-color: var(--border);
+}
+
+/* v7: navigation shortcuts and overview scope have separate roles. */
+.monitor-nav > button,
+.monitor-nav-items > button,
+.nav-bottom > button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.monitor-nav .lucide {
+  flex: 0 0 16px;
+  color: var(--text-secondary);
+}
+.monitor-nav button[aria-current="page"] .lucide {
+  color: var(--text-primary);
+}
+.monitor-nav .nav-projects {
+  overflow: visible;
+  flex-shrink: 0;
+  gap: 0;
+  padding-top: 16px;
+}
+.nav-projects .eyebrow {
+  padding: 0 12px;
+  line-height: 24px;
+}
+.monitor-nav .nav-projects button {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  height: 28px;
+  min-height: 28px;
+  padding: 3px 12px;
+  line-height: 22px;
+}
+.nav-projects button > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.nav-projects button > small {
+  flex-shrink: 0;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+.nav-bottom .theme-control > label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+}
+.nav-bottom .theme-control select {
+  border: 0;
+  background: transparent;
+  width: auto;
+}
+.task-overview > header {
+  margin-bottom: 16px;
+}
+.overview-scope {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 32px;
+  position: relative;
+  z-index: 3;
+}
+.scope-control {
+  position: relative;
+  min-width: 0;
+}
+.scope-trigger {
+  height: 32px;
+  min-height: 32px;
+  max-width: 220px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  overflow: hidden;
+  white-space: nowrap;
+}
+.scope-create {
+  margin-left: auto;
+  flex-shrink: 0;
+}
+.scope-popup {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  width: 336px;
+  max-width: calc(100vw - 40px);
+  padding: 8px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+.scope-popup > input {
+  min-height: 32px;
+  width: 100%;
+  margin-bottom: 4px;
+}
+.scope-popup button {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  height: 32px;
+  min-height: 32px;
+  padding: 4px 12px;
+  background: transparent;
+  border: 0;
+  text-align: left;
+}
+.scope-popup button:hover {
+  background: var(--hover);
+}
+.scope-popup button > span:first-child {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.scope-popup button small {
+  flex-shrink: 0;
+}
+.scope-options {
+  max-height: min(360px, 50dvh);
+  overflow-y: auto;
+}
+.scope-caption {
+  display: block;
+  padding: 4px 12px;
+  color: var(--text-secondary);
+}
+.status-scope-popup {
+  width: 208px;
+}
+.task-detail .history-view .message.user {
+  padding-top: 10px;
+  padding-bottom: 10px;
+  margin-left: auto;
+  margin-right: 0;
+}
+@media (max-width: 799px) {
+  .overview-scope {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .scope-trigger {
+    max-width: 150px;
+  }
+  .scope-create {
+    min-height: 32px;
+  }
+  .status-scope-popup {
+    left: auto;
+    right: 0;
+  }
+}
+
+.overview-mode .monitor-nav button[aria-current="page"] {
+  border-color: transparent;
+}
+.monitor-nav {
+  overflow-y: auto;
+}
+
+/* Connection feedback is compact; initial loading lives in the sidebar footer. */
+.connection-notice {
+  align-self: flex-end;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin: 8px 24px 0;
+  max-width: min(560px, calc(100% - 48px));
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+.connection-notice button {
+  min-height: 28px;
+  padding: 3px 8px;
+  flex-shrink: 0;
+  font-size: 12px;
+}
+.connection-notice summary {
+  cursor: pointer;
+}
+.connection-notice p {
+  margin: 8px 0;
+}
+@media (max-width: 799px) {
+  .connection-notice {
+    margin: 4px 20px;
+    max-width: calc(100% - 40px);
+  }
+}
+
+/* The overview and task workspace use the same navigation DOM and spacing. */
+.monitor-shell {
+  grid-template-columns: 272px minmax(0, 1fr);
+}
+.monitor-shell .monitor-nav {
+  padding: 24px 12px 16px;
+  gap: 12px;
+  border: 0;
+}
+.monitor-shell .monitor-brand {
+  padding: 0 12px 12px;
+}
+.monitor-shell .monitor-nav button {
+  min-height: 36px;
+  padding: 6px 12px;
+}
+.monitor-shell .monitor-nav-items {
+  gap: 4px;
+}
+.monitor-shell .monitor-nav button[aria-current="page"] {
+  border-color: transparent;
+}
+.monitor-shell .monitor-nav .nav-projects button {
+  min-height: 28px;
+  height: 28px;
+  padding: 3px 12px;
+}
+.task-is-open.monitor-shell {
+  grid-template-columns: 272px minmax(0, 1fr);
+}
+.task-is-open > .monitor-nav {
+  display: flex;
+}
+.task-is-open.focus-mode {
+  grid-template-columns: minmax(0, 1fr);
+}
+.task-is-open.focus-mode > .monitor-nav {
+  display: none;
+}
+@media (max-width: 1099px) {
+  .mobile-nav-button {
+    display: block;
+  }
+  .monitor-shell,
+  .task-is-open.monitor-shell {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .monitor-shell > .monitor-nav {
+    display: none;
+  }
+  .monitor-shell.task-nav-open > .task-nav-backdrop {
+    background: color-mix(in srgb, var(--overlay-bg) 40%, transparent);
+  }
+  .monitor-shell.task-nav-open > .monitor-nav {
+    display: flex;
+    position: absolute;
+    inset: 0 auto 0 0;
+    z-index: 31;
+    width: 272px;
+    max-width: calc(100vw - 32px);
+    height: 100dvh;
+  }
+}
+
+/* Quiet scrollbars share the reading surface, including long output and drafts. */
+.task-detail :is(.detail-scroll, pre, textarea) {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--text-secondary) 45%, transparent)
+    transparent;
+}
+.task-detail :is(.detail-scroll, pre, textarea):hover {
+  scrollbar-color: color-mix(in srgb, var(--text-secondary) 65%, transparent)
+    transparent;
+}
+.task-detail :is(.detail-scroll, pre, textarea)::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+.task-detail :is(.detail-scroll, pre, textarea)::-webkit-scrollbar-track {
+  background: transparent;
+}
+.task-detail :is(.detail-scroll, pre, textarea)::-webkit-scrollbar-thumb {
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--text-secondary) 45%, transparent);
+}
+.task-detail :is(.detail-scroll, pre, textarea)::-webkit-scrollbar-thumb:hover {
+  background: color-mix(in srgb, var(--text-secondary) 65%, transparent);
+}
+@media (forced-colors: active) {
+  .task-detail :is(.detail-scroll, pre, textarea) {
+    scrollbar-color: auto;
+  }
+}
+
+/* The viewport owns scrolling; the content column owns the reading axis. */
+.task-detail .detail-scroll :is(.message, .task-context, .turn-divider),
+.task-detail .detail-scroll > .reading-content > details,
+.task-detail .history-view .tool {
+  max-width: var(--reading-width);
+}
+.task-heading button {
+  min-height: 32px;
+  height: 32px;
+  padding-top: 4px;
+  padding-bottom: 4px;
+}
+/* Explicit WebKit width keeps the track visible instead of an auto-hidden overlay.
+   Firefox retains its native thin, themed scrollbar. */
+@supports selector(::-webkit-scrollbar) {
+  .task-detail .detail-scroll,
+  .task-detail .detail-scroll:hover {
+    scrollbar-width: auto;
+    scrollbar-color: auto;
+    padding-right: calc(var(--reading-gutter) - 6px);
+  }
+}
+.task-detail .detail-scroll::-webkit-scrollbar-track {
+  background: color-mix(in srgb, var(--border) 35%, transparent);
+}
+
+/* Consecutive tool calls read as a continuous list, rather than stacked cards. */
+.task-detail .history-view .tool {
+  margin-top: 0;
+  margin-bottom: 0;
+  padding: 0;
+  font-size: 14px;
+}
+.task-detail .history-view .tool > summary {
+  min-height: 32px;
+  padding: 6px 0;
+  line-height: 20px;
+  background: transparent;
+}
+.task-detail .history-view :is(.command-record, .mcp-tool) > summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  list-style: none;
+}
+.task-detail
+  .history-view
+  :is(.command-record, .mcp-tool)
+  > summary::-webkit-details-marker {
+  display: none;
+}
+.task-detail .history-view :is(.command-record, .mcp-tool) > summary::before {
+  display: none;
+}
+.tool-chevron {
+  flex-shrink: 0;
+}
+.tool-state-mark {
+  flex: 0 0 10px;
+  font-size: 14px;
+}
+.tool-preview {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tool-state {
+  flex-shrink: 0;
+  font-size: 12px;
+  white-space: nowrap;
+}
+.tool-output {
+  padding: 8px 0 12px 44px;
+}
+.mcp-tool[open] > summary .tool-chevron {
+  transform: rotate(90deg);
+}
+@media (max-width: 799px) {
+  .tool-exit {
+    display: none;
+  }
+  .tool-output {
+    padding-left: 22px;
+  }
+}
+
+.overview-workspace {
+  margin-top: 28px;
+}
+.overview-workspace > header {
+  gap: 16px;
+  margin-bottom: 8px;
+}
+.overview-workspace h3 {
+  margin: 0;
+  font-size: 18px;
+  line-height: 28px;
+  font-weight: 500;
+}
+.overview-workspace header > div {
+  min-width: 0;
+}
+.workspace-path {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-secondary);
+}
+.overview-workspace .overview-task {
+  min-height: 64px;
+  padding: 8px 0;
+}
+.overview-workspace .overview-task strong {
+  font-size: 14px;
+  line-height: 24px;
+}
+.workspace-expand {
+  margin-top: 8px;
+  font-size: 13px;
+}
+@media (max-width: 799px) {
+  .overview-workspace > header {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .overview-workspace header > div {
+    max-width: 100%;
+  }
+}
+
+.overview-workspace .overview-task small {
+  font-size: 12px;
+  line-height: 18px;
+}
+.task-overview {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--text-secondary) 45%, transparent)
+    color-mix(in srgb, var(--border) 35%, transparent);
+}
+@supports selector(::-webkit-scrollbar) {
+  .task-overview {
+    scrollbar-width: auto;
+    scrollbar-color: auto;
+  }
+}
+.task-overview::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+.task-overview::-webkit-scrollbar-track {
+  background: color-mix(in srgb, var(--border) 35%, transparent);
+}
+.task-overview::-webkit-scrollbar-thumb {
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--text-secondary) 45%, transparent);
+}
+.task-overview::-webkit-scrollbar-thumb:hover {
+  background: color-mix(in srgb, var(--text-secondary) 65%, transparent);
+}
+@media (forced-colors: active) {
+  .task-overview {
+    scrollbar-color: auto;
+  }
+}

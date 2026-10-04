@@ -24,6 +24,7 @@ class SessionActions:
         store: Store,
         queries: SessionQueries,
     ):
+        self.catalog = None
         self.config, self.connection, self.store, self.queries = (
             config,
             connection,
@@ -79,7 +80,12 @@ class SessionActions:
             self.store.watch(tid)
             return await self.connection.rpc(
                 "turn/start",
-                {"threadId": tid, "input": [{"type": "text", "text": b["text"]}]},
+                {
+                    "threadId": tid,
+                    "input": await self.catalog.inputs(
+                        tid, b["text"], b.get("references", []), b.get("expectedCwd")
+                    ),
+                },
             )
         if action == "steer":
             thread = (await self.queries.read(tid))["thread"]
@@ -94,7 +100,9 @@ class SessionActions:
                 {
                     "threadId": tid,
                     "expectedTurnId": current["id"],
-                    "input": [{"type": "text", "text": b["text"]}],
+                    "input": await self.catalog.inputs(
+                        tid, b["text"], b.get("references", []), b.get("expectedCwd")
+                    ),
                 },
             )
         if action == "interrupt":

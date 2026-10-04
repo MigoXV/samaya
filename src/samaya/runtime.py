@@ -3,6 +3,8 @@
 import asyncio
 
 from samaya.codex.connection import Connection
+from samaya.composer.catalog import InputCatalog
+from samaya.composer.commands import CommandService
 from samaya.config import Settings
 from samaya.decisions import mcp
 from samaya.decisions.service import Decisions
@@ -22,7 +24,10 @@ class Runtime:
         )
         self.decisions = Decisions(self.connection, self.publish)
         self.sessions = SessionQueries(self.connection, store, self.decisions)
+        self.catalog = InputCatalog(config, self.connection, self.sessions)
         self.actions = SessionActions(config, self.connection, store, self.sessions)
+        self.actions.catalog = self.catalog
+        self.commands = CommandService(self.catalog, self.actions)
         self.operations = Operations(store, self.dispatch, self.publish)
         self.monitor = Monitor(
             self.connection, self.sessions, self.decisions, store, self.changed
@@ -49,12 +54,20 @@ class Runtime:
         self.decisions.disconnect()
 
     async def receive(self, event: dict) -> None:
+        if event.get("method") in (
+            "skills/changed",
+            "app/list/updated",
+            "thread/settings/updated",
+        ):
+            self.catalog.invalidate()
         self.decisions.observe(event)
         if event.get("method") == "samaya/connection":
             event = {**event, "params": self.status()}
         await self.publish(event)
 
     async def dispatch(self, action: str, body: dict) -> dict:
+        if action == "command":
+            return await self.commands.execute(body)
         if action == "respond":
             return await self.decisions.respond(body)
         return await self.actions.execute(action, body)

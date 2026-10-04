@@ -9,14 +9,19 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "typecheck": "tsc -b --pretty false",
-    "test:browser": "pnpm run test:monitor",
+    "test:browser": "pnpm run test:monitor && pnpm run test:reading && pnpm run test:composer && pnpm run test:figma && pnpm run test:scope",
     "test:monitor": "node tests/monitor.mjs && node tests/monitor-states.mjs && node tests/monitor-contrast.mjs",
     "test:monitor:performance": "node tests/monitor-performance.mjs",
     "test:monitor:readonly": "node tests/monitor-runtime-readonly.mjs",
     "test:monitor:logs": "node tests/monitor-long-log.mjs",
-    "test:workflow": "node tests/workflow-v3.mjs"
+    "test:workflow": "node tests/workflow-v3.mjs",
+    "test:reading": "node tests/reading-workspace-v4.mjs && node tests/compact-workspace.mjs && node tests/latest-reading.mjs",
+    "test:composer": "node tests/chat-workspace-v5.mjs",
+    "test:figma": "node tests/figma-sync-v6.mjs && node tests/model-selector.mjs && node tests/decision-search.mjs && node tests/usage-settings.mjs",
+    "test:scope": "node tests/overview-scope-v7.mjs && node tests/workspace-overview.mjs"
   },
   "dependencies": {
+    "lucide-react": "^1.50.0",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
     "react-markdown": "^10.1.0",

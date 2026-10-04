@@ -1,7 +1,7 @@
 import { chromium, expect } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
 import { mkdirSync, writeFileSync } from "node:fs";
-import { fixture, install } from "./monitor-fixture.mjs";
+import { fixture, install, returnToOverview } from "./monitor-fixture.mjs";
 const browser = await chromium.launch({ args: ["--no-sandbox"] });
 const context = await browser.newContext({
     viewport: { width: 1440, height: 900 },
@@ -14,6 +14,7 @@ page.on("pageerror", (e) => errors.push(e.message));
 const out = "../../.samaya/workflow-v3";
 mkdirSync(out, { recursive: true });
 await page.goto(process.env.SAMAYA_UI_TEST_URL || "http://127.0.0.1:5175");
+await page.getByRole("button", { name: "查看全部任务 →", exact: true }).click();
 await page.getByRole("list", { name: "任务列表" }).waitFor();
 await expect(page.locator(".task-row")).toHaveCount(16);
 await expect(
@@ -38,7 +39,7 @@ await page
   .getByRole("button", { name: /选择方案.*去重范围/ })
   .click();
 await page.getByRole("radio", { name: /同会话/ }).check();
-await page.getByRole("button", { name: "提交回答", exact: true }).click();
+await page.getByRole("button", { name: "确认 →", exact: true }).click();
 await expect(
   page.getByText(
     "请求已处理、失效或连接已变化。请核对最新任务状态，不能重复授权。",
@@ -49,37 +50,46 @@ await page.locator(".task-row").first().locator(".task-open").click();
 await page
   .getByLabel("补充当前任务", { exact: true })
   .fill("演示：增加边界测试");
-await page.getByRole("button", { name: "追加到当前轮次" }).click();
+await page.getByRole("button", { name: "追加指令" }).click();
 await expect
   .poll(() => calls.filter((c) => c.action === "steer").length)
   .toBe(1);
-await page.getByRole("button", { name: "停止本轮", exact: true }).click();
+await page.getByRole("button", { name: "停止当前轮次", exact: true }).click();
 await page
   .getByRole("dialog")
   .getByRole("button", { name: "停止本轮", exact: true })
   .click();
-await expect(page.locator(".detail-status")).toContainText("本轮已中断");
-await page.getByRole("button", { name: "返回列表", exact: true }).click();
+await expect(page.getByRole("dialog")).toHaveCount(0);
+await expect(
+  page.getByRole("button", { name: "停止当前轮次", exact: true }),
+).toHaveCount(0);
+await returnToOverview(page);
 await page.locator('[data-task-id="demo-6"] .task-open').click();
-await expect(page.locator(".task-detail")).toContainText("后台命令运行中");
-await page.getByRole("button", { name: "改动与结果", exact: true }).click();
-await page.getByText("演示结果：检查结束；不代表真实运行时验收。").waitFor();
-await page.getByRole("button", { name: "返回列表", exact: true }).click();
+await expect(page.locator(".task-detail")).toContainText("1 个后台命令");
+await page.getByRole("button", { name: "改动与产物", exact: true }).click();
+await page
+  .getByRole("region", { name: "改动与结果" })
+  .getByText("演示结果：检查结束；不代表真实运行时验收。")
+  .waitFor();
+await returnToOverview(page);
 await page.getByRole("button", { name: "新建任务", exact: true }).click();
 await page.getByLabel("服务器目录").fill("/demo/Samaya");
 await page.getByLabel("工作要求").fill("演示：新任务目标");
 await page.getByRole("button", { name: "派发任务", exact: true }).click();
-await expect(page.locator(".task-detail h2")).toContainText("新任务");
+await expect(page.locator(".task-reading-heading h1")).toContainText("新任务");
 await expect
   .poll(() => calls.filter((c) => c.action === "create").length)
   .toBe(1);
 await expect
   .poll(() => calls.filter((c) => c.action === "send").length)
   .toBe(1);
-await page.getByRole("button", { name: "返回列表", exact: true }).click();
+await returnToOverview(page);
 // Cross-tab resolution of the same request disables the old form.
 const other = await context.newPage();
 await other.goto(process.env.SAMAYA_UI_TEST_URL || "http://127.0.0.1:5175");
+await other
+  .getByRole("button", { name: "查看全部任务 →", exact: true })
+  .click();
 await other.getByRole("list", { name: "任务列表" }).waitFor();
 await page
   .locator('[data-task-id="demo-2"]')
@@ -98,7 +108,7 @@ await expect(
 ).toBeVisible();
 await page.keyboard.press("Escape");
 await other.close();
-await page.getByLabel("主题").selectOption("abyssus");
+await page.evaluate(() => window.samayaTheme.setPreference("abyssus"));
 await page.screenshot({ path: out + "/desktop-dark.png" });
 const darkAxe = await new AxeBuilder({ page }).analyze();
 await page.setViewportSize({ width: 1366, height: 768 });
@@ -121,11 +131,12 @@ for (const width of [390, 320]) {
   });
   await page.locator(".task-row").first().locator(".task-open").click();
   await page.getByLabel("补充当前任务", { exact: true }).fill("草稿保留");
-  await page.getByRole("button", { name: "返回列表", exact: true }).click();
+  await returnToOverview(page);
 }
 // Restore while keeping the current state: no submission may be replayed.
 const before = calls.length;
 await page.reload();
+await page.getByRole("button", { name: "查看全部任务 →", exact: true }).click();
 await page.getByRole("list", { name: "任务列表" }).waitFor();
 expect(calls.length).toBe(before);
 const result = {

@@ -1,5 +1,5 @@
 import { chromium, expect } from "@playwright/test";
-import { fixture, install } from "./monitor-fixture.mjs";
+import { fixture, install, returnToOverview } from "./monitor-fixture.mjs";
 import { mkdirSync, writeFileSync } from "node:fs";
 const browser = await chromium.launch({ args: ["--no-sandbox"] });
 const context = await browser.newContext({
@@ -54,14 +54,12 @@ await page.locator('[data-task-id="demo-19"] .task-open').click();
 await page.getByLabel("补充当前任务", { exact: true }).fill("草稿保留");
 await page.getByRole("button", { name: "更新最近任务", exact: true }).click();
 await expect(page.locator('[data-task-id="demo-30"]')).toBeVisible();
-await expect(page.locator(".task-detail h2")).toContainText("19");
-await expect(page.locator(".task-detail")).toContainText(
-  "此任务在当前最近范围外",
-);
+await expect(page.locator(".task-heading h1")).toContainText("19");
+await expect(page.locator('[data-task-id="demo-19"]')).toHaveCount(0);
 await expect(page.getByLabel("补充当前任务", { exact: true })).toHaveValue(
   "草稿保留",
 );
-await page.getByRole("button", { name: "返回列表", exact: true }).click();
+await returnToOverview(page);
 await page.getByLabel("最近任务数量").selectOption("10");
 await expect(page.locator(".task-row")).toHaveCount(10);
 await page.reload();
@@ -78,13 +76,13 @@ await page.getByLabel("项目筛选").selectOption("");
 await page.getByLabel("最近任务数量").selectOption("20");
 await page.locator('[data-task-id="demo-0"] .task-open').click();
 await expect(
-  page.getByRole("button", { name: "当前工作", exact: true }),
-).toHaveAttribute("aria-current", "page");
+  page.getByRole("region", { name: "连续执行记录", exact: true }),
+).toBeVisible();
 await page.locator(".turn-divider").waitFor();
 await page.waitForFunction(
   () => window.__sources.length >= 2 && window.__sources.every((s) => s.ready),
 );
-await expect(page.locator(".recent-requirement")).toContainText(
+await expect(page.locator(".message.user")).toContainText(
   "演示要求：修复重复提交",
 );
 // One native item keeps its identity through start, streamed text and completion.

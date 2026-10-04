@@ -1,4 +1,5 @@
 import { useId, useLayoutEffect, useRef, useState } from "react";
+import { ToolSummary } from "./ToolSummary";
 import type { Item, Pending } from "./types";
 import { options, validateField } from "./mcp-schema";
 import type { McpValue } from "./mcp-schema";
@@ -410,47 +411,39 @@ export function McpTool({ item, progress }: { item: Item; progress?: string }) {
   return (
     <details className="tool mcp-tool">
       <summary>
-        <span>MCP</span>
-        <code>
-          {String(item.server || "未知服务")} /{" "}
-          {String(item.tool || "未知工具")}
-        </code>
-        <small>
-          {(
-            {
-              inProgress: "执行中",
-              completed: "已完成",
-              failed: "失败",
-            } as Record<string, string>
-          )[item.status || ""] || "状态未知"}
-        </small>
+        <ToolSummary
+          item={item}
+          label={`${String(item.server || "未知服务")} / ${String(item.tool || "未知工具")}`}
+        />
       </summary>
-      {progress && <p role="status">{progress}</p>}
-      {typeof error.message === "string" && (
-        <p role="alert">工具失败：{error.message}</p>
-      )}
-      <details>
-        <summary>输入参数</summary>
-        <pre tabIndex={0}>
-          {JSON.stringify(item.arguments, null, 2) || "未提供"}
-        </pre>
-      </details>
-      {Array.isArray(result.content) && (
-        <div className="mcp-content">
-          {result.content.map((c, i) => (
-            <Content key={i} value={c} />
-          ))}
-        </div>
-      )}
-      {result.structuredContent !== undefined && (
+      <div className="tool-output">
+        {progress && <p role="status">{progress}</p>}
+        {typeof error.message === "string" && (
+          <p role="alert">工具失败：{error.message}</p>
+        )}
         <details>
-          <summary>结构化结果</summary>
+          <summary>输入参数</summary>
           <pre tabIndex={0}>
-            {JSON.stringify(result.structuredContent, null, 2)}
+            {JSON.stringify(item.arguments, null, 2) || "未提供"}
           </pre>
         </details>
-      )}
-      {!item.result && !item.error && <p className="muted">尚无可用结果</p>}
+        {Array.isArray(result.content) && (
+          <div className="mcp-content">
+            {result.content.map((c, i) => (
+              <Content key={i} value={c} />
+            ))}
+          </div>
+        )}
+        {result.structuredContent !== undefined && (
+          <details>
+            <summary>结构化结果</summary>
+            <pre tabIndex={0}>
+              {JSON.stringify(result.structuredContent, null, 2)}
+            </pre>
+          </details>
+        )}
+        {!item.result && !item.error && <p className="muted">尚无可用结果</p>}
+      </div>
     </details>
   );
 }

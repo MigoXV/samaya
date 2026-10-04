@@ -1,0 +1,209 @@
+.model-selector {
+  position: relative;
+  min-width: 0;
+  grid-row: 1;
+  grid-column: 3;
+}
+.composer-input .model-trigger {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 12px;
+  height: 36px;
+  min-height: 36px;
+  max-width: 240px;
+  border: 0;
+  border-radius: 18px;
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 14px;
+  line-height: 22px;
+}
+.model-trigger .model-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.model-trigger .model-effort {
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+.model-trigger img {
+  flex-shrink: 0;
+}
+.model-menu {
+  position: absolute;
+  bottom: calc(100% + 18px);
+  right: 0;
+  z-index: 60;
+  width: 260px;
+  max-width: calc(100vw - 40px);
+  padding: 10px 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface);
+  max-height: min(480px, 65dvh);
+  overflow-y: auto;
+}
+.model-menu button {
+  border: 0;
+  background: transparent;
+  color: var(--text-primary);
+}
+.model-menu button:hover {
+  background: var(--hover);
+}
+.model-list-title {
+  display: block;
+  padding: 0 10px;
+  height: 24px;
+  color: var(--text-secondary);
+  font-size: 14px;
+}
+.model-list [role="menuitemradio"] {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 28px;
+  padding: 4px 10px;
+  border-radius: 8px;
+  font-size: 14px;
+  line-height: 20px;
+  text-align: left;
+}
+.model-list button span:first-child {
+  overflow-wrap: anywhere;
+}
+.model-menu p {
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.reasoning-menu {
+  padding: 12px;
+}
+.reasoning-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 38px;
+  margin-bottom: 10px;
+}
+.reasoning-header > img {
+  flex-shrink: 0;
+}
+.model-menu .reasoning-model {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 0;
+  font-size: 14px;
+  line-height: 20px;
+  color: var(--accent-strong);
+}
+.reasoning-model small {
+  color: var(--text-secondary);
+  font-size: 14px;
+  max-width: 100%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.model-menu .reasoning-reset {
+  width: 28px;
+  min-height: 24px;
+  padding: 0;
+  font-size: 20px;
+  color: var(--text-secondary);
+}
+.reasoning-slider {
+  position: relative;
+  height: 28px;
+  border-radius: 14px;
+  background: var(--surface-subtle);
+}
+.effort-stops {
+  position: absolute;
+  inset: 2px;
+  display: flex;
+  justify-content: space-between;
+  pointer-events: none;
+}
+.effort-stops span {
+  width: 24px;
+  height: 24px;
+}
+.reasoning-slider input {
+  position: absolute;
+  inset: 2px;
+  width: calc(100% - 4px);
+  height: 24px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  appearance: none;
+  background: transparent;
+  cursor: pointer;
+}
+.reasoning-slider input::-webkit-slider-thumb {
+  appearance: none;
+  width: 24px;
+  height: 24px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--text-primary);
+}
+.reasoning-slider input::-moz-range-thumb {
+  width: 24px;
+  height: 24px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--text-primary);
+}
+[data-theme="abyssus"] .model-trigger img,
+[data-theme="abyssus"] .reasoning-header > img,
+[data-theme="abyssus"] .effort-stops img {
+  filter: invert(1);
+}
+@media (max-width: 799px) {
+  .composer-input:has(.model-selector) {
+    gap: 4px;
+  }
+  .composer-input .model-trigger {
+    gap: 4px;
+    padding: 0 6px;
+    max-width: 124px;
+  }
+  .model-trigger .model-lightning {
+    display: none;
+  }
+  .model-trigger .model-name {
+    max-width: 54px;
+  }
+  .model-selector {
+    position: static;
+  }
+  .model-menu {
+    right: 10px;
+    bottom: calc(100% + 8px);
+    max-width: calc(100vw - 60px);
+  }
+}
+@media (max-width: 360px) {
+  .composer-input .model-trigger {
+    max-width: 96px;
+    padding-inline: 4px;
+  }
+  .model-trigger .model-name {
+    max-width: 24px;
+  }
+}
+.composer-input .model-trigger:hover,
+.composer-input .model-trigger:active,
+.composer-input .model-trigger[aria-expanded="true"] {
+  background: transparent;
+}

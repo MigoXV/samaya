@@ -2,18 +2,18 @@ import { chromium, expect } from "@playwright/test";
 import { fixture, install } from "./monitor-fixture.mjs";
 import { writeFileSync } from "node:fs";
 const b = await chromium.launch({ args: ["--no-sandbox"] }),
-  c = await b.newContext({ viewport: { width: 1024, height: 900 } }),
+  c = await b.newContext({ viewport: { width: 1366, height: 900 } }),
   s = fixture(1000);
 await install(c, s);
 const p = await c.newPage();
 await p.goto(process.env.SAMAYA_UI_TEST_URL || "http://127.0.0.1:5175");
 await p.getByRole("list").waitFor();
 await p.locator('[data-task-id="demo-6"] .task-open').click();
-await p.getByRole("button", { name: "当前工作", exact: true }).click();
+await p.getByRole("button", { name: "对话", exact: true }).click();
 await p.locator(".tool>summary").first().click();
-await p.locator(".tool pre").waitFor();
+await p.locator('.tool pre[aria-label="命令输出"]').waitFor();
 const r = await p.evaluate(async (s) => {
-  const pre = document.querySelector(".tool pre");
+  const pre = document.querySelector('.tool pre[aria-label="命令输出"]');
   pre.scrollTop = 800;
   const range = document.createRange();
   range.setStart(pre.firstChild, 50);
@@ -74,4 +74,4 @@ await b.close();
 expect(r.selectedTextPreserved).toBe(true);
 expect(r.scrollPreserved).toBe(true);
 expect(r.overflow).toBe(false);
-expect(r.compactRowHeight).toBe(96);
+expect(r.compactRowHeight).toBe(128);

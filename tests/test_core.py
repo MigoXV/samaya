@@ -79,15 +79,21 @@ async def test_interrupt_rejects_stale_turn_without_touching_others(tmp_path):
     store.close()
 
 
-def test_directory_symlink_escape_and_relationship(tmp_path):
+def test_directory_outside_shortcuts_and_relationship(tmp_path):
     allowed = tmp_path / "root"
     allowed.mkdir()
     outside = tmp_path / "private"
     outside.mkdir()
     (allowed / "link").symlink_to(outside)
     config = Settings(roots=[allowed])
-    with pytest.raises(ValueError):
-        config.directory(str(allowed / "link"))
+    assert config.directory(str(allowed / "link")) == outside
+    assert config.directory(str(outside)) == outside
+    with pytest.raises(ValueError, match="目录不存在或不是文件夹"):
+        config.directory(str(outside / "missing"))
+    file = outside / "file.txt"
+    file.write_text("text")
+    with pytest.raises(ValueError, match="目录不存在或不是文件夹"):
+        config.directory(str(file))
     assert (
         parent_id(
             {"source": {"subAgent": {"thread_spawn": {"parent_thread_id": "parent"}}}}
@@ -254,6 +260,19 @@ def test_moved_routes_keep_monitor_history_and_operation_contracts(web):
         assert client.get("/api/threads/one").json() == {"thread": {"id": "one"}}
         assert client.get("/api/threads/one/turns").json()["data"] == [{"id": "turn"}]
         assert client.get("/api/threads/one/turns/turn/items").json()["data"] == []
+        assert client.get("/api/threads/one/turns?limit=1").status_code == 200
+        runtime.sessions.turns.assert_awaited_with("one", None, 1)
+        assert (
+            client.get(
+                "/api/threads/one/turns/turn/items?limit=20&cursor=older"
+            ).status_code
+            == 200
+        )
+        runtime.sessions.items.assert_awaited_with("one", "turn", "older", 20)
+        assert client.get("/api/threads/one/turns?limit=0").status_code == 422
+        assert (
+            client.get("/api/threads/one/turns/turn/items?limit=101").status_code == 422
+        )
         summary = client.get("/api/threads/one/turns/turn/summary").json()
         assert summary["threadId"] == "one" and summary["turnId"] == "turn"
         csrf = client.get("/api/auth").json()["csrf"]
@@ -275,3 +294,57 @@ def test_moved_routes_keep_monitor_history_and_operation_contracts(web):
             client.get("/api/operations/test-operation-identity").json() == first.json()
         )
         runtime.operations.dispatch.assert_awaited_once()
+
+
+def test_directory_browse_above_shortcuts(web, monkeypatch):
+    from pathlib import Path
+
+    with TestClient(create_app(web)) as client:
+        shortcut = web.roots[0]
+        response = client.get("/api/directories", params={"path": str(shortcut)})
+        assert response.status_code == 200
+        assert response.json()["parent"] == str(shortcut.parent)
+        response = client.get("/api/directories", params={"path": str(shortcut.parent)})
+        assert response.status_code == 200
+        response = client.get("/api/directories", params={"path": "/"})
+        assert response.json()["parent"] is None
+        original = Path.iterdir
+
+        def denied(path):
+            if path == shortcut:
+                raise PermissionError("denied")
+            return original(path)
+
+        monkeypatch.setattr(Path, "iterdir", denied)
+        response = client.get("/api/directories", params={"path": str(shortcut)})
+        assert response.status_code == 403
+
+
+def test_usage_reads_account_limits_without_thread_or_mutation(web):
+    payload = {
+        "rateLimits": {"planType": "pro", "primary": {"usedPercent": 32}},
+        "rateLimitsByLimitId": {"codex": {"primary": {"usedPercent": 32}}},
+        "rateLimitResetCredits": {"availableCount": 0},
+    }
+    app = create_app(web)
+    with TestClient(app) as client:
+        app.state.runtime.connection.rpc = AsyncMock(return_value=payload)
+        result = client.get("/api/usage")
+        assert result.status_code == 200
+        data = result.json()
+        assert {key: data[key] for key in payload} == payload
+        assert data["updatedAt"] > 0
+        app.state.runtime.connection.rpc.assert_awaited_once_with(
+            "account/rateLimits/read", {}
+        )
+        app.state.runtime.connection.rpc.side_effect = ConnectionError("连接已断开")
+        assert client.get("/api/usage").status_code == 503
+
+
+def test_usage_requires_authentication(web):
+    web.token = "test-only-long-token"
+    app = create_app(web)
+    with TestClient(app) as client:
+        app.state.runtime.connection.rpc = AsyncMock()
+        assert client.get("/api/usage").status_code == 401
+        app.state.runtime.connection.rpc.assert_not_called()

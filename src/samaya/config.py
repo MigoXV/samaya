@@ -37,8 +37,6 @@ class Settings:
 
     def directory(self, value: str) -> Path:
         path = Path(value).expanduser().resolve()
-        if not any(path == root or root in path.parents for root in self.roots):
-            raise ValueError("目录不在 SAMAYA_ROOTS 允许范围内")
         if not path.is_dir():
             raise ValueError("目录不存在或不是文件夹")
         return path

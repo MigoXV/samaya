@@ -256,6 +256,19 @@ export async function install(context, state) {
     if (p === "/api/auth" || p === "/api/login")
       body = { authenticated: true, csrf: "isolated-demo" };
     else if (p === "/api/monitor") body = state;
+    else if (p === "/api/input-catalog")
+      body = {
+        cwd:
+          state.records.find(
+            (r) => r.thread.id === url.searchParams.get("threadId"),
+          )?.thread.cwd || url.searchParams.get("cwd"),
+        references: [],
+        commands: [],
+        prompts: [],
+        errors: [],
+      };
+    else if (p.endsWith("/command-context"))
+      body = { data: { goal: null }, fields: [], readOnly: true };
     else if (p === "/api/status")
       body = {
         connection: "connected",
@@ -385,4 +398,17 @@ export async function install(context, state) {
     });
   });
   return { calls, broadcast };
+}
+
+export async function returnToOverview(page) {
+  const dialog = page.getByRole("dialog");
+  if (await dialog.isVisible()) await page.keyboard.press("Escape");
+  const overview = page.getByRole("button", { name: "任务总览", exact: true });
+  if (!(await overview.isVisible()))
+    await page
+      .getByRole("button", { name: "展开任务侧栏", exact: true })
+      .click();
+  await overview.click();
+  const all = page.getByRole("button", { name: "查看全部任务 →", exact: true });
+  if (await all.isVisible()) await all.click();
 }

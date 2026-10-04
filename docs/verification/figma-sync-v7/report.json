@@ -1,0 +1,34 @@
+{
+  "geometry": [
+    {
+      "width": 1440,
+      "right": 1216,
+      "composerRight": 1216,
+      "paddingTop": "10px",
+      "paddingBottom": "10px"
+    },
+    {
+      "width": 768,
+      "right": 744,
+      "composerRight": 744,
+      "paddingTop": "10px",
+      "paddingBottom": "10px"
+    },
+    {
+      "width": 390,
+      "right": 370,
+      "composerRight": 370,
+      "paddingTop": "10px",
+      "paddingBottom": "10px"
+    },
+    {
+      "width": 320,
+      "right": 300,
+      "composerRight": 300,
+      "paddingTop": "10px",
+      "paddingBottom": "10px"
+    }
+  ],
+  "errors": [],
+  "noMutations": true
+}

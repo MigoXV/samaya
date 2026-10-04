@@ -5,9 +5,7 @@
   grid-template-columns: 208px minmax(0, 1fr);
   background: var(--bg-primary);
   color: var(--text-primary);
-  font-family:
-    DengXian, "等线", "Noto Sans SC", "Microsoft YaHei", "PingFang SC",
-    system-ui, sans-serif;
+  font-family: var(--font-ui);
   font-size: 16px;
   line-height: 1.5;
   overflow: hidden;
@@ -1038,4 +1036,531 @@
     flex-shrink: 0;
     white-space: nowrap;
   }
+}
+
+/* v4: navigation changes shape; the mounted reading workspace stays continuous. */
+.monitor-toolbar {
+  min-height: 56px;
+  height: 56px;
+  flex-shrink: 0;
+}
+.task-navigation {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+}
+.monitor-filters {
+  min-height: 48px;
+  padding: 8px 16px;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.recent-scope {
+  min-height: 0;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  gap: 8px;
+  margin-left: auto;
+  font-size: 12px;
+}
+.recent-scope > span {
+  display: none;
+}
+.monitor-workspace {
+  flex-direction: row;
+}
+.task-navigation .monitor-list {
+  min-height: 0;
+}
+.task-is-open.monitor-shell {
+  grid-template-columns: minmax(0, 1fr);
+}
+.task-is-open > .monitor-nav,
+.task-is-open .monitor-toolbar {
+  display: none;
+}
+.task-is-open .task-navigation {
+  flex: 0 0 304px;
+  width: 304px;
+  border-right: 1px solid var(--border);
+  background: var(--bg-secondary);
+}
+.sidebar-toolbar {
+  display: flex;
+  align-items: center;
+  height: 48px;
+  flex-shrink: 0;
+  padding: 8px;
+  gap: 8px;
+}
+.sidebar-toolbar button {
+  min-height: 32px;
+  padding: 4px 8px;
+}
+.sidebar-close,
+.task-sidebar-toggle,
+.task-nav-backdrop {
+  display: none;
+}
+.task-is-open .monitor-filters {
+  display: flex;
+  flex-wrap: wrap;
+  padding: 8px;
+}
+.task-is-open .monitor-filters .search-label {
+  flex-basis: 100%;
+  max-width: none;
+}
+.task-is-open .monitor-filters label:not(.search-label) {
+  flex: 1 1 112px;
+}
+.task-is-open .monitor-filters select {
+  max-width: 100%;
+  font-size: 12px;
+}
+.task-is-open .recent-scope {
+  display: flex;
+  margin-left: 0;
+}
+.task-is-open .task-row {
+  position: relative;
+  display: block;
+  height: 144px;
+  padding: 12px 16px;
+}
+.task-is-open .task-open {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 4px;
+  width: 100%;
+  min-height: 80px !important;
+}
+.task-is-open .task-identity,
+.task-is-open .task-progress {
+  gap: 0;
+}
+.task-is-open .task-identity strong {
+  font-size: 14px;
+}
+.task-is-open .task-identity small {
+  font-size: 12px;
+}
+.task-is-open .task-progress {
+  font-size: 12px;
+}
+.task-is-open .task-decision {
+  display: inline-block;
+  width: auto;
+  max-width: 210px;
+  margin-top: 4px;
+}
+.task-is-open .task-decision > .muted {
+  display: none;
+}
+.task-is-open .task-decision button {
+  min-height: 32px;
+  font-size: 12px;
+  padding: 4px 8px;
+}
+.task-is-open .task-decision small {
+  display: inline;
+  margin-left: 4px;
+}
+.task-is-open .task-freshness {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  width: auto;
+}
+.task-is-open .task-freshness time {
+  display: none;
+}
+.task-is-open .task-freshness small {
+  font-size: 11px;
+}
+.task-detail,
+.focus-mode .task-detail {
+  flex: 1;
+  min-width: 0;
+  width: auto;
+  max-width: none;
+  padding: 0;
+  border: 0;
+  margin: 0;
+  background: var(--bg-primary);
+}
+.task-heading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 48px;
+  flex-shrink: 0;
+  padding: 4px 16px;
+  min-width: 0;
+}
+.task-heading h1 {
+  font-size: 16px;
+  font-weight: 500;
+  margin: 0;
+  min-width: 0;
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.task-heading button {
+  min-height: 32px;
+  padding: 4px 8px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.task-heading .project-context {
+  max-width: 144px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.detail-tabs {
+  height: 40px;
+  min-height: 40px;
+  padding: 0 16px;
+  margin: 0;
+  display: flex;
+  align-items: stretch;
+  gap: 16px;
+  border-bottom: 1px solid var(--border);
+}
+.detail-tabs button {
+  flex: 0 0 auto;
+  width: auto;
+  min-height: 32px;
+  padding: 4px 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  font-size: 14px;
+}
+.detail-tabs button[aria-current="page"] {
+  border: 0;
+  border-bottom: 2px solid var(--accent-strong);
+  color: var(--text-primary);
+}
+.detail-tabs .detail-state {
+  color: var(--text-secondary);
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+  flex-shrink: 1;
+}
+.detail-tabs .reading-width {
+  margin-left: auto;
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+.reading-surface {
+  flex: 1;
+  min-height: 0;
+  position: relative;
+}
+.detail-scroll {
+  height: 100%;
+  padding: 24px 32px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-gutter: stable;
+}
+.reading-content {
+  min-width: 0;
+}
+.detail-scroll .message,
+.task-context,
+.turn-divider,
+.detail-scroll > .reading-content > details {
+  max-width: 960px;
+  margin-left: auto;
+  margin-right: auto;
+}
+.reading-wide .detail-scroll .message {
+  max-width: none;
+}
+.history-view .message {
+  padding: 16px 0;
+  border: 0;
+}
+.history-view .message.user {
+  border: 0;
+}
+.history-view .message p {
+  margin: 8px 0 16px;
+}
+.history-view .tool {
+  padding: 8px 0;
+  font-size: 13px;
+  margin: 8px 0;
+}
+.history-view .tool summary {
+  display: list-item;
+  padding: 4px 8px;
+  background: var(--surface-subtle);
+  min-height: 32px;
+}
+.history-view .tool summary small {
+  margin-left: 8px;
+}
+.history-view .tool pre {
+  max-height: 360px;
+  overflow: auto;
+  white-space: pre;
+}
+.history-view .markdown pre {
+  max-width: 100%;
+  overflow: auto;
+}
+.history-view .markdown table {
+  display: block;
+  max-width: 100%;
+  overflow-x: auto;
+}
+.task-context:empty {
+  display: none;
+}
+.task-context > .request-action {
+  margin-bottom: 8px;
+}
+.task-error {
+  padding: 8px 0;
+}
+.task-error summary {
+  color: var(--accent-strong);
+}
+.related-activities {
+  margin: 8px 0;
+}
+.turn-divider {
+  margin-top: 0;
+  padding: 8px 0;
+  border: 0;
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+.jump-latest {
+  position: absolute;
+  bottom: 12px;
+  right: 24px;
+  min-height: 32px;
+  background: var(--surface);
+}
+.detail-footer {
+  display: block;
+  border-top: 1px solid var(--border);
+  padding: 8px 24px;
+  min-height: 104px;
+}
+.task-composer {
+  display: block;
+  margin: 0;
+  padding: 0;
+}
+.task-composer label {
+  display: block;
+  margin: 0;
+}
+.task-composer textarea {
+  display: block;
+  width: 100%;
+  min-height: 40px;
+  max-height: 400px;
+  margin: 0;
+  padding: 8px;
+  resize: none;
+  font-size: 16px;
+  line-height: 24px;
+  border: 0;
+  background: transparent;
+}
+.composer-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  height: 40px;
+}
+.composer-actions button {
+  min-height: 32px;
+  margin: 0;
+  padding: 4px 12px;
+}
+.composer-spacer {
+  flex: 1;
+}
+.workspace-full-path {
+  display: block;
+  overflow-wrap: anywhere;
+  margin: 16px 0;
+}
+.focus-mode .task-navigation {
+  display: none;
+}
+.focus-mode .monitor-main {
+  width: 100%;
+  max-width: none;
+}
+.focus-mode .monitor-workspace {
+  padding: 0;
+}
+@media (max-width: 1099px) {
+  .task-is-open .task-navigation {
+    display: none;
+  }
+  .task-is-open.task-nav-open .task-navigation {
+    display: flex;
+    position: absolute;
+    z-index: 31;
+    inset: 0 auto 0 0;
+    max-width: calc(100vw - 32px);
+    width: 304px;
+  }
+  .task-nav-open .task-nav-backdrop {
+    display: block;
+    position: absolute;
+    inset: 0;
+    z-index: 30;
+    background: var(--overlay-bg);
+    border: 0;
+    border-radius: 0;
+  }
+  .sidebar-close,
+  .task-sidebar-toggle {
+    display: block;
+  }
+  .task-is-open .has-detail .monitor-list {
+    display: block;
+  }
+  .task-heading .workspace-exceptions {
+    display: none;
+  }
+}
+@media (max-width: 799px) {
+  .monitor-toolbar {
+    height: auto;
+    min-height: 56px;
+  }
+  .monitor-filters {
+    padding: 8px;
+    gap: 8px;
+  }
+  .monitor-filters label {
+    flex: 1 1 128px;
+  }
+  .monitor-filters .search-label {
+    flex-basis: 100%;
+    max-width: none;
+  }
+  .task-heading {
+    padding: 0 8px;
+    gap: 4px;
+  }
+  .task-heading h1 {
+    font-size: 14px;
+  }
+  .task-heading button {
+    min-height: 44px;
+    padding: 4px 8px;
+    font-size: 12px;
+  }
+  .task-heading .focus-toggle,
+  .task-heading .project-context,
+  .task-heading .task-sidebar-toggle {
+    display: none;
+  }
+  .task-heading .workspace-back {
+    display: block;
+  }
+  .detail-tabs {
+    gap: 16px;
+    padding: 0 16px;
+    height: 44px;
+    min-height: 44px;
+  }
+  .detail-tabs button {
+    min-height: 44px;
+  }
+  .detail-tabs .reading-width {
+    display: none;
+  }
+  .detail-scroll {
+    padding: 16px;
+  }
+  .detail-footer {
+    padding: 8px;
+    min-height: 108px;
+    padding-bottom: max(8px, env(safe-area-inset-bottom));
+  }
+  .composer-actions {
+    gap: 4px;
+    height: 44px;
+  }
+  .composer-actions button {
+    min-height: 44px;
+    padding: 4px 8px;
+    font-size: 13px;
+  }
+  .composer-shortcut {
+    display: none;
+  }
+  .task-is-open .monitor-feedback {
+    max-height: 112px;
+    overflow: auto;
+  }
+  .task-navigation .task-open {
+    min-width: 0;
+  }
+}
+.task-is-open .task-row {
+  height: 128px;
+  padding: 8px 16px;
+}
+.task-is-open .task-open {
+  min-height: 76px !important;
+}
+.task-is-open .task-progress > span,
+.task-is-open .task-identity small {
+  line-height: 16px;
+}
+.task-is-open .task-freshness .pin {
+  min-height: 32px;
+}
+.outside-selected {
+  font-size: 12px;
+  align-self: center;
+  color: var(--text-secondary);
+}
+.attention-text {
+  text-decoration: none;
+  font-weight: 500;
+}
+.attention-text::before {
+  content: "! ";
+}
+@media (max-width: 799px) {
+  .outside-selected {
+    display: none;
+  }
+}
+.task-is-open .task-freshness .pin {
+  white-space: nowrap;
+  top: auto;
+  bottom: 0;
+  width: auto;
+}
+.task-is-open .task-progress .fact {
+  display: block;
+}
+.task-composer textarea {
+  max-height: min(400px, 45dvh);
 }

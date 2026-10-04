@@ -9,18 +9,23 @@ p.on("request", (r) => {
 const errors = [];
 p.on("pageerror", (e) => errors.push(e.message));
 await p.goto(process.env.SAMAYA_RUNTIME_TEST_URL || "http://127.0.0.1:8772");
+await p.getByRole("button", { name: "查看全部任务 →", exact: true }).click();
 await p.getByRole("list", { name: "任务列表" }).waitFor();
 const data = await p.evaluate(() =>
   fetch("/api/monitor").then((r) => r.json()),
 );
 await p.locator(".task-open").first().click();
-await p.locator(".task-detail h2").waitFor();
-const selected = await p.locator(".task-detail h2").textContent();
-await p.getByRole("button", { name: "当前工作", exact: true }).click();
+await p.locator(".task-reading-heading h1").waitFor();
+const selected = await p.locator(".task-reading-heading h1").textContent();
+await expect(
+  p.getByRole("region", { name: "连续执行记录", exact: true }),
+).toBeVisible();
 await p.locator(".history-view .message").first().waitFor();
 await p.reload();
-await p.locator(".task-detail h2").waitFor();
-expect(await p.locator(".task-detail h2").textContent()).toBe(selected);
+await p.locator(".task-reading-heading h1").waitFor();
+expect(await p.locator(".task-reading-heading h1").textContent()).toBe(
+  selected,
+);
 await p.locator(".history-view .message").first().waitFor();
 await p.screenshot({ path: "../../.samaya/workflow-v3/runtime-desktop.png" });
 const result = {

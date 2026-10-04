@@ -28,6 +28,7 @@ class Operations:
     @staticmethod
     def validate_action(action: str, body: dict) -> None:
         required = {
+            "command": ["threadId", "command"],
             "create": ["cwd"],
             "send": ["threadId", "text"],
             "steer": ["threadId", "text", "expectedTurnId"],

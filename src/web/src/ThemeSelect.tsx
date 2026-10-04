@@ -16,7 +16,7 @@ declare global {
   }
 }
 
-export function ThemeSelect() {
+export function ThemeSelect({ segmented = false }: { segmented?: boolean }) {
   const id = useId();
   const theme = useSyncExternalStore(
     window.samayaTheme.subscribe,
@@ -24,21 +24,48 @@ export function ThemeSelect() {
   );
   return (
     <div className="theme-control">
-      <label htmlFor={id}>界面主题</label>
-      <select
-        id={id}
-        value={theme.preference}
-        aria-describedby={`${id}-status`}
-        onChange={(event) =>
-          window.samayaTheme.setPreference(
-            event.target.value as ThemePreference,
-          )
-        }
-      >
-        <option value="vallum">白垣</option>
-        <option value="abyssus">苍渊</option>
-        <option value="system">跟随系统</option>
-      </select>
+      {segmented ? (
+        <div className="theme-setting-row">
+          <span id={id}>主题</span>
+          <div role="group" aria-labelledby={id} className="theme-buttons">
+            {(
+              [
+                ["vallum", "白垣"],
+                ["abyssus", "苍渊"],
+                ["system", "跟随系统"],
+              ] as const
+            ).map(([value, label]) => (
+              <button
+                key={value}
+                type="button"
+                aria-pressed={theme.preference === value}
+                onClick={() => window.samayaTheme.setPreference(value)}
+              >
+                {label}
+                {theme.preference === value ? " ✓" : ""}
+              </button>
+            ))}
+          </div>
+        </div>
+      ) : (
+        <>
+          <label htmlFor={id}>界面主题</label>
+          <select
+            id={id}
+            value={theme.preference}
+            aria-describedby={`${id}-status`}
+            onChange={(event) =>
+              window.samayaTheme.setPreference(
+                event.target.value as ThemePreference,
+              )
+            }
+          >
+            <option value="vallum">白垣</option>
+            <option value="abyssus">苍渊</option>
+            <option value="system">跟随系统</option>
+          </select>
+        </>
+      )}
       <small
         id={`${id}-status`}
         role="status"

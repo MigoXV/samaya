@@ -30,8 +30,31 @@ export type MonitorSnapshot = {
   changes: Change[];
   requestCoverage: string;
 };
+/** A display snippet, never a substitute for the original Markdown message. */
+export const plainSnippet = (value: string) =>
+  value
+    .replace(/```[^\n]*\n?/g, " ")
+    .replace(/!?\[([^\]]*)\]\([^)]*\)/g, "$1")
+    .replace(/(^|\n)\s{0,3}(?:#{1,6}|>|[-*+] |\d+\. )/g, " ")
+    .replace(/(\*\*|__|~~|`)/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+export function commandSummary(item: {
+  status?: string;
+  exitCode?: number | null;
+}) {
+  return item.status === "inProgress"
+    ? "命令执行中"
+    : item.exitCode != null
+      ? `命令执行结束 · 退出码 ${item.exitCode}`
+      : item.status === "failed"
+        ? "命令执行失败 · 查看原因"
+        : "命令状态：" + (item.status || "待确认");
+}
 export const threadTitle = (t: Thread) =>
-  t.name || t.preview?.split("\n")[0].slice(0, 120) || "未命名任务";
+  plainSnippet(
+    t.name || t.preview?.split("\n")[0].slice(0, 120) || "未命名任务",
+  );
 export const projectName = (t: Thread) =>
   t.cwd?.split("/").filter(Boolean).at(-1) || "未提供目录";
 export const clock = (n?: number | null) =>
@@ -62,7 +85,12 @@ export function execution(r: Observation): string {
 }
 export function progress(r: Observation): { text: string; source: string } {
   if (r.turn?.error?.message)
-    return { text: r.turn.error.message, source: "Codex 轮次错误" };
+    return {
+      text: /refresh.*token|token.*refresh/i.test(r.turn.error.message)
+        ? "登录凭据刷新失败 · 展开查看原始错误"
+        : plainSnippet(r.turn.error.message),
+      source: "Codex 轮次错误",
+    };
   if (r.turn?.status === "interrupted")
     return {
       text: "服务端确认本轮已中断；未提供更具体原因。文件和后台进程未自动回滚或终止。",
@@ -85,12 +113,15 @@ export function progress(r: Observation): { text: string; source: string } {
     );
   if (failed)
     return {
-      text: `${failed.command || failed.type} · ${failed.exitCode != null ? `退出码 ${failed.exitCode}` : "执行失败"}`,
+      text:
+        failed.type === "commandExecution"
+          ? commandSummary(failed) + "；原因待核对输出"
+          : `${failed.type} · 执行失败`,
       source: "工具结果",
     };
   const step = r.plan?.steps.find((s) => s.status === "inProgress");
   if (step && r.turn?.status === "inProgress")
-    return { text: step.step, source: "原生计划 · 当前步骤" };
+    return { text: plainSnippet(step.step), source: "原生计划 · 当前步骤" };
   const active = [...items]
     .reverse()
     .find((i) => i.status === "inProgress" && i.type !== "reasoning");
@@ -102,12 +133,12 @@ export function progress(r: Observation): { text: string; source: string } {
       .find((i) => !["reasoning", "userMessage"].includes(i.type));
   if (last?.type === "agentMessage")
     return {
-      text: last.text || "已收到回复；展开查看内容",
+      text: plainSnippet(last.text || "已收到回复；展开查看内容"),
       source: "AI 说明 · 非验收结论",
     };
   if (last?.type === "commandExecution")
     return {
-      text: `${last.status === "inProgress" ? "命令执行中" : last.exitCode != null ? `命令退出码 ${last.exitCode}` : "命令状态 " + (last.status || "待确认")}：${last.command || "展开执行记录"}`,
+      text: commandSummary(last),
       source: "命令事件",
     };
   if (last?.type === "fileChange")
@@ -140,7 +171,7 @@ export function recentFact(r: Observation): string | null {
     );
   if (!item) return null;
   return item.type === "commandExecution"
-    ? `命令退出码 ${item.exitCode}：${item.command || "命令"}`
+    ? commandSummary(item)
     : `已记录 ${item.changes?.length || 0} 项文件变更`;
 }
 export function rootId(id: string, records: Map<string, Observation>): string {

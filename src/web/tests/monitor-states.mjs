@@ -1,5 +1,5 @@
 import { chromium, expect } from "@playwright/test";
-import { fixture, install } from "./monitor-fixture.mjs";
+import { fixture, install, returnToOverview } from "./monitor-fixture.mjs";
 import { writeFileSync, mkdirSync } from "node:fs";
 const browser = await chromium.launch({ args: ["--no-sandbox"] });
 const cases = [];
@@ -13,6 +13,9 @@ async function scenario(name, alter, check) {
   const controls = await install(context, state),
     page = await context.newPage();
   await page.goto(url);
+  await page
+    .getByRole("button", { name: "查看全部任务 →", exact: true })
+    .click();
   await check(page, state, controls, context);
   cases.push(name);
   await context.unrouteAll({ behavior: "wait" });
@@ -83,6 +86,8 @@ await scenario(
   },
   async (p) => {
     await p.getByRole("list").waitFor();
+    await expect(p.locator(".monitor-banner")).toHaveCount(0);
+    await p.locator(".connection-notice summary").click();
     await expect(
       p.getByText("连接已断开或正在恢复。保留最后确认状态，不代表执行已停止。"),
     ).toBeVisible();
@@ -108,20 +113,19 @@ await scenario(
     });
     await p.locator('[data-task-id="demo-0"] .task-open').click();
     await p.getByLabel("补充当前任务", { exact: true }).fill("只发送一次");
-    await p.getByRole("button", { name: "追加到当前轮次" }).click();
+    await p.getByRole("button", { name: "追加指令" }).click();
     await expect(
       p.getByRole("button", { name: "1 项操作待核查" }),
     ).toBeVisible();
     await p.reload();
     await p.getByRole("button", { name: "1 项操作待核查" }).waitFor();
     expect(requests).toBe(1);
-    await p.getByRole("button", { name: "追加到当前轮次" }).click();
-    await expect(p.getByRole("alert")).toContainText("此对象有操作等待核查");
+    await expect(p.getByRole("button", { name: "追加指令" })).toBeDisabled();
     expect(requests).toBe(1);
-    await p.getByRole("button", { name: "返回列表", exact: true }).click();
+    await returnToOverview(p);
     await p.locator('[data-task-id="demo-3"] .task-open').click();
     await p.getByLabel("补充当前任务", { exact: true }).fill("另一任务要求");
-    await p.getByRole("button", { name: "追加到当前轮次" }).click();
+    await p.getByRole("button", { name: "追加指令" }).click();
     await expect.poll(() => requests).toBe(2);
   },
 );
@@ -190,7 +194,7 @@ await scenario(
       .getByRole("button", { name: /等待答复确认.*去重范围/ })
       .click();
     await expect(
-      p.getByRole("button", { name: "提交回答", exact: true }),
+      p.getByRole("button", { name: "确认 →", exact: true }),
     ).toBeDisabled();
     await expect(p.getByText("答复已发送；等待服务端消除请求。")).toBeVisible();
     s.pendingRequests = s.pendingRequests.filter((r) => r.key !== "req-0");
@@ -273,6 +277,23 @@ await scenario(
     await expect(p.getByText("demo-10：已确认", { exact: true })).toBeVisible();
   },
 );
+
+await scenario(
+  "initial-connection-is-not-an-outage",
+  (s) => {
+    s.connection = "connecting";
+    s.initialized = false;
+  },
+  async (p) => {
+    await expect(
+      p.getByText("正在取得全局会话状态…", { exact: true }),
+    ).toBeVisible();
+    await expect(p.locator(".monitor-banner")).toHaveCount(0);
+    await expect(p.locator(".connection-notice")).toHaveCount(0);
+    await expect(p.locator(".nav-bottom")).toContainText("正在连接…");
+  },
+);
+
 mkdirSync("../../.samaya/workflow-v3", { recursive: true });
 writeFileSync(
   "../../.samaya/workflow-v3/states.json",

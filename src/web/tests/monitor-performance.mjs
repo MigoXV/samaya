@@ -16,14 +16,14 @@ await page.locator('[data-task-id="demo-0"] .task-open').click();
 await page
   .getByLabel("补充当前任务", { exact: true })
   .fill("压力测试期间保留草稿");
-await page.locator(".recent-requirement p").waitFor();
+await page.locator(".message.user .prose").waitFor();
 const sampling = page.evaluate(async (base) => {
   const latency = [],
     longTasks = [];
   new PerformanceObserver((list) =>
     longTasks.push(...list.getEntries().map((e) => e.duration)),
   ).observe({ entryTypes: ["longtask"] });
-  const log = document.querySelector(".recent-requirement p"),
+  const log = document.querySelector(".message.user .prose"),
     range = document.createRange();
   range.selectNodeContents(log);
   const selection = getSelection();
@@ -67,7 +67,9 @@ const sampling = page.evaluate(async (base) => {
         const start = performance.now();
         const observer = new MutationObserver(() => {
           if (
-            document.querySelector(".task-detail")?.textContent.includes(label)
+            document
+              .querySelector('[data-task-id="demo-0"] .fact')
+              ?.textContent.includes(label)
           ) {
             requestAnimationFrame(() =>
               latency.push(performance.now() - start),
@@ -75,7 +77,7 @@ const sampling = page.evaluate(async (base) => {
             observer.disconnect();
           }
         });
-        observer.observe(document.querySelector(".task-detail"), {
+        observer.observe(document.querySelector(".monitor-list"), {
           subtree: true,
           childList: true,
           characterData: true,
@@ -106,14 +108,14 @@ const sampling = page.evaluate(async (base) => {
     scrollAfter: list.scrollTop,
     draft: document.querySelector(".task-composer textarea").value,
     renderedRows: document.querySelectorAll(".task-row").length,
-    selectedTask: document.querySelector(".task-detail h2").textContent,
+    selectedTask: document.querySelector(".task-heading h1").textContent,
   };
 }, state);
 await page.waitForTimeout(40000);
 const selectionBeforeTyping = await page.evaluate(
   () =>
     getSelection().toString() ===
-    document.querySelector(".recent-requirement p").textContent,
+    document.querySelector(".message.user .prose").textContent,
 );
 await page.evaluate(() => {
   window.__inputLatencies = [];
