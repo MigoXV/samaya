@@ -17,6 +17,7 @@ import {
   useRef,
   useState,
 } from "react";
+import type { ReactNode } from "react";
 import { api, operation, pendingOperations, clearOperation } from "./api";
 import { DirectoryPicker, Modal, RequestForm } from "./components";
 import { ExecutionHistory } from "./ExecutionHistory";
@@ -299,6 +300,7 @@ export function MonitorWorkbench({ logout }: { logout: () => void }) {
     [requestKey, setRequestKey] = useState<string | null>(null);
   const [notice, setNotice] = useState(""),
     [error, setError] = useState(""),
+    [feedbackThread, setFeedbackThread] = useState(""),
     [busy, setBusy] = useState(""),
     [cwd, setCwd] = useState(""),
     [goal, setGoal] = useState(""),
@@ -569,6 +571,9 @@ export function MonitorWorkbench({ logout }: { logout: () => void }) {
   }, [view, data?.initialized, workMode, sidebarScroll, scroll]);
   const open = useCallback(
     (id: string) => {
+      setError("");
+      setNotice("");
+      setFeedbackThread("");
       visitProject(records.get(id)?.thread.cwd || "");
       setOpened((old) => [id, ...old.filter((x) => x !== id)].slice(0, 30));
       setTaskTab("work");
@@ -609,6 +614,9 @@ export function MonitorWorkbench({ logout }: { logout: () => void }) {
     [],
   );
   const navigate = (v: View) => {
+    setError("");
+    setNotice("");
+    setFeedbackThread("");
     setView(v);
     if (v === "overview") {
       setSelected("");
@@ -633,12 +641,21 @@ export function MonitorWorkbench({ logout }: { logout: () => void }) {
             : "/",
     );
   };
-  async function run(action: string, body: Record<string, unknown>) {
+  const [inFlightScopes, setInFlightScopes] = useState<string[]>([]);
+  async function run(
+    action: string,
+    body: Record<string, unknown>,
+    options?: { throwOnError?: boolean; localFeedback?: boolean },
+  ) {
     const scope = String(body.requestKey || body.threadId || "create");
     if (submitting.current.has(scope)) return null;
     submitting.current.add(scope);
+    setInFlightScopes((old) => [...old, scope]);
     setBusy(scope);
-    setError("");
+    if (!options?.localFeedback) {
+      setError("");
+      setNotice("");
+    }
     try {
       const result = await operation(action, body);
       if (action === "interrupt")
@@ -646,27 +663,78 @@ export function MonitorWorkbench({ logout }: { logout: () => void }) {
           ...old,
           [String(body.threadId)]: String(body.turnId),
         }));
-      setNotice(
-        action === "respond"
-          ? result.result?.sent
-            ? "答复已发送，等待 Codex 确认；是否继续执行以新的活动为准。"
-            : "答复已确认；是否继续执行以新的活动为准。"
-          : action === "interrupt"
-            ? "停止请求已提交；等待轮次中断确认。"
-            : action === "terminate"
-              ? "终止请求已提交；请根据后台命令列表核对结果。"
-              : "操作已确认。",
-      );
-      await refresh();
+      if (!options?.localFeedback) {
+        setFeedbackThread(String(body.threadId || ""));
+        setNotice(
+          action === "respond"
+            ? result.result?.sent
+              ? "答复已发送，等待 Codex 确认；是否继续执行以新的活动为准。"
+              : "答复已确认；是否继续执行以新的活动为准。"
+            : action === "interrupt"
+              ? "停止请求已提交；等待轮次中断确认。"
+              : action === "terminate"
+                ? "终止请求已提交；请根据后台命令列表核对结果。"
+                : "",
+        );
+      }
+      if (options?.localFeedback) {
+        // The settings receipt already contains the authoritative selected values.
+        // Global monitoring reconciles separately from the local saving indicator.
+        void refresh().catch(() => {});
+      } else {
+        try {
+          await refresh();
+        } catch {
+          setFeedbackThread(String(body.threadId || ""));
+          setNotice("操作结果已确认，任务状态仍在同步。");
+        }
+      }
       return result;
     } catch (e) {
-      setError(String(e));
+      if (!options?.localFeedback) {
+        setFeedbackThread(String(body.threadId || ""));
+        setError(String(e));
+      }
+      if (options?.throwOnError) throw e;
       return null;
     } finally {
       submitting.current.delete(scope);
+      setInFlightScopes((old) => old.filter((value) => value !== scope));
       setBusy("");
     }
   }
+  const unresolvedReceipts = receipts.filter(
+    (r) => !inFlightScopes.includes(r.scope),
+  );
+  const receiptEntry = unresolvedReceipts.length > 0 && (
+    <button
+      className="quiet operation-receipts"
+      onClick={() => setDialog("receipts")}
+      aria-label={`${unresolvedReceipts.length} 项操作待核查`}
+      title={`${unresolvedReceipts.length} 项操作待核查`}
+    >
+      {narrow
+        ? `${unresolvedReceipts.length} 回执`
+        : `${unresolvedReceipts.length} 项操作待核查`}
+    </button>
+  );
+  const operationFeedback = (
+    <>
+      {error && (
+        <p className="operation-feedback" role="alert">
+          {error}
+        </p>
+      )}
+      {notice && (
+        <p className="operation-feedback" role="status">
+          {notice}
+        </p>
+      )}
+    </>
+  );
+  const feedbackForCurrentTask =
+    !feedbackThread ||
+    rootId(feedbackThread, records) === rootId(selected, records);
   async function create() {
     const created = await run("create", { cwd, name: newName });
     if (!created) return;
@@ -816,6 +884,12 @@ export function MonitorWorkbench({ logout }: { logout: () => void }) {
           </button>
         </div>
         <div className="nav-bottom">
+          {!workMode && receiptEntry}
+          {!workMode && !dialog && !requestTask && (error || notice) && (
+            <button className="quiet" onClick={() => setDialog("receipts")}>
+              查看操作反馈
+            </button>
+          )}
           <button onClick={() => navigate("records")}>
             <History
               size={16}
@@ -918,26 +992,6 @@ export function MonitorWorkbench({ logout }: { logout: () => void }) {
             </button>
           </div>
         )}
-        {(error || notice || receipts.length > 0) && (
-          <div className="monitor-feedback" aria-live="polite">
-            {error && <span role="alert">{error}</span>}
-            {notice && <span>{notice}</span>}
-            {receipts.length > 0 && (
-              <button onClick={() => setDialog("receipts")}>
-                {receipts.length} 项操作待核查
-              </button>
-            )}
-            <button
-              className="quiet"
-              onClick={() => {
-                setError("");
-                setNotice("");
-              }}
-            >
-              收起提示
-            </button>
-          </div>
-        )}
         {overviewMode && (
           <TaskOverview
             controls={
@@ -965,15 +1019,10 @@ export function MonitorWorkbench({ logout }: { logout: () => void }) {
             initialized={!!data?.initialized}
             summary={sidebarSummary}
             open={open}
-            decide={(id, key) => {
-              setRequestTask(id);
-              setRequestKey(key);
-            }}
             all={() => {
               setAllTasks(true);
               setSearch("");
             }}
-            attention={() => navigate("attention")}
           />
         )}
         {!overviewMode &&
@@ -1294,6 +1343,19 @@ export function MonitorWorkbench({ logout }: { logout: () => void }) {
                           ☰
                         </button>
                         <span className="toolbar-space" />
+                        {receiptEntry}
+                        {error &&
+                          !feedbackForCurrentTask &&
+                          !unresolvedReceipts.length && (
+                            <button
+                              className="quiet operation-receipts"
+                              onClick={() => setDialog("receipts")}
+                              aria-label="查看操作反馈"
+                              title="查看操作反馈"
+                            >
+                              {narrow ? "反馈" : "查看操作反馈"}
+                            </button>
+                          )}
 
                         <button
                           className={
@@ -1506,6 +1568,17 @@ export function MonitorWorkbench({ logout }: { logout: () => void }) {
                           tid={selected}
                           turnId={selectedRecord.turn?.id}
                           turnStatus={selectedRecord.turn?.status}
+                          turnStartedAt={selectedRecord.turn?.startedAt}
+                          working={
+                            !!connected &&
+                            selectedRecord.turn?.status === "inProgress" &&
+                            execution(selectedRecord) === "执行中" &&
+                            !(
+                              requestsByRoot.get(rootId(selected, records))
+                                ?.length ||
+                              waitingUnknown(selectedRecord, EMPTY)
+                            )
+                          }
                           tab={taskTab}
                         />
                         {taskTab === "work" &&
@@ -1578,6 +1651,18 @@ export function MonitorWorkbench({ logout }: { logout: () => void }) {
                               selectedRecord.turn?.status === "inProgress")
                           }
                           run={run}
+                          runSettings={(action, body) =>
+                            run(action, body, {
+                              throwOnError: true,
+                              localFeedback: true,
+                            })
+                          }
+                          inspectReceipts={() => setDialog("receipts")}
+                          feedback={
+                            !dialog && !requestTask && feedbackForCurrentTask
+                              ? operationFeedback
+                              : null
+                          }
                           stop={() => setDialog("stop")}
                           open={open}
                           navigateCommand={(name) => {
@@ -1700,8 +1785,14 @@ export function MonitorWorkbench({ logout }: { logout: () => void }) {
               onClick={() =>
                 void navigator.clipboard
                   .writeText(selectedRecord.thread.cwd)
-                  .then(() => setNotice("工作目录已复制"))
-                  .catch(() => setError("复制失败，请选择路径手动复制。"))
+                  .then(() => {
+                    setFeedbackThread(selected);
+                    setNotice("工作目录已复制");
+                  })
+                  .catch(() => {
+                    setFeedbackThread(selected);
+                    setError("复制失败，请选择路径手动复制。");
+                  })
               }
             >
               复制目录
@@ -1728,6 +1819,7 @@ export function MonitorWorkbench({ logout }: { logout: () => void }) {
             {clock(selectedRecord.confirmedAt)}
           </p>
           <p>导航不会修改工作目录。已启动的进程保留原工作目录。</p>
+          {operationFeedback}
         </Modal>
       )}
       {searchOpen && (
@@ -1828,6 +1920,7 @@ export function MonitorWorkbench({ logout }: { logout: () => void }) {
               状态；不会构造未知请求的授权按钮。
             </p>
           )}
+          {operationFeedback}
         </Modal>
       )}
       {dialog === "create" && (
@@ -1869,6 +1962,7 @@ export function MonitorWorkbench({ logout }: { logout: () => void }) {
               </p>
             </details>
           </form>
+          {operationFeedback}
         </Modal>
       )}
       {dialog === "workspace" && selectedRecord && (
@@ -1900,6 +1994,7 @@ export function MonitorWorkbench({ logout }: { logout: () => void }) {
               切换工作区
             </button>
           )}
+          {operationFeedback}
         </Modal>
       )}
       {dialog === "stop" && selectedRecord && (
@@ -1925,10 +2020,19 @@ export function MonitorWorkbench({ logout }: { logout: () => void }) {
             停止本轮
           </button>
           <button onClick={() => setDialog(null)}>取消</button>
+          {operationFeedback}
         </Modal>
       )}
       {dialog === "receipts" && (
         <Modal title="核查操作回执" close={() => setDialog(null)}>
+          {feedbackThread && !feedbackForCurrentTask && (
+            <p>
+              {records.has(feedbackThread)
+                ? threadTitle(records.get(feedbackThread)!.thread)
+                : feedbackThread}
+            </p>
+          )}
+          {operationFeedback}
           {receipts.map((r) => (
             <section key={r.operationId}>
               <p>
@@ -1941,6 +2045,7 @@ export function MonitorWorkbench({ logout }: { logout: () => void }) {
                     const result = await api<Receipt>(
                       "/operations/" + r.operationId,
                     );
+                    setFeedbackThread(r.threadId || "");
                     setNotice(
                       `回执：${result.state} ${JSON.stringify(result.result || {})}`,
                     );
@@ -1948,6 +2053,7 @@ export function MonitorWorkbench({ logout }: { logout: () => void }) {
                       clearOperation(r.operationId);
                     await refresh();
                   } catch (e) {
+                    setFeedbackThread(r.threadId || "");
                     setError(String(e));
                   }
                 }}
@@ -2031,6 +2137,9 @@ function TaskComposer({
   connected,
   busy,
   run,
+  runSettings,
+  inspectReceipts,
+  feedback,
   stop,
   open,
   navigateCommand,
@@ -2039,6 +2148,12 @@ function TaskComposer({
   connected: boolean;
   busy: boolean;
   run: (a: string, b: Record<string, unknown>) => Promise<Receipt | null>;
+  runSettings: (
+    a: string,
+    b: Record<string, unknown>,
+  ) => Promise<Receipt | null>;
+  inspectReceipts: () => void;
+  feedback: ReactNode;
   stop: () => void;
   open: (id: string) => void;
   navigateCommand: (name: string) => void;
@@ -2140,6 +2255,7 @@ function TaskComposer({
         }
       />
       {localError && <small role="alert">{localError}</small>}
+      {!command && feedback}
       <ComposerInput
         value={draft}
         onChange={setDraft}
@@ -2152,13 +2268,16 @@ function TaskComposer({
             key={id}
             tid={id}
             model={record.thread.model}
+            reasoningEffort={record.thread.reasoningEffort}
+            serviceTier={record.thread.serviceTier}
+            busy={busy}
             disabled={
               !connected ||
-              busy ||
               record.thread.canAcceptDirectInput === false ||
               !!record.error
             }
-            run={run}
+            run={runSettings}
+            inspectReceipts={inspectReceipts}
           />
         }
         active={active}

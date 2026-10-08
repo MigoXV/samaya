@@ -45,6 +45,15 @@ def services(tmp_path):
                 ],
                 "nextCursor": None,
             }
+        if method == "thread/settings/update":
+            thread.update(
+                {
+                    ("reasoningEffort" if k == "effort" else k): v
+                    for k, v in params.items()
+                    if k != "threadId"
+                }
+            )
+            return {}
         if method == "model/list":
             return {
                 "data": [
@@ -80,7 +89,14 @@ def services(tmp_path):
     connection = SimpleNamespace(
         generation=1, connected=lambda: True, rpc=AsyncMock(side_effect=rpc)
     )
-    queries = SimpleNamespace(read=AsyncMock(return_value={"thread": thread}))
+
+    async def settings(tid, refresh=False):
+        return {k: thread.get(k) for k in ("model", "reasoningEffort", "serviceTier")}
+
+    queries = SimpleNamespace(
+        read=AsyncMock(return_value={"thread": thread}),
+        settings=AsyncMock(side_effect=settings),
+    )
     catalog = InputCatalog(Settings(roots=[tmp_path]), connection, queries)
     commands = CommandService(
         catalog, SimpleNamespace(store=SimpleNamespace(watch=lambda _: None))
@@ -178,7 +194,7 @@ async def test_command_routes_to_native_method(services, command, args, method):
     await cmd.execute(
         {"threadId": "t", "command": command, "expectedTurnId": "last", "args": args}
     )
-    assert con.rpc.call_args.args[0] == method
+    assert any(c.args[0] == method for c in con.rpc.call_args_list)
     assert not any(c.args[0] == "turn/interrupt" for c in con.rpc.call_args_list)
 
 

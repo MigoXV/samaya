@@ -267,6 +267,14 @@ export async function install(context, state) {
         prompts: [],
         errors: [],
       };
+    else if (p.endsWith("/model-settings"))
+      body = {
+        models: [],
+        current: { model: null, reasoningEffort: null, serviceTier: "default" },
+        expectedTurnId: null,
+        active: false,
+        editable: true,
+      };
     else if (p.endsWith("/command-context"))
       body = { data: { goal: null }, fields: [], readOnly: true };
     else if (p === "/api/status")

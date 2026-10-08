@@ -34,6 +34,10 @@ def register_routes(application: FastAPI, config: Settings) -> None:
     async def command_context(tid: str, command: str):
         return await service().commands.context(tid, command)
 
+    @application.get("/api/threads/{tid}/model-settings")
+    async def model_settings(tid: str):
+        return await service().commands.model_settings(tid, refresh=True)
+
     @application.get("/api/status")
     async def status():
         return service().status()

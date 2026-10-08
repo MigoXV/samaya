@@ -1,0 +1,86 @@
+.tool-sequence,
+.working-status {
+  max-width: var(--reading-width, 880px);
+  margin-left: auto;
+  margin-right: auto;
+  color: var(--text-secondary);
+  font-size: 14px;
+}
+.history-pagination {
+  min-height: 24px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 20px;
+}
+.task-detail .detail-scroll {
+  overflow-anchor: none;
+}
+.history-pagination button {
+  min-height: 24px;
+  padding: 2px 8px;
+  margin-left: 8px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font-size: inherit;
+}
+.history-loading-icon {
+  display: inline-block;
+  animation: history-loading 0.8s linear infinite;
+}
+.history-local-loading {
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+@keyframes history-loading {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .history-loading-icon {
+    animation: none;
+  }
+}
+.tool-sequence {
+  margin-top: 8px;
+  margin-bottom: 8px;
+}
+.task-detail .history-view .tool-sequence > summary {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 32px;
+  padding: 6px 0;
+  line-height: 20px;
+  list-style: none;
+  background: transparent;
+  cursor: pointer;
+}
+.tool-sequence > summary::-webkit-details-marker {
+  display: none;
+}
+.tool-sequence > summary::before {
+  display: none;
+}
+.tool-sequence-action {
+  font-size: 12px;
+}
+.tool-sequence > summary:hover,
+.tool-sequence > summary:focus-visible {
+  color: var(--text-primary);
+}
+.tool-sequence-close {
+  min-height: 32px;
+  padding: 6px 0;
+  font-size: 12px;
+}
+.working-status {
+  margin-top: 16px;
+  margin-bottom: 16px;
+  line-height: 20px;
+  font-variant-numeric: tabular-nums;
+}

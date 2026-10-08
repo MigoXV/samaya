@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { ToolSummary } from "./ToolSummary";
+import { UserMessage } from "./UserMessage";
 import { api } from "./api";
 import type { Item, Pending } from "./types";
 import { McpRequest, McpTool } from "./mcp";
@@ -163,15 +164,7 @@ export function ItemView({
 }) {
   if (item.type === "mcpToolCall")
     return <McpTool item={item} progress={progress} />;
-  if (item.type === "userMessage")
-    return (
-      <section className="message user">
-        <div className="eyebrow">你</div>
-        <div className="prose">
-          {item.content?.map((c) => c.text || "").join("\n") || item.text}
-        </div>
-      </section>
-    );
+  if (item.type === "userMessage") return <UserMessage item={item} />;
   if (item.type === "agentMessage") return <AgentReply item={item} />;
   if (item.type === "reasoning") return null;
   if (item.type === "commandExecution") return <CommandRecord item={item} />;

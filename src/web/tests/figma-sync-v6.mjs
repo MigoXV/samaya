@@ -47,23 +47,28 @@ const page = await context.newPage(),
   errors = [];
 page.on("pageerror", (e) => errors.push(e.message));
 await page.goto(process.env.SAMAYA_UI_TEST_URL || "http://127.0.0.1:8765");
-await expect(page.locator(".attention-preview")).toHaveCount(2);
+await expect(page.locator(".attention-preview")).toHaveCount(0);
 await expect(page.locator(".overview-workspace")).toHaveCount(3);
 for (const group of await page.locator(".overview-workspace").all())
   await expect(group.locator(".overview-task")).toHaveCount(5);
 await expect(page.locator(".overview-ended")).toHaveCount(0);
-await page.locator(".attention-preview").first().click();
+await page.locator('.overview-task[data-task-id="demo-0"]').click();
 await expect(
-  page.getByRole("button", { name: "确认 →", exact: true }),
+  page
+    .getByRole("region", { name: "希望采用哪种去重方案？", exact: true })
+    .getByRole("button", { name: "确认 →", exact: true }),
 ).toBeVisible();
-await page.getByRole("dialog").press("Escape");
+await page
+  .locator(".monitor-nav-items")
+  .getByRole("button", { name: "任务总览", exact: true })
+  .click();
 state.records[30].thread.updatedAt = Date.now() / 1000 + 100;
 state.records[30].terminals = [{ processId: "outside", command: "background" }];
 await broadcast();
 await expect(
   page
     .locator(
-      '.overview-workspace[data-workspace="/demo/Samaya"] .overview-task',
+      '.overview-workspace[data-workspace="/demo/Samaya"] .overview-task:not(.needs-attention)',
     )
     .first(),
 ).toHaveAttribute("data-task-id", "demo-30");

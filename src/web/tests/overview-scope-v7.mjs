@@ -68,7 +68,10 @@ await page
   .getByRole("group", { name: "选择状态", exact: true })
   .getByRole("button", { name: "待我处理", exact: true })
   .click();
-await expect(page.locator(".attention-preview")).toHaveCount(2);
+await expect(page.locator(".attention-preview")).toHaveCount(0);
+await expect(
+  page.locator(".overview-task.needs-attention").first(),
+).toBeVisible();
 expect(
   await page.locator(".overview-workspace .overview-task").count(),
 ).toBeGreaterThan(0);

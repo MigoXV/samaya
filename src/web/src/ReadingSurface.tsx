@@ -23,27 +23,60 @@ export function ReadingSurface({
     const target = positions.get(key) ?? (tab === "work" ? Infinity : 0);
     let restoring = Number.isFinite(target);
     let prepend: { top: number; height: number } | null = null;
+    let anchor: { node: HTMLElement; y: number } | null = null;
     let frame = 0;
     follow.current = target === Infinity;
     const distance = () =>
       Math.max(0, el.scrollHeight - el.scrollTop - el.clientHeight);
     const updateButton = () =>
       setAway(distance() > Math.max(1200, el.clientHeight * 2));
+    const captureAnchor = () => {
+      const top = el.getBoundingClientRect().top;
+      const candidates = [
+        ...el.querySelectorAll<HTMLElement>(
+          ".message, .tool-sequence > summary",
+        ),
+        ...el.querySelectorAll<HTMLElement>(".turn-divider"),
+      ];
+      const node = candidates.find((n) => {
+        const rect = n.getBoundingClientRect();
+        return (
+          rect.height > 0 &&
+          rect.bottom > top + 24 &&
+          rect.top < top + el.clientHeight
+        );
+      });
+      anchor = node
+        ? { node, y: node.getBoundingClientRect().top - top }
+        : null;
+    };
     const restore = () => {
       if (prepend) {
-        el.scrollTop = prepend.top + el.scrollHeight - prepend.height;
+        if (anchor?.node.isConnected) {
+          el.scrollTop +=
+            anchor.node.getBoundingClientRect().top -
+            el.getBoundingClientRect().top -
+            anchor.y;
+        } else el.scrollTop = prepend.top + el.scrollHeight - prepend.height;
         prepend = null;
       } else if (follow.current) {
         el.scrollTop = el.scrollHeight;
       } else if (restoring) {
         el.scrollTop = target;
         if (el.scrollHeight - el.clientHeight >= target) restoring = false;
+      } else if (anchor?.node.isConnected) {
+        el.scrollTop +=
+          anchor.node.getBoundingClientRect().top -
+          el.getBoundingClientRect().top -
+          anchor.y;
       }
+      if (!follow.current && !restoring) captureAnchor();
       updateButton();
     };
     const interact = () => {
       restoring = false;
       follow.current = false;
+      captureAnchor();
     };
     const wheel = (e: WheelEvent) => {
       if (e.deltaY < 0) interact();
@@ -55,6 +88,7 @@ export function ReadingSurface({
       if (!restoring && !prepend) {
         follow.current = distance() <= 32;
         positions.set(key, follow.current ? Infinity : el.scrollTop);
+        if (!follow.current) captureAnchor();
       }
       updateButton();
     };
@@ -62,28 +96,56 @@ export function ReadingSurface({
       interact();
       prepend = { top: el.scrollTop, height: el.scrollHeight };
       cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => {
+        // A concurrent React commit may land after this frame. Keep the capture until content changes.
+        if (prepend && el.scrollHeight !== prepend.height) restore();
+      });
+    };
+    const resizeMessage = (event: Event) => {
+      interact();
+      const node = (event as CustomEvent<HTMLElement>).detail;
+      anchor = {
+        node,
+        y: Math.max(
+          0,
+          node.getBoundingClientRect().top - el.getBoundingClientRect().top,
+        ),
+      };
+      cancelAnimationFrame(frame);
       frame = requestAnimationFrame(restore);
     };
     restore();
     const observer = new ResizeObserver(restore);
     observer.observe(el.firstElementChild!);
     observer.observe(el);
+    // Restore after the content commit, before its resulting scroll event can replace the anchor.
+    const mutations = new MutationObserver(() => {
+      if (!follow.current) restore();
+    });
+    mutations.observe(el.firstElementChild!, {
+      childList: true,
+      subtree: true,
+      characterData: true,
+    });
     el.addEventListener("scroll", scroll);
     el.addEventListener("wheel", wheel, { passive: true });
     el.addEventListener("touchstart", interact, { passive: true });
     el.addEventListener("pointerdown", interact);
     el.addEventListener("keydown", keydown);
     el.addEventListener("samaya:prepend-history", preserve);
+    el.addEventListener("samaya:resize-message", resizeMessage);
     return () => {
       positions.set(key, follow.current ? Infinity : el.scrollTop);
       cancelAnimationFrame(frame);
       observer.disconnect();
+      mutations.disconnect();
       el.removeEventListener("scroll", scroll);
       el.removeEventListener("wheel", wheel);
       el.removeEventListener("touchstart", interact);
       el.removeEventListener("pointerdown", interact);
       el.removeEventListener("keydown", keydown);
       el.removeEventListener("samaya:prepend-history", preserve);
+      el.removeEventListener("samaya:resize-message", resizeMessage);
       if (positions.size > 100)
         positions.delete(positions.keys().next().value!);
     };

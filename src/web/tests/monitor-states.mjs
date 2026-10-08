@@ -130,6 +130,42 @@ await scenario(
   },
 );
 await scenario(
+  "late-operation-failure-keeps-its-task-scope",
+  () => {},
+  async (p, s, c, context) => {
+    let release;
+    await context.route("**/api/operations", async (route) => {
+      await new Promise((resolve) => {
+        release = resolve;
+      });
+      await route.fulfill({
+        status: 503,
+        json: { detail: "演示：原任务提交结果未知" },
+      });
+    });
+    await p.locator('[data-task-id="demo-0"] .task-open').click();
+    await p.getByLabel("补充当前任务", { exact: true }).fill("只提交原任务");
+    await p.getByRole("button", { name: "追加指令", exact: true }).click();
+    await returnToOverview(p);
+    await p.locator('[data-task-id="demo-3"] .task-open').click();
+    await expect.poll(() => typeof release).toBe("function");
+    release();
+    await expect(
+      p.getByRole("button", { name: "1 项操作待核查", exact: true }),
+    ).toBeVisible();
+    await expect(
+      p.locator(".task-composer .operation-feedback[role='alert']"),
+    ).toHaveCount(0);
+    await expect(p.locator(".monitor-feedback")).toHaveCount(0);
+    await p
+      .getByRole("button", { name: "1 项操作待核查", exact: true })
+      .click();
+    const dialog = p.getByRole("dialog", { name: "核查操作回执" });
+    await expect(dialog).toContainText("demo-0");
+    await expect(dialog).toContainText("提交结果待确认");
+  },
+);
+await scenario(
   "mcp-typed-fields-and-unspecified-boolean",
   (s) => {
     const p = s.pendingRequests.find((p) => p.key === "req-7");

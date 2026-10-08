@@ -54,6 +54,7 @@ class Runtime:
         self.decisions.disconnect()
 
     async def receive(self, event: dict) -> None:
+        self.sessions.observe_settings(event)
         if event.get("method") in (
             "skills/changed",
             "app/list/updated",

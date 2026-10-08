@@ -51,6 +51,19 @@ await page.goto(process.env.SAMAYA_UI_TEST_URL || "http://127.0.0.1:8765");
 await page.getByRole("button", { name: "查看全部任务 →", exact: true }).click();
 await page.locator('[data-task-id="demo-0"] .task-open').click();
 await expect(page.locator(".command-record")).toHaveCount(5);
+const sequence = page.locator(".tool-sequence");
+await expect(sequence).toHaveCount(1);
+await expect(sequence).not.toHaveAttribute("open");
+await expect(sequence.locator(":scope > summary")).toHaveText(
+  "已进行一系列工具调用查看详情",
+);
+expect(
+  await sequence
+    .locator(":scope > summary")
+    .evaluate((el) => el.getBoundingClientRect().height),
+).toBe(32);
+await sequence.locator(":scope > summary").click();
+await expect(sequence).toHaveAttribute("open");
 for (const theme of ["vallum", "abyssus"]) {
   await page.evaluate(
     (value) => window.samayaTheme.setPreference(value),
@@ -101,15 +114,13 @@ for (const theme of ["vallum", "abyssus"]) {
   }
 }
 await page.setViewportSize({ width: 1440, height: 960 });
-const assets = await page
-  .locator(".tool-chevron")
-  .evaluateAll((nodes) =>
-    nodes.map((n) => ({
-      loaded: n.complete && n.naturalWidth === 14 && n.naturalHeight === 14,
-      width: n.getBoundingClientRect().width,
-      height: n.getBoundingClientRect().height,
-    })),
-  );
+const assets = await page.locator(".tool-chevron").evaluateAll((nodes) =>
+  nodes.map((n) => ({
+    loaded: n.complete && n.naturalWidth === 14 && n.naturalHeight === 14,
+    width: n.getBoundingClientRect().width,
+    height: n.getBoundingClientRect().height,
+  })),
+);
 expect(assets.every((a) => a.loaded && a.width === 14 && a.height === 14)).toBe(
   true,
 );
