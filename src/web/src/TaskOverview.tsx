@@ -1,9 +1,8 @@
-import { useState } from "react";
+import { useId, useState } from "react";
 import type { ReactNode } from "react";
 import {
   execution,
   projectName,
-  requestLabel,
   rootId,
   threadTitle,
   waitingUnknown,
@@ -18,9 +17,7 @@ export function TaskOverview({
   initialized,
   summary,
   open,
-  decide,
   all,
-  attention,
   controls,
   visibleIds,
 }: {
@@ -30,34 +27,41 @@ export function TaskOverview({
   initialized: boolean;
   summary: (r: Observation) => string;
   open: (id: string) => void;
-  decide: (id: string, requestKey: string) => void;
   all: () => void;
-  attention: () => void;
   controls: ReactNode;
   visibleIds: Set<string>;
 }) {
-  const roots = [...records.values()].filter(
+  const allRoots = [...records.values()].filter(
+    (r) => !r.thread.parentThreadId || !records.has(r.thread.parentThreadId),
+  );
+  const roots = allRoots.filter(
     (r) =>
       (!r.thread.parentThreadId || !records.has(r.thread.parentThreadId)) &&
       (!project || r.thread.cwd === project) &&
       visibleIds.has(r.thread.id),
   );
-  const pending = requests.filter(
-    (p) =>
-      (!project ||
-        records.get(rootId(p.params.threadId, records))?.thread.cwd ===
-          project) &&
-      visibleIds.has(rootId(p.params.threadId, records)),
+  const pendingIds = new Set(
+    requests.map((p) => rootId(p.params.threadId, records)),
   );
-  const uncertainRequests = roots.filter((r) =>
-    waitingUnknown(
-      r,
-      requests.filter((p) => p.params.threadId === r.thread.id),
-    ),
-  );
+  for (const r of records.values())
+    if (
+      waitingUnknown(
+        r,
+        requests.filter((p) => p.params.threadId === r.thread.id),
+      )
+    )
+      pendingIds.add(rootId(r.thread.id, records));
   const [limits, setLimits] = useState<Record<string, number>>({});
+  const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
+  const prefix = useId();
   const activityAt = (r: Observation) =>
-    Math.max(r.thread.updatedAt || 0, r.progressAt || 0);
+    r.thread.recencyAt ?? r.thread.updatedAt ?? 0;
+  const workspaceRecency = new Map<string, number>();
+  for (const r of allRoots)
+    workspaceRecency.set(
+      r.thread.cwd || "",
+      Math.max(workspaceRecency.get(r.thread.cwd || "") || 0, activityAt(r)),
+    );
   const byWorkspace = new Map<string, Observation[]>();
   for (const r of roots) {
     const key = r.thread.cwd || "";
@@ -70,15 +74,17 @@ export function TaskOverview({
       cwd,
       tasks: tasks.sort(
         (a, b) =>
+          Number(pendingIds.has(b.thread.id)) -
+            Number(pendingIds.has(a.thread.id)) ||
           activityAt(b) - activityAt(a) ||
           a.thread.id.localeCompare(b.thread.id),
       ),
-      updatedAt: Math.max(...tasks.map(activityAt)),
+      updatedAt: workspaceRecency.get(cwd) || 0,
     }))
     .sort((a, b) => b.updatedAt - a.updatedAt || a.cwd.localeCompare(b.cwd));
   const row = (r: Observation) => (
     <button
-      className="overview-task"
+      className={`overview-task${pendingIds.has(r.thread.id) ? " needs-attention" : ""}`}
       key={r.thread.id}
       data-task-id={r.thread.id}
       onClick={() => open(r.thread.id)}
@@ -92,6 +98,14 @@ export function TaskOverview({
       <span className="overview-action">进入对话</span>
     </button>
   );
+  const footer = (
+    <footer>
+      <button className="quiet" onClick={all}>
+        查看全部任务 →
+      </button>
+      <small>完整任务与历史记录按需查看</small>
+    </footer>
+  );
   return (
     <section className="task-overview" aria-label="任务总览">
       <header>
@@ -99,47 +113,12 @@ export function TaskOverview({
       </header>
       {controls}
       {!initialized ? (
-        <p role="status">正在读取任务…</p>
+        <>
+          <p role="status">正在读取任务…</p>
+          {footer}
+        </>
       ) : (
         <>
-          <section aria-label="待我处理预览">
-            <header>
-              <h2>待我处理 · {pending.length} 项请求</h2>
-              <button className="quiet" onClick={attention}>
-                查看全部 →
-              </button>
-            </header>
-            {pending.slice(0, 2).map((p) => {
-              const id = rootId(p.params.threadId, records),
-                r = records.get(id);
-              return (
-                <button
-                  key={p.key}
-                  className="overview-task attention-preview"
-                  onClick={() => decide(id, p.key)}
-                >
-                  <span>
-                    <strong>
-                      {r ? threadTitle(r.thread) : p.params.threadId}
-                    </strong>
-                    <small>
-                      {r ? projectName(r.thread) + " · " : ""}
-                      {requestLabel(p)}
-                    </small>
-                  </span>
-                  <span className="overview-action">处理请求</span>
-                </button>
-              );
-            })}
-            {uncertainRequests.length > 0 && (
-              <button className="quiet" onClick={attention}>
-                另有 {uncertainRequests.length} 个任务的请求待核对 →
-              </button>
-            )}
-            {!pending.length && !uncertainRequests.length && (
-              <p className="overview-empty">暂无待处理请求</p>
-            )}
-          </section>
           <section
             aria-label="最近活跃的工作区"
             className="overview-workspaces"
@@ -148,72 +127,120 @@ export function TaskOverview({
               <h2>最近活跃的工作区</h2>
               <small>{workspaces.length} 个工作区</small>
             </header>
-            {workspaces.map(({ cwd, tasks, updatedAt }) => {
-              const limit = limits[cwd] || 5;
-              const remaining = Math.max(0, tasks.length - limit);
-              return (
-                <section
-                  className="overview-workspace"
-                  key={cwd}
-                  data-workspace={cwd}
-                  aria-label={`${projectName(tasks[0].thread)} 工作区`}
-                >
-                  <header>
-                    <div>
-                      <h3>{projectName(tasks[0].thread)}</h3>
-                      <small className="workspace-path" title={cwd}>
-                        {cwd || "未提供目录"}
-                      </small>
+            <div
+              className="overview-workspace-scroll"
+              tabIndex={0}
+              role="region"
+              aria-label="工作区列表"
+            >
+              {workspaces.map(({ cwd, tasks, updatedAt }) => {
+                const limit = limits[cwd] || 5;
+                const remaining = Math.max(0, tasks.length - limit);
+                const name = projectName(tasks[0].thread);
+                const bodyId = `${prefix}-${encodeURIComponent(cwd)}`;
+                const pendingCount = tasks.filter((r) =>
+                  pendingIds.has(r.thread.id),
+                ).length;
+                return (
+                  <section
+                    className="overview-workspace"
+                    key={cwd}
+                    data-workspace={cwd}
+                    aria-label={`${name} 工作区`}
+                  >
+                    <header>
+                      <h3>
+                        <button
+                          type="button"
+                          className="workspace-toggle"
+                          aria-expanded={!collapsed[cwd]}
+                          aria-controls={bodyId}
+                          aria-label={`${collapsed[cwd] ? "展开" : "折叠"} ${name} 工作区`}
+                          onClick={() =>
+                            setCollapsed((old) => ({
+                              ...old,
+                              [cwd]: !old[cwd],
+                            }))
+                          }
+                        >
+                          <span className="workspace-identity">
+                            <img
+                              className="workspace-chevron-light"
+                              src="/figma/workspace-chevron.svg"
+                              alt=""
+                            />
+                            <img
+                              className="workspace-chevron-dark"
+                              src="/figma/workspace-chevron-dark.svg"
+                              alt=""
+                            />
+                            <span>
+                              <span className="workspace-name">{name}</span>
+                              <small className="workspace-path" title={cwd}>
+                                {cwd || "未提供目录"}
+                              </small>
+                            </span>
+                          </span>
+                          <small className="workspace-metadata">
+                            {tasks.length} 个任务
+                            {pendingCount > 0 && ` · 待处理 ${pendingCount}`} ·
+                            最近活动{" "}
+                            {updatedAt
+                              ? new Date(updatedAt * 1000).toLocaleString(
+                                  "zh-CN",
+                                  {
+                                    month: "numeric",
+                                    day: "numeric",
+                                    hour: "2-digit",
+                                    minute: "2-digit",
+                                  },
+                                )
+                              : "尚未确认"}
+                          </small>
+                        </button>
+                      </h3>
+                    </header>
+                    <div
+                      id={bodyId}
+                      className="workspace-tasks"
+                      hidden={!!collapsed[cwd]}
+                    >
+                      {tasks.slice(0, limit).map(row)}
+                      {remaining > 0 && (
+                        <button
+                          className="quiet workspace-expand"
+                          onClick={() =>
+                            setLimits((old) => ({ ...old, [cwd]: limit + 5 }))
+                          }
+                        >
+                          再展开 {Math.min(5, remaining)} 个任务 · 还剩{" "}
+                          {remaining} 个
+                        </button>
+                      )}
+                      {limit > 5 && (
+                        <button
+                          className="quiet workspace-expand"
+                          onClick={() =>
+                            setLimits((old) => ({ ...old, [cwd]: 5 }))
+                          }
+                        >
+                          收起到最近 5 个
+                        </button>
+                      )}
                     </div>
-                    <small>
-                      {tasks.length} 个任务 · 最近活动{" "}
-                      {updatedAt
-                        ? new Date(updatedAt * 1000).toLocaleString("zh-CN", {
-                            month: "numeric",
-                            day: "numeric",
-                            hour: "2-digit",
-                            minute: "2-digit",
-                          })
-                        : "尚未确认"}
-                    </small>
-                  </header>
-                  {tasks.slice(0, limit).map(row)}
-                  {remaining > 0 && (
-                    <button
-                      className="quiet workspace-expand"
-                      onClick={() =>
-                        setLimits((old) => ({ ...old, [cwd]: limit + 5 }))
-                      }
-                    >
-                      再展开 {Math.min(5, remaining)} 个任务 · 还剩 {remaining}{" "}
-                      个
-                    </button>
-                  )}
-                  {limit > 5 && (
-                    <button
-                      className="quiet workspace-expand"
-                      onClick={() => setLimits((old) => ({ ...old, [cwd]: 5 }))}
-                    >
-                      收起到最近 5 个
-                    </button>
-                  )}
-                </section>
-              );
-            })}
-            {!workspaces.length && (
-              <p className="overview-empty">
-                当前范围没有任务，可新建任务或调整筛选。
-              </p>
-            )}
+                  </section>
+                );
+              })}
+              {!workspaces.length && (
+                <p className="overview-empty">
+                  当前范围没有任务，可新建任务或调整筛选。
+                </p>
+              )}
+              {footer}
+            </div>
           </section>
         </>
       )}
-      <footer>
-        <button className="quiet" onClick={all}>
-          查看全部任务 →
-        </button>
-        <small>完整任务与历史记录按需查看</small>
-      </footer>
     </section>
   );
 }

@@ -128,6 +128,45 @@ class CommandService:
             if not cursor:
                 return data
 
+    async def model_settings(self, tid, refresh=False, thread=None):
+        thread = thread or (await self.queries.read(tid))["thread"]
+        configured = await self.queries.settings(tid, refresh=refresh)
+        rows = await self.pages("model/list")
+        current_model = configured.get("model") or thread.get("model")
+        models = [
+            {
+                "model": m["model"],
+                "displayName": m.get("displayName") or m["model"],
+                "isDefault": bool(m.get("isDefault")),
+                "effortOptions": choices(
+                    m.get("supportedReasoningEfforts") or [],
+                    "reasoningEffort",
+                    "description",
+                ),
+                "defaultEffort": m.get("defaultReasoningEffort"),
+                "serviceTiers": m.get("serviceTiers") or [],
+                "defaultServiceTier": m.get("defaultServiceTier"),
+            }
+            for m in rows
+            if not m.get("hidden") or m["model"] == current_model
+        ]
+        selected = next((m for m in models if m["model"] == current_model), {})
+        current = {
+            "model": current_model,
+            "reasoningEffort": configured.get("reasoningEffort")
+            or selected.get("defaultEffort"),
+            "serviceTier": configured.get("serviceTier")
+            or selected.get("defaultServiceTier")
+            or "default",
+        }
+        return {
+            "models": models,
+            "current": current,
+            "expectedTurnId": (thread.get("turns") or [{}])[-1].get("id"),
+            "active": bool(active_turn(thread)),
+            "editable": thread.get("canAcceptDirectInput") is not False,
+        }
+
     async def context(self, tid, command):
         command = ALIASES.get(command, command)
         if command not in NATIVE:
@@ -144,7 +183,10 @@ class CommandService:
         rpc = self.connection.rpc
         model = thread.get("model")
         if command in ("model", "reasoning", "fast", "plan"):
-            models = await self.pages("model/list")
+            settings = await self.model_settings(tid, thread=thread)
+            result["modelSettings"] = settings
+            models = settings["models"]
+            model = settings["current"]["model"]
             current = next((m for m in models if m["model"] == model), None)
             if command == "model":
                 result["fields"] = [
@@ -158,18 +200,13 @@ class CommandService:
             elif command == "reasoning":
                 if not current:
                     raise ValueError("当前模型不在目录中，无法确定推理强度")
-                result["defaultValue"] = current.get("defaultReasoningEffort", "")
+                result["defaultValue"] = current.get("defaultEffort", "")
                 result["fields"] = [
                     field(
                         "value",
                         "推理强度（下一轮）",
-                        choices(
-                            current.get("supportedReasoningEfforts", []),
-                            "reasoningEffort",
-                            "description",
-                        ),
-                        thread.get("reasoningEffort")
-                        or current.get("defaultReasoningEffort", ""),
+                        current["effortOptions"],
+                        settings["current"]["reasoningEffort"] or "",
                     )
                 ]
             elif command == "fast":
@@ -180,7 +217,8 @@ class CommandService:
                     field(
                         "value",
                         "服务档位（可能改变用量）",
-                        [{"value": "default", "label": "默认"}, *choices(tiers)],
+                        [{"value": "default", "label": "标准"}, *choices(tiers)],
+                        settings["current"]["serviceTier"],
                     )
                 ]
             else:
@@ -338,6 +376,13 @@ class CommandService:
             raise ValueError("只读命令不需要执行")
         if b.get("expectedTurnId") != context["expectedTurnId"]:
             raise ValueError("轮次已变化，请重新打开命令")
+        settings = context.get("modelSettings")
+        if (
+            settings
+            and "expectedModel" in b
+            and b["expectedModel"] != settings["current"]["model"]
+        ):
+            raise ValueError("模型已被其他客户端改变，请重新读取设置")
         for f in context["fields"]:
             if f["options"] is not None and args.get(f["name"]) not in {
                 x["value"] for x in f["options"]
@@ -367,8 +412,44 @@ class CommandService:
                         "fast": "serviceTier",
                         "permissions": "permissions",
                     }[cmd]
-                ] = None if value == "default" else value
-            return await rpc("thread/settings/update", patch)
+                ] = value if cmd == "fast" else None if value == "default" else value
+                if cmd == "model":
+                    target = next(m for m in settings["models"] if m["model"] == value)
+                    efforts = {o["value"] for o in target["effortOptions"]}
+                    old = settings["current"]
+                    patch["effort"] = (
+                        old["reasoningEffort"]
+                        if old["reasoningEffort"] in efforts
+                        else target["defaultEffort"]
+                        if efforts
+                        else None
+                    )
+                    tiers = {t["id"] for t in target["serviceTiers"]}
+                    patch["serviceTier"] = (
+                        old["serviceTier"]
+                        if old["serviceTier"] in tiers
+                        or old["serviceTier"] == "default"
+                        else "default"
+                    )
+            result = await rpc("thread/settings/update", patch)
+            if cmd in ("model", "reasoning", "fast"):
+                try:
+                    confirmed = await self.model_settings(tid, refresh=True)
+                    for key, native_key in (
+                        ("model", "model"),
+                        ("reasoningEffort", "effort"),
+                        ("serviceTier", "serviceTier"),
+                    ):
+                        if (
+                            native_key in patch
+                            and patch[native_key] is not None
+                            and confirmed["current"][key] != patch[native_key]
+                        ):
+                            return {**result, "settingsPending": True}
+                    return {**result, "modelSettings": confirmed}
+                except Exception:  # noqa: BLE001 - write acknowledged; read failure must not invite replay
+                    return {**result, "settingsPending": True}
+            return result
         if cmd == "memories":
             return await rpc(
                 "thread/memoryMode/set", {"threadId": tid, "mode": args["value"]}

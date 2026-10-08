@@ -123,8 +123,9 @@ class Monitor:
                     "error": "正在核对当前状态",
                 }
                 self.projection.touch(tid)
-            elif thread.get("updatedAt") != self.projection.records[tid]["thread"].get(
-                "updatedAt"
+            elif any(
+                thread.get(key) != self.projection.records[tid]["thread"].get(key)
+                for key in ("updatedAt", "recencyAt")
             ):
                 self.projection.touch(tid)
         for tid in set(self.projection.records) - set(found) - loaded:
@@ -151,7 +152,7 @@ class Monitor:
                         "thread/read", {"threadId": tid, "includeTurns": False}
                     )
                 )["thread"]
-                thread = normalize(thread)
+                thread = self.queries.with_settings(normalize(thread))
                 if tid not in self.projection.records:
                     self.projection.records[tid] = {
                         "thread": thread,

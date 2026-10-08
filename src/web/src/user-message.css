@@ -1,0 +1,43 @@
+.history-view .user-message-text {
+  line-height: 28px;
+}
+.user-message-text[data-collapsed="true"] {
+  max-height: 168px;
+  overflow: hidden;
+}
+.task-detail .user-message-toggle {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 32px;
+  margin-top: 8px;
+  padding: 4px 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 20px;
+}
+.task-detail .user-message-toggle:hover,
+.task-detail .user-message-toggle:focus-visible {
+  color: var(--text-primary);
+}
+.user-message-chevron,
+.user-message-chevron img {
+  display: block;
+  width: 12px;
+  height: 12px;
+}
+.user-message-chevron[data-expanded="true"] {
+  transform: rotate(180deg);
+}
+.user-message-chevron .chevron-dark {
+  display: none;
+}
+[data-theme="abyssus"] .user-message-chevron .chevron-light {
+  display: none;
+}
+[data-theme="abyssus"] .user-message-chevron .chevron-dark {
+  display: block;
+}

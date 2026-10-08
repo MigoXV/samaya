@@ -16,6 +16,8 @@ export type Turn = {
   id: string;
   status: string;
   items: Item[];
+  startedAt?: number | null;
+  completedAt?: number | null;
   error?: { message: string };
 };
 export type Thread = {
@@ -29,7 +31,10 @@ export type Thread = {
   turns?: Turn[];
   canAcceptDirectInput?: boolean;
   archived?: boolean;
-  model?: string;
+  model?: string | null;
+  reasoningEffort?: string | null;
+  serviceTier?: string | null;
+  recencyAt?: number | null;
 };
 export type Pending = {
   key: string;

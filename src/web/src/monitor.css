@@ -353,8 +353,7 @@
 .stop-button {
   margin-top: 8px;
 }
-.monitor-banner,
-.monitor-feedback {
+.monitor-banner {
   font-size: 14px;
   padding: 8px 24px;
   display: flex;
@@ -365,13 +364,24 @@
   border-bottom: 1px solid var(--border);
   overflow-wrap: anywhere;
 }
-.monitor-banner button,
-.monitor-feedback button {
+.monitor-banner button {
   min-height: 32px;
   padding: 4px 8px;
 }
-.monitor-feedback [role="alert"] {
-  font-weight: 500;
+.operation-feedback {
+  margin: 4px 0;
+  font-size: 12px;
+  line-height: 18px;
+  overflow-wrap: anywhere;
+}
+.operation-receipts {
+  min-width: 32px;
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex-shrink: 1;
+  font-size: 12px;
 }
 .attention-text {
   font-weight: 600 !important;
@@ -704,8 +714,7 @@
   .monitor-shell dialog button {
     min-height: 44px;
   }
-  .monitor-banner,
-  .monitor-feedback {
+  .monitor-banner {
     padding: 8px 16px;
     gap: 8px;
   }
@@ -1020,10 +1029,6 @@
   }
   .task-is-open .detail-top button:last-child {
     display: none;
-  }
-  .task-is-open .monitor-feedback {
-    padding: 4px 8px;
-    font-size: 13px;
   }
   .task-is-open .detail-path code {
     max-height: 72px;
@@ -1512,10 +1517,6 @@
   }
   .composer-shortcut {
     display: none;
-  }
-  .task-is-open .monitor-feedback {
-    max-height: 112px;
-    overflow: auto;
   }
   .task-navigation .task-open {
     min-width: 0;

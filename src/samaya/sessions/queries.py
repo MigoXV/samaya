@@ -21,6 +21,55 @@ class SessionQueries:
         self.connection, self.store, self.decisions = connection, store, decisions
         self.subscription_problems: dict[str, str] = {}
         self.legacy_items: set[str] = set()
+        self.setting_snapshots: dict[str, tuple[str, int, dict]] = {}
+        self.settings_revision = 0
+
+    def observe_settings(self, event: dict) -> None:
+        if event.get("method") != "thread/settings/updated":
+            return
+        params = event["params"]
+        settings = params.get("threadSettings", {})
+        self.settings_revision += 1
+        self.setting_snapshots[params["threadId"]] = (
+            self.connection.connection_id,
+            self.settings_revision,
+            {
+                "model": settings.get("model"),
+                "reasoningEffort": settings.get("effort"),
+                "serviceTier": settings.get("serviceTier"),
+            },
+        )
+
+    async def settings(self, tid: str, refresh: bool = False) -> dict:
+        generation = self.connection.connection_id
+        cached = self.setting_snapshots.get(tid)
+        if cached and cached[0] == generation and not refresh:
+            return dict(cached[2])
+        revision = self.settings_revision
+        try:
+            result = await self.connection.rpc(
+                "thread/resume", {"threadId": tid, "excludeTurns": True}
+            )
+        except JsonRpcError as exc:
+            if (
+                "missing source rollout" not in str(exc)
+                or not cached
+                or cached[0] != generation
+            ):
+                raise
+            return dict(cached[2])
+        latest = self.setting_snapshots.get(tid)
+        if latest and latest[0] == generation and latest[1] > revision:
+            return dict(latest[2])
+        values = {k: result.get(k) for k in ("model", "reasoningEffort", "serviceTier")}
+        self.setting_snapshots[tid] = (generation, revision, values)
+        return dict(values)
+
+    def with_settings(self, thread: dict) -> dict:
+        cached = self.setting_snapshots.get(thread["id"])
+        if cached and cached[0] == self.connection.connection_id:
+            thread.update(cached[2])
+        return thread
 
     async def restore(self) -> None:
         loaded = set((await self.connection.rpc("thread/loaded/list", {}))["data"])
@@ -142,7 +191,7 @@ class SessionQueries:
                 raise
             result["historyNotice"] = "新会话尚未产生历史记录"
 
-        result["thread"] = normalize(result["thread"])
+        result["thread"] = self.with_settings(normalize(result["thread"]))
         result["pendingRequests"] = [
             p
             for p in self.decisions.pending.values()

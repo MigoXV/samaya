@@ -14,7 +14,7 @@ const context = await browser.newContext({
 const state = fixture(45);
 // Distinct activity timestamps make ordering observable, independent of statuses.
 state.records.forEach((r, i) => {
-  r.progressAt = r.thread.updatedAt - 100;
+  r.thread.recencyAt = r.thread.updatedAt - 100;
 });
 const { calls, broadcast } = await install(context, state);
 const page = await context.newPage();
@@ -23,6 +23,9 @@ page.on("pageerror", (e) => errors.push(e.message));
 await page.goto(process.env.SAMAYA_UI_TEST_URL || "http://127.0.0.1:8765");
 const groups = page.locator(".overview-workspace");
 await expect(groups).toHaveCount(3);
+await expect(
+  page.locator('.task-overview [aria-label="待我处理预览"]'),
+).toHaveCount(0);
 for (const group of await groups.all())
   await expect(group.locator(".overview-task")).toHaveCount(5);
 await expect(page.locator(".overview-ended")).toHaveCount(0);
@@ -34,6 +37,13 @@ await expect(samaya.locator(".overview-task")).toHaveCount(10);
 await samaya.getByRole("button", { name: /再展开 5 个任务/ }).click();
 await expect(samaya.locator(".overview-task")).toHaveCount(15);
 await expect(samaya.locator(".workspace-expand")).toHaveCount(1);
+await samaya.getByRole("button", { name: "折叠 Samaya 工作区" }).click();
+await expect(samaya.locator(".workspace-tasks")).toBeHidden();
+await expect(groups.nth(1).locator(".workspace-tasks")).toBeVisible();
+await expect(samaya.locator(".workspace-metadata")).toContainText("待处理");
+await samaya.getByRole("button", { name: "展开 Samaya 工作区" }).focus();
+await page.keyboard.press("Enter");
+await expect(samaya.locator(".overview-task")).toHaveCount(15);
 // A task ending stays in its workspace and remains immediately accessible.
 const stopped = state.records.find((r) => r.thread.id === "demo-3");
 stopped.turn.status = "completed";
@@ -50,16 +60,18 @@ await expect(samaya.locator('[data-task-id="demo-3"]')).toContainText(
 await samaya.getByRole("button", { name: "收起到最近 5 个" }).click();
 await expect(samaya.locator(".overview-task")).toHaveCount(5);
 const latest = state.records.find((r) => r.thread.id === "demo-44");
-latest.progressAt = Date.now() / 1000 + 100;
+latest.progressAt = Date.now() / 1000 + 200;
+await broadcast();
+await expect(groups.first()).toHaveAttribute("data-workspace", "/demo/Samaya");
+latest.thread.recencyAt = Date.now() / 1000 + 100;
 await broadcast();
 await expect(groups.first()).toHaveAttribute(
   "data-workspace",
   "/demo/MeetNote",
 );
-await expect(groups.first().locator(".overview-task").first()).toHaveAttribute(
-  "data-task-id",
-  "demo-44",
-);
+await expect(
+  groups.first().locator(".overview-task:not(.needs-attention)").first(),
+).toHaveAttribute("data-task-id", "demo-44");
 for (const theme of ["vallum", "abyssus"]) {
   await page.evaluate(
     (value) => window.samayaTheme.setPreference(value),
@@ -67,7 +79,35 @@ for (const theme of ["vallum", "abyssus"]) {
   );
   for (const width of [1440, 390, 320]) {
     await page.setViewportSize({ width, height: 960 });
-    await page.locator(".task-overview").evaluate((el) => (el.scrollTop = 0));
+    await page
+      .locator(".overview-workspace-scroll")
+      .evaluate((el) => (el.scrollTop = 0));
+    const geometry = await page.evaluate(() => {
+      const outer = document.querySelector(".task-overview");
+      const list = document.querySelector(".overview-workspace-scroll");
+      const title = document.querySelector(".task-overview h1");
+      const heading = document.querySelector(".overview-workspaces > header");
+      const top = title.getBoundingClientRect().top;
+      const sectionTop = heading.getBoundingClientRect().top;
+      list.scrollTop = 200;
+      return {
+        outerOverflow: getComputedStyle(outer).overflowY,
+        listOverflow: getComputedStyle(list).overflowY,
+        scrollTop: list.scrollTop,
+        fixedTitle: title.getBoundingClientRect().top === top,
+        fixedHeading: heading.getBoundingClientRect().top === sectionTop,
+        listBottom: list.getBoundingClientRect().bottom,
+        pageHeight: innerHeight,
+      };
+    });
+    expect(geometry.outerOverflow).toBe("hidden");
+    expect(geometry.listOverflow).toBe("auto");
+    expect(geometry.scrollTop).toBeGreaterThan(0);
+    expect(geometry.fixedTitle && geometry.fixedHeading).toBe(true);
+    expect(geometry.listBottom).toBeLessThanOrEqual(geometry.pageHeight);
+    await page
+      .locator(".overview-workspace-scroll")
+      .evaluate((el) => (el.scrollTop = 0));
     expect(
       await page.evaluate(
         () => document.documentElement.scrollWidth <= innerWidth,
@@ -83,7 +123,11 @@ for (const theme of ["vallum", "abyssus"]) {
   ).toEqual([]);
 }
 await page.setViewportSize({ width: 1440, height: 960 });
-await groups.first().locator(".overview-task").first().click();
+await groups
+  .first()
+  .locator(".overview-task:not(.needs-attention)")
+  .first()
+  .click();
 await expect(page.locator(".task-reading-heading")).toContainText(
   latest.thread.name,
 );

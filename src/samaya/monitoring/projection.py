@@ -182,7 +182,14 @@ class Projection:
             record.update(plan=summary.get("plan"), progressAt=now, eventAt=now)
             self.records[tid] = record
             return
-        if method == "thread/status/changed":
+        if method == "thread/settings/updated":
+            settings = params.get("threadSettings", {})
+            thread.update(
+                model=settings.get("model"),
+                reasoningEffort=settings.get("effort"),
+                serviceTier=settings.get("serviceTier"),
+            )
+        elif method == "thread/status/changed":
             if (
                 params["status"].get("type") == "active"
                 and turn

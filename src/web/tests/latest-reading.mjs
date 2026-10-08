@@ -7,6 +7,11 @@ const context = await browser.newContext({
 const state = fixture();
 await install(context, state);
 const requests = [];
+let releaseOlder;
+const olderGate = new Promise((resolve) => {
+  releaseOlder = resolve;
+});
+let olderRequested = false;
 let turnsReturned = false,
   earlyLatest = false;
 const pageItems = (prefix) =>
@@ -51,10 +56,15 @@ await context.route("**/api/threads/*/turns/*/items?*", async (route) => {
         samayaCursor: 0,
       },
     });
-  } else
+  } else {
+    if (url.searchParams.get("cursor") === "older-items") {
+      olderRequested = true;
+      await olderGate;
+    }
     await route.fulfill({
       json: { data: pageItems("older"), nextCursor: null, samayaCursor: 0 },
     });
+  }
 });
 const page = await context.newPage();
 await page.goto(process.env.SAMAYA_UI_TEST_URL || "http://127.0.0.1:8765");
@@ -66,6 +76,7 @@ const reader = page.locator(".detail-scroll");
 const distance = () =>
   reader.evaluate((el) => el.scrollHeight - el.clientHeight - el.scrollTop);
 await expect.poll(distance).toBeLessThan(2);
+await expect(page.getByRole("button", { name: /加载更早/ })).toHaveCount(0);
 await expect(page.locator(".latest-position")).toHaveCount(0);
 await expect(page.locator(".jump-latest")).toHaveCount(0);
 expect(
@@ -76,18 +87,35 @@ expect(
 expect(
   requests
     .filter((url) => url.includes("/items"))
-    .every((url) => url.includes("limit=20")),
+    .every((url) => url.includes("limit=100")),
 ).toBe(true);
 await reader.evaluate((el) => (el.scrollTop -= 400));
 await expect.poll(distance).toBeGreaterThan(390);
 await expect(page.locator(".jump-latest")).toHaveCount(0);
-await reader.evaluate((el) => (el.scrollTop = 0));
-await expect(
-  page.getByRole("button", { name: "返回最新消息", exact: true }),
-).toBeVisible();
 const marker = page.locator('[data-item-id="latest-19"]');
+await reader.evaluate((el) => (el.scrollTop = 0));
 const before = (await marker.boundingBox()).y;
-await page.getByRole("button", { name: "加载更早记录", exact: true }).click();
+await expect.poll(() => olderRequested).toBe(true);
+await page.evaluate(() =>
+  window.__emit(
+    "message",
+    {
+      method: "item/completed",
+      params: {
+        threadId: "demo-0",
+        turnId: "turn-0",
+        item: {
+          id: "concurrent-tail",
+          type: "agentMessage",
+          text: "补历史期间到来的实时输出。\n\n".repeat(40),
+        },
+      },
+    },
+    90,
+  ),
+);
+await expect(page.locator('[data-item-id="concurrent-tail"]')).toHaveCount(1);
+releaseOlder();
 await expect(page.locator('[data-item-id="older-19"]')).toHaveCount(1);
 await expect
   .poll(async () => Math.abs((await marker.boundingBox()).y - before))
@@ -141,9 +169,9 @@ expect(
   Math.abs((await reader.evaluate((el) => el.scrollTop)) - top),
 ).toBeLessThan(2);
 await reader.evaluate((el) => (el.scrollTop = 0));
-await page.getByRole("button", { name: "加载更早轮次", exact: true }).click();
+
 await expect(page.locator('[data-turn-id="turn-old"]')).toHaveCount(1);
-expect(requests.some((url) => url.includes("limit=3&cursor=older-turns"))).toBe(
+expect(requests.some((url) => url.includes("limit=1&cursor=older-turns"))).toBe(
   true,
 );
 // Re-entering the workspace starts at the newest tail, even after an earlier visit.
