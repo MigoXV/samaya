@@ -32,9 +32,10 @@ export function ReadingSurface({
       setAway(distance() > Math.max(1200, el.clientHeight * 2));
     const captureAnchor = () => {
       const top = el.getBoundingClientRect().top;
+      // Native item boundaries remain stable when a prepended reply takes the author label.
       const candidates = [
         ...el.querySelectorAll<HTMLElement>(
-          ".message, .tool-sequence > summary",
+          "[data-item-id]:has(> .message), .tool-sequence > summary",
         ),
         ...el.querySelectorAll<HTMLElement>(".turn-divider"),
       ];

@@ -126,30 +126,48 @@ function MarkdownTable({ children }: { children?: ReactNode }) {
   return <table tabIndex={0}>{children}</table>;
 }
 const markdownComponents = { pre: MarkdownPre, table: MarkdownTable };
-function AgentReply({ item }: { item: Item }) {
+function AgentReply({ item, showAuthor }: { item: Item; showAuthor: boolean }) {
   const [notice, setNotice] = useState("");
+  useEffect(() => {
+    if (notice !== "已复制") return;
+    const timer = setTimeout(() => setNotice(""), 2000);
+    return () => clearTimeout(timer);
+  }, [notice]);
   return (
-    <section className="message">
-      <div className="eyebrow">Codex</div>
-      <div className="markdown">
-        <Markdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
-          {item.text || ""}
-        </Markdown>
-      </div>
-      <div className="response-actions">
-        <button
-          className="quiet"
-          aria-label="复制这条回复"
-          onClick={() => {
-            void navigator.clipboard
-              .writeText(item.text || "")
-              .then(() => setNotice("已复制"))
-              .catch(() => setNotice("复制失败，请选择正文复制"));
-          }}
-        >
-          <img src="/figma/copy.svg" alt="" />
-        </button>
-        <small role="status">{notice}</small>
+    <section className="message agent-reply">
+      {showAuthor && <div className="eyebrow agent-reply-author">Codex</div>}
+      <div className="agent-reply-body">
+        <div className="markdown">
+          <Markdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
+            {item.text || ""}
+          </Markdown>
+        </div>
+        <div className="response-actions">
+          <button
+            type="button"
+            className="quiet"
+            aria-label="复制这条回复"
+            title={notice || "复制这条回复"}
+            onClick={() => {
+              void navigator.clipboard
+                .writeText(item.text || "")
+                .then(() => setNotice("已复制"))
+                .catch(() => setNotice("复制失败，请选择正文复制"));
+            }}
+          >
+            {notice === "已复制" ? (
+              <span aria-hidden="true">✓</span>
+            ) : (
+              <img src="/figma/copy.svg" alt="" />
+            )}
+          </button>
+          <small
+            className={notice === "已复制" ? "sr-only" : "response-notice"}
+            role="status"
+          >
+            {notice}
+          </small>
+        </div>
       </div>
     </section>
   );
@@ -158,14 +176,17 @@ function AgentReply({ item }: { item: Item }) {
 export function ItemView({
   item,
   progress,
+  showAgentAuthor = true,
 }: {
   item: Item;
   progress?: string;
+  showAgentAuthor?: boolean;
 }) {
   if (item.type === "mcpToolCall")
     return <McpTool item={item} progress={progress} />;
   if (item.type === "userMessage") return <UserMessage item={item} />;
-  if (item.type === "agentMessage") return <AgentReply item={item} />;
+  if (item.type === "agentMessage")
+    return <AgentReply item={item} showAuthor={showAgentAuthor} />;
   if (item.type === "reasoning") return null;
   if (item.type === "commandExecution") return <CommandRecord item={item} />;
   if (item.type === "fileChange")
@@ -224,10 +245,12 @@ export function ItemView({
 export function RequestForm({
   request,
   busy,
+  attentionActive = true,
   respond,
 }: {
   request: Pending;
   busy: boolean;
+  attentionActive?: boolean;
   respond: (response: Record<string, unknown>) => void;
 }) {
   const [answers, setAnswers] = useState<Record<string, string>>({});
@@ -244,16 +267,20 @@ export function RequestForm({
     ].includes(request.method);
   return (
     <section
-      className={questions ? "decision-request" : "request-panel"}
+      className={
+        questions
+          ? `decision-request task-activity task-waiting ${
+              attentionActive && !busy && !request.responseState
+                ? "task-attention-live"
+                : ""
+            }`
+          : "request-panel"
+      }
       aria-label={
         questions?.map((q) => q.question).join("；") || "等待你的输入"
       }
     >
-      {questions ? (
-        <p className="decision-status">◌ 等待你的决定</p>
-      ) : (
-        <h3>等待审批</h3>
-      )}
+      {!questions && <h3>等待审批</h3>}
       {request.params.reason && <p>{request.params.reason}</p>}
       {request.params.command && <pre>{request.params.command}</pre>}
       {request.params.cwd && <p className="muted">{request.params.cwd}</p>}

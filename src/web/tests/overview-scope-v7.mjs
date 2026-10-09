@@ -182,7 +182,10 @@ for (const width of [1440, 768, 390, 320]) {
       paddingBottom: s.paddingBottom,
     };
   });
-  expect(Math.abs(box.right - box.composerRight)).toBeLessThanOrEqual(1);
+  // Desktop: 880px reading width and 860px composer share the same center.
+  expect(
+    Math.abs(box.right - box.composerRight - (width >= 800 ? 10 : 0)),
+  ).toBeLessThanOrEqual(1);
   expect(box.paddingTop).toBe("10px");
   expect(box.paddingBottom).toBe("10px");
   geometry.push({ width, ...box });

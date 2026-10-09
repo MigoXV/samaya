@@ -24,6 +24,7 @@ export function TaskOverview({
   project,
   initialized,
   summary,
+  activityClass,
   open,
   all,
   controls,
@@ -34,6 +35,7 @@ export function TaskOverview({
   project: string;
   initialized: boolean;
   summary: (r: Observation) => string;
+  activityClass: (r: Observation) => string;
   open: (id: string) => void;
   all: () => void;
   controls: ReactNode;
@@ -50,6 +52,11 @@ export function TaskOverview({
   );
   const pendingIds = new Set(
     requests.map((p) => rootId(p.params.threadId, records)),
+  );
+  const questionIds = new Set(
+    requests
+      .filter((p) => p.params.questions?.length && !p.responseState)
+      .map((p) => rootId(p.params.threadId, records)),
   );
   for (const r of records.values())
     if (
@@ -107,18 +114,25 @@ export function TaskOverview({
     .sort((a, b) => b.updatedAt - a.updatedAt || a.cwd.localeCompare(b.cwd));
   const row = (r: Observation) => (
     <button
-      className={`overview-task${pendingIds.has(r.thread.id) ? " needs-attention" : ""}`}
+      className={`overview-task ${pendingIds.has(r.thread.id) ? "needs-attention" : ""} ${activityClass(r)}`}
       key={r.thread.id}
       data-task-id={r.thread.id}
+      aria-label={`${threadTitle(r.thread)} · ${summary(r) || execution(r)}`}
       onClick={() => open(r.thread.id)}
     >
       <span>
         <strong>{threadTitle(r.thread)}</strong>
         <small>
-          {projectName(r.thread)} · {summary(r) || execution(r)}
+          {projectName(r.thread)} ·{" "}
+          {(summary(r) || execution(r)).replace(/^(运行中|待你处理) · /, "")}
         </small>
       </span>
-      <span className="overview-action">进入对话</span>
+      <span className="overview-action">
+        {questionIds.has(r.thread.id) &&
+        activityClass(r).includes("task-attention-live")
+          ? "回答问题"
+          : "进入对话"}
+      </span>
     </button>
   );
   const footer = (

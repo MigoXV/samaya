@@ -43,6 +43,7 @@ import type { Observation } from "./monitor";
 import type { Pending, Preview, Receipt, Status, Thread } from "./types";
 import "./monitor.css";
 import "./workspace-v5.css";
+import "./task-activity.css";
 import "./usage.css";
 import { ComposerInput } from "./ComposerInput";
 import { CommandDialog } from "./CommandDialog";
@@ -82,9 +83,11 @@ const TaskRow = memo(function TaskRow({
   pin,
   compact = false,
   summary = "",
+  activity = "",
 }: {
   compact?: boolean;
   summary?: string;
+  activity?: string;
   record: Observation;
   requests: Pending[];
   childrenCount: number;
@@ -104,7 +107,7 @@ const TaskRow = memo(function TaskRow({
   if (compact)
     return (
       <div
-        className={`task-row compact-task ${summary ? "has-status" : ""} ${selected ? "is-selected" : ""}`}
+        className={`task-row compact-task ${activity} ${summary ? "has-status" : ""} ${selected ? "is-selected" : ""}`}
         role="listitem"
         data-task-id={t.id}
       >
@@ -118,7 +121,9 @@ const TaskRow = memo(function TaskRow({
             {pinned ? "· " : ""}
             {threadTitle(t)}
           </strong>
-          {summary && <small>{summary}</small>}
+          {summary && (
+            <small>{summary.replace(/^(运行中|待你处理) · /, "")}</small>
+          )}
         </button>
         {(requests.length > 0 || unknown) && (
           <button
@@ -140,7 +145,7 @@ const TaskRow = memo(function TaskRow({
     );
   return (
     <div
-      className={`task-row ${selected ? "is-selected" : ""}`}
+      className={`task-row ${activity} ${selected ? "is-selected" : ""}`}
       role="listitem"
       data-task-id={t.id}
     >
@@ -525,6 +530,27 @@ export function MonitorWorkbench({ logout }: { logout: () => void }) {
     if (state === "执行中") return "运行中 · " + progress(r).text;
     if (/失败|异常|未知|待确认|未映射/.test(state)) return state;
     return "";
+  };
+  const activityClass = (r: Observation) => {
+    const pending = requestsByRoot.get(r.thread.id) || EMPTY;
+    const fresh = (record: Observation) =>
+      connected &&
+      !record.error &&
+      !!record.confirmedAt &&
+      tick - record.confirmedAt * 1000 <= 45000;
+    if (pending.length || unknownRoots.has(r.thread.id))
+      return `task-activity task-waiting ${
+        fresh(r) && pending.some((p) => !p.responseState && busy !== p.key)
+          ? "task-attention-live"
+          : ""
+      }`;
+    const running =
+      fresh(r) &&
+      (execution(r) === "执行中" ||
+        childMap
+          .get(r.thread.id)
+          ?.some((c) => fresh(c) && execution(c) === "执行中"));
+    return `task-activity ${running ? "task-running" : ""}`;
   };
   const offsets = rowOffsets(
     filtered.map((r) =>
@@ -1048,6 +1074,7 @@ export function MonitorWorkbench({ logout }: { logout: () => void }) {
             project={project}
             initialized={!!data?.initialized}
             summary={sidebarSummary}
+            activityClass={activityClass}
             open={open}
             all={() => {
               setAllTasks(true);
@@ -1316,6 +1343,7 @@ export function MonitorWorkbench({ logout }: { logout: () => void }) {
                               key={r.thread.id}
                               compact={workMode}
                               summary={sidebarSummary(r)}
+                              activity={activityClass(r)}
                               record={r}
                               requests={
                                 requestsByRoot.get(r.thread.id) || EMPTY
@@ -1443,13 +1471,37 @@ export function MonitorWorkbench({ logout }: { logout: () => void }) {
                           <h1 title={threadTitle(selectedRecord.thread)}>
                             {threadTitle(selectedRecord.thread)}
                           </h1>
+                          <nav className="detail-tabs" aria-label="任务内容">
+                            {[
+                              ["work", "对话"],
+                              ["result", "改动与产物"],
+                            ].map(([tab, label]) => (
+                              <button
+                                key={tab}
+                                className="quiet"
+                                aria-current={
+                                  taskTab === tab ? "page" : undefined
+                                }
+                                onClick={() => setTaskTab(tab)}
+                              >
+                                {label}
+                              </button>
+                            ))}
+                          </nav>
                           <div
                             className="task-live-status"
                             role="status"
-                            title={
+                            title={[
                               sidebarSummary(selectedRecord) ||
-                              execution(selectedRecord)
-                            }
+                                execution(selectedRecord),
+                              execution(selectedRecord) === "执行中" &&
+                              connected &&
+                              selectedRecord.progressAt
+                                ? `最近进展 ${clock(selectedRecord.progressAt)}`
+                                : "",
+                            ]
+                              .filter(Boolean)
+                              .join(" · ")}
                           >
                             <span>
                               {sidebarSummary(selectedRecord) ||
@@ -1464,23 +1516,6 @@ export function MonitorWorkbench({ logout }: { logout: () => void }) {
                               )}
                           </div>
                         </div>
-                        <nav className="detail-tabs" aria-label="任务内容">
-                          {[
-                            ["work", "对话"],
-                            ["result", "改动与产物"],
-                          ].map(([tab, label]) => (
-                            <button
-                              key={tab}
-                              className="quiet"
-                              aria-current={
-                                taskTab === tab ? "page" : undefined
-                              }
-                              onClick={() => setTaskTab(tab)}
-                            >
-                              {label}
-                            </button>
-                          ))}
-                        </nav>
                       </div>
                       <ReadingSurface
                         key={selected + taskTab + readerVisit}
@@ -1650,6 +1685,9 @@ export function MonitorWorkbench({ logout }: { logout: () => void }) {
                                 )}
                                 <RequestForm
                                   request={p}
+                                  attentionActive={activityClass(
+                                    selectedRecord,
+                                  ).includes("task-attention-live")}
                                   busy={
                                     !connected ||
                                     busy === p.key ||
@@ -1936,6 +1974,15 @@ export function MonitorWorkbench({ logout }: { logout: () => void }) {
               <RequestForm
                 key={activeRequest.key}
                 request={activeRequest}
+                attentionActive={(() => {
+                  const record = records.get(
+                    rootId(activeRequest.params.threadId, records),
+                  );
+                  return (
+                    !!record &&
+                    activityClass(record).includes("task-attention-live")
+                  );
+                })()}
                 busy={
                   !connected ||
                   busy === activeRequest.key ||

@@ -105,11 +105,11 @@ for (const theme of ["vallum", "abyssus"]) {
       };
     });
     expect(geometry.toolbar).toBe(40);
-    expect(geometry.heading).toBe(72);
+    expect(geometry.heading).toBe(width < 800 ? 64 : 40);
     expect(geometry.readerRight).toBe(geometry.workspaceRight);
     expect(geometry.readerBottom).toBe(geometry.footerTop);
     expect(geometry.overflow).toBe(false);
-    if (width === 1440) expect(geometry.composer).toBe(880);
+    if (width === 1440) expect(geometry.composer).toBe(860);
     await page.screenshot({ path: `${out}/${theme}-${width}.png` });
   }
 }

@@ -1,0 +1,120 @@
+/* Figma: shared state colors; only the 4px outline animates. */
+.monitor-shell {
+  --task-activity-border-width: 4px;
+  --task-activity-border-color: var(--accent);
+  --task-activity-period: 1.5s;
+}
+[data-theme="vallum"] .monitor-shell {
+  --task-activity-border-color: var(--accent-strong);
+}
+.monitor-shell .task-activity:is(.task-running, .task-waiting) {
+  position: relative;
+  border-radius: 8px;
+  background: var(--surface-subtle);
+  box-shadow: none;
+}
+.monitor-shell .overview-task.task-activity:is(.task-running, .task-waiting) {
+  border: 0;
+}
+.monitor-shell .task-waiting::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border: var(--task-activity-border-width) solid
+    var(--task-activity-border-color);
+  border-radius: inherit;
+  box-sizing: border-box;
+  pointer-events: none;
+  opacity: 1;
+}
+.monitor-shell .task-attention-live::after {
+  animation: task-attention-breathe var(--task-activity-period) linear infinite;
+}
+.monitor-shell .decision-request.task-waiting {
+  max-width: none;
+  width: 100%;
+  padding: 16px;
+  gap: 8px;
+}
+.monitor-shell .decision-request.task-waiting form {
+  gap: 8px;
+}
+.decision-option img {
+  pointer-events: none;
+}
+/* One uninterrupted cycle from Figma's complete motion snippet; no end holds. */
+@keyframes task-attention-breathe {
+  0% {
+    opacity: 1;
+    animation-timing-function: cubic-bezier(0.333, 0, 0.667, 0.342);
+  }
+  6.25% {
+    opacity: 0.97907;
+    animation-timing-function: cubic-bezier(0.333, 0.231, 0.667, 0.573);
+  }
+  12.5% {
+    opacity: 0.9194499999999999;
+    animation-timing-function: cubic-bezier(0.333, 0.285, 0.667, 0.627);
+  }
+  18.75% {
+    opacity: 0.83024;
+    animation-timing-function: cubic-bezier(0.333, 0.316, 0.667, 0.658);
+  }
+  25% {
+    opacity: 0.725;
+    animation-timing-function: cubic-bezier(0.333, 0.342, 0.667, 0.684);
+  }
+  31.25% {
+    opacity: 0.61976;
+    animation-timing-function: cubic-bezier(0.333, 0.373, 0.667, 0.715);
+  }
+  37.5% {
+    opacity: 0.53055;
+    animation-timing-function: cubic-bezier(0.333, 0.427, 0.667, 0.769);
+  }
+  43.75% {
+    opacity: 0.47093;
+    animation-timing-function: cubic-bezier(0.333, 0.658, 0.667, 1);
+  }
+  50% {
+    opacity: 0.45;
+    animation-timing-function: cubic-bezier(0.333, 0, 0.667, 0.342);
+  }
+  56.25% {
+    opacity: 0.47093;
+    animation-timing-function: cubic-bezier(0.333, 0.231, 0.667, 0.573);
+  }
+  62.5% {
+    opacity: 0.53055;
+    animation-timing-function: cubic-bezier(0.333, 0.285, 0.667, 0.627);
+  }
+  68.75% {
+    opacity: 0.61976;
+    animation-timing-function: cubic-bezier(0.333, 0.316, 0.667, 0.658);
+  }
+  75% {
+    opacity: 0.725;
+    animation-timing-function: cubic-bezier(0.333, 0.342, 0.667, 0.684);
+  }
+  81.25% {
+    opacity: 0.83024;
+    animation-timing-function: cubic-bezier(0.333, 0.373, 0.667, 0.715);
+  }
+  87.5% {
+    opacity: 0.9194499999999999;
+    animation-timing-function: cubic-bezier(0.333, 0.427, 0.667, 0.769);
+  }
+  93.75% {
+    opacity: 0.97907;
+    animation-timing-function: cubic-bezier(0.333, 0.658, 0.667, 1);
+  }
+  100% {
+    opacity: 1;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .monitor-shell .task-attention-live::after {
+    animation: none;
+    opacity: 1;
+  }
+}

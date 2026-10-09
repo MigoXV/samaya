@@ -388,6 +388,7 @@
 /* Shared reading axis: header, body, composer all use the same gutters. */
 .task-detail {
   --reading-width: 880px;
+  --composer-width: 860px;
   --reading-gutter: max(20px, calc((100% - var(--reading-width)) / 2));
 }
 .task-heading {
@@ -402,20 +403,19 @@
   flex-shrink: 0;
   padding: 0 var(--reading-gutter);
   display: flex;
-  flex-direction: column;
-  height: 72px;
-  gap: 4px;
+  height: 40px;
 }
 .task-title-status {
   display: flex;
   align-items: center;
   height: 40px;
   min-height: 40px;
-  gap: 20px;
+  gap: 16px;
+  width: 100%;
 }
 .task-reading-heading h1 {
-  font-size: 20px;
-  line-height: 28px;
+  font-size: 18px;
+  line-height: 24px;
   flex: 1;
   min-width: 0;
   font-weight: 500;
@@ -430,7 +430,8 @@
   line-height: 18px;
   color: var(--text-secondary);
   min-width: 0;
-  max-width: 45%;
+  flex: 0 1 120px;
+  max-width: 120px;
 }
 .task-live-status > span {
   overflow: hidden;
@@ -438,35 +439,37 @@
   text-overflow: ellipsis;
 }
 .task-live-status time {
-  flex-shrink: 0;
+  display: none;
 }
 .task-reading-heading .detail-tabs {
   position: static;
-  height: 28px;
-  min-height: 28px;
-  gap: 24px;
+  height: 32px;
+  min-height: 32px;
+  gap: 16px;
+  flex-shrink: 0;
   padding: 0;
   align-items: stretch;
 }
 .task-reading-heading .detail-tabs button {
-  padding: 2px 0;
-  font-size: 14px;
-  line-height: 22px;
+  padding: 4px 0;
+  font-size: 13px;
+  line-height: 20px;
 }
 .task-reading-heading .detail-tabs button[aria-current="page"] {
   border-bottom-color: var(--text-primary);
+  border-bottom-width: 2px;
 }
 .task-detail .detail-scroll {
-  padding: 16px var(--reading-gutter);
+  padding: 12px var(--reading-gutter);
   scrollbar-gutter: stable;
 }
 .task-detail .detail-footer {
   padding: 12px var(--reading-gutter) 20px;
-  min-height: 88px;
+  min-height: 90px;
 }
 .task-detail .task-composer {
   width: 100%;
-  max-width: none;
+  max-width: var(--composer-width);
 }
 .task-detail .history-view .message.user {
   max-width: min(544px, 88%);
@@ -486,25 +489,109 @@
   filter: invert(1);
 }
 .response-actions {
-  display: flex;
-  gap: 4px;
-  align-items: center;
-  margin-top: 12px;
+  position: relative;
+  opacity: 0;
+  pointer-events: none;
+  align-self: start;
 }
 .response-actions button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
   height: 32px;
   min-height: 32px;
-  padding: 6px 8px;
+  padding: 7px;
+  border: 0;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 16px;
 }
 .response-actions img {
   display: block;
 }
+.task-detail .history-view .message.agent-reply {
+  padding: 0;
+  margin-top: 12px;
+  margin-bottom: 12px;
+}
+.agent-reply-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 32px;
+  gap: 8px;
+}
+.agent-reply-body .markdown {
+  min-width: 0;
+}
+.agent-reply-body .markdown > :first-child {
+  margin-top: 0;
+}
+.agent-reply-body .markdown > :last-child {
+  margin-bottom: 0;
+}
+.task-detail .history-view .agent-reply > .agent-reply-author {
+  margin-bottom: 12px;
+  font-size: 14px;
+  line-height: 22px;
+  font-weight: 400;
+  color: var(--text-secondary);
+}
+.agent-reply:hover .response-actions,
+.agent-reply:focus-within .response-actions,
+.response-actions:has(.response-notice:not(:empty)) {
+  opacity: 1;
+  pointer-events: auto;
+}
+.response-notice:not(:empty) {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  z-index: 2;
+  width: max-content;
+  max-width: min(240px, 70vw);
+  padding: 4px 8px;
+  background: var(--surface);
+  color: var(--text-primary);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 12px;
+}
+@media (hover: none), (pointer: coarse) {
+  .response-actions {
+    opacity: 1;
+    pointer-events: auto;
+  }
+}
 @media (max-width: 799px) {
+  .task-reading-heading,
+  .task-title-status {
+    height: 64px;
+    min-height: 64px;
+  }
+  .task-title-status {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 96px;
+    grid-template-rows: 32px 32px;
+    gap: 0 8px;
+  }
   .task-reading-heading h1 {
     font-size: 18px;
+    grid-column: 1;
+    grid-row: 1;
   }
   .task-live-status {
-    max-width: min(130px, 40%);
+    grid-column: 2;
+    grid-row: 1;
+    max-width: 96px;
+    width: 96px;
+  }
+  .task-reading-heading .detail-tabs {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+  .response-actions {
+    opacity: 1;
+    pointer-events: auto;
   }
   .task-heading {
     padding: 4px 12px;
@@ -526,9 +613,9 @@
 }
 .task-composer .composer-input textarea {
   padding: 0;
-  min-height: 28px;
+  min-height: 24px;
   max-height: min(168px, 33dvh);
-  line-height: 28px;
+  line-height: 24px;
 }
 .task-heading .global-pending,
 .task-heading .workspace-exceptions {
@@ -553,8 +640,11 @@
 }
 /* Focus belongs to the integrated editor rather than a second nested box. */
 .composer-input:focus-within {
-  outline: 2px solid var(--focus-ring);
-  outline-offset: 2px;
+  border-color: var(--border-strong);
+  outline: none;
+}
+.composer-input:has(textarea:focus-visible) {
+  border-color: var(--focus-ring);
 }
 .task-composer textarea:focus-visible {
   outline: none;
@@ -1044,10 +1134,6 @@
 .overview-workspace .overview-task {
   min-height: 64px;
   padding: 8px 16px;
-}
-.overview-workspace .overview-task.needs-attention {
-  border: 1px solid var(--focus);
-  border-radius: 8px;
 }
 .overview-workspace .overview-task strong {
   font-size: 14px;

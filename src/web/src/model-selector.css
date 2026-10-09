@@ -1,5 +1,5 @@
 .model-selector {
-  position: relative;
+  position: static;
   min-width: 0;
   grid-row: 1;
   grid-column: 3;
@@ -7,8 +7,8 @@
 .composer-input .model-trigger {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 0 12px;
+  gap: 4px;
+  padding: 0 4px;
   height: 36px;
   min-height: 36px;
   max-width: 240px;
@@ -16,8 +16,8 @@
   border-radius: 18px;
   background: transparent;
   color: var(--text-primary);
-  font-size: 14px;
-  line-height: 22px;
+  font-size: 13px;
+  line-height: 20px;
 }
 .model-trigger .model-name {
   overflow: hidden;
@@ -44,8 +44,8 @@
 }
 .model-menu {
   position: absolute;
-  bottom: calc(100% + 18px);
-  right: 0;
+  bottom: calc(100% + 9px);
+  right: calc(var(--composer-padding-x) + 36px + var(--composer-gap));
   z-index: 60;
   width: 260px;
   max-width: calc(100vw - 40px);
@@ -55,6 +55,9 @@
   background: var(--surface);
   max-height: min(480px, 65dvh);
   overflow-y: auto;
+}
+.composer-input:has(.stop-button) .model-menu {
+  right: calc(var(--composer-padding-x) + 72px + 2 * var(--composer-gap));
 }
 .model-menu button {
   border: 0;
@@ -182,25 +185,25 @@
 }
 @media (max-width: 799px) {
   .composer-input:has(.model-selector) {
-    gap: 4px;
+    gap: var(--composer-gap);
   }
   .composer-input .model-trigger {
     gap: 4px;
-    padding: 0 6px;
+    padding: 0 4px;
     max-width: 124px;
   }
   .model-trigger .model-lightning {
     display: none;
   }
   .model-trigger .model-name {
-    max-width: 54px;
+    max-width: 36px;
   }
   .model-selector {
     position: static;
   }
-  .model-menu {
+  .composer-input .model-menu {
     right: 10px;
-    bottom: calc(100% + 8px);
+    bottom: calc(100% + 9px);
     max-width: calc(100vw - 60px);
   }
 }
@@ -210,7 +213,7 @@
     padding-inline: 4px;
   }
   .model-trigger .model-name {
-    max-width: 24px;
+    max-width: 36px;
   }
 }
 .composer-input .model-trigger:hover,
@@ -240,10 +243,6 @@
 }
 .composer-input .fast-toggle:hover {
   background: transparent;
-}
-.fast-toggle img {
-  width: 13px;
-  height: 18px;
 }
 .fast-toggle[aria-pressed="false"] img {
   opacity: 0.45;
@@ -280,6 +279,9 @@
   filter: invert(1);
 }
 @media (max-width: 799px) {
+  .model-controls > .fast-toggle {
+    display: none;
+  }
   .model-controls .model-trigger {
     max-width: 102px;
     padding-left: 0;
@@ -287,7 +289,7 @@
 }
 @media (max-width: 360px) {
   .model-controls .model-trigger {
-    max-width: 70px;
+    max-width: 96px;
   }
 }
 .model-spinner {
