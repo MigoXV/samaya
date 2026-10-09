@@ -20,11 +20,10 @@
 
 [白垣流程](https://www.figma.com/proto/qaGSrQhakH253tizxKkoae?node-id=27-74&starting-point-node-id=27%3A74) 与 [苍渊流程](https://www.figma.com/proto/qaGSrQhakH253tizxKkoae?node-id=27-714&starting-point-node-id=27%3A714) 包含新建、选择方案、确认答复、观察继续执行、追加、停止、后台仍运行、结果、断线恢复和设置入口。桌面决定使用覆盖层，保留工作台背景；确认和继续执行是不同步骤。模拟服务事件明确标注“演示”。共有 38 个流程画板，原型连线没有跨主题跳转。
 
-复用原有语义变量集合 `2:7` 的白垣 `2:1`、苍渊 `8:0` 两个模式，以及按钮、字号和几何变量。无新品牌色板。行组件使用 Auto Layout；两套主题共享结构。节点清单见 `docs/design/monitor-v2*.json`。
 
 设计稿中的 16 个主任务、3 个项目、子任务及请求全部是演示数据。Figma 原型不连接执行服务。代码使用同一布局方向，并为真实长文本、焦点及触控将桌面行设为 72 px、窄屏行设为 124 px；浏览器验收的首屏密度仍达到 10 / 8 行目标。
 
-浏览器演示预览：[白垣桌面](design/previews/monitor-v2/desktop-vallum.png)、[苍渊桌面](design/previews/monitor-v2/desktop-abyssus.png)、[白垣手机决定](design/previews/monitor-v2/decision-vallum.png)、[苍渊手机决定](design/previews/monitor-v2/decision-abyssus.png)。
+浏览器演示预览：白垣桌面、苍渊桌面、白垣手机决定、苍渊手机决定。
 
 ## 实际实现与数据来源
 

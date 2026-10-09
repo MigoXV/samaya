@@ -4,9 +4,9 @@
 
 ## 设计与实现
 
-[Figma 最近任务／白垣](https://www.figma.com/design/qaGSrQhakH253tizxKkoae/?node-id=35-5586)、[苍渊](https://www.figma.com/design/qaGSrQhakH253tizxKkoae/?node-id=35-6932)、[当前工作](https://www.figma.com/design/qaGSrQhakH253tizxKkoae/?node-id=35-5952)、[手机详情](https://www.figma.com/design/qaGSrQhakH253tizxKkoae/?node-id=35-6879)。节点清单及原型目标见 [workflow-v3.json](design/workflow-v3.json)。新增 42 个可编辑画板，复用原有变量、按钮、任务行，新增 ActivityRow 的消息、命令、变更与请求变体。包含双主题、390/320px、最近 10/20、待处理、工作／结果、断连、派发、停止、决定发送与确认等流程。所有设计内容均为演示数据，Figma 原型不连接运行时。
+[Figma 最近任务／白垣](https://www.figma.com/design/qaGSrQhakH253tizxKkoae/?node-id=35-5586)、[苍渊](https://www.figma.com/design/qaGSrQhakH253tizxKkoae/?node-id=35-6932)、[当前工作](https://www.figma.com/design/qaGSrQhakH253tizxKkoae/?node-id=35-5952)、[手机详情](https://www.figma.com/design/qaGSrQhakH253tizxKkoae/?node-id=35-6879)。新增 42 个可编辑画板，复用原有变量、按钮、任务行，新增 ActivityRow 的消息、命令、变更与请求变体。包含双主题、390/320px、最近 10/20、待处理、工作／结果、断连、派发、停止、决定发送与确认等流程。所有设计内容均为演示数据，Figma 原型不连接运行时。
 
-代码继续使用 React、TypeScript、Vite 和现有语义 Token；字体栈保留 DengXian／等线及跨平台回退。Figma 使用可用的 Noto Sans SC 回退字体，两套主题共用组件与布局。实际浏览器预览见 [预览目录](design/previews/workflow-v3/README.md)。
+代码继续使用 React、TypeScript、Vite 和现有语义 Token；字体栈保留 DengXian／等线及跨平台回退。Figma 使用可用的 Noto Sans SC 回退字体，两套主题共用组件与布局。浏览器预览由隔离测试生成，保存在忽略的 `.samaya/` 目录。
 
 - 首页默认最近 **20 个主任务**，可选 10 个并按浏览器保存。先应用项目、搜索与执行筛选，再按 Codex `Thread.updatedAt` 取最近集合；同步时间不参与排序。
 - 当前集合保持稳定，收到新活动显示「更新最近任务」，由用户更新。原行仍实时显示实际状态；本轮结束不会立即移走正在查看的对象。网页新建任务直接进入当前集合。
@@ -40,7 +40,7 @@ SDK／runtime 继续锁定 **0.160.0**。已核对实际安装 SDK 的 `TurnPlan
 
 ## 本次验证结果
 
-2026-10-03；原始数据见 [verification/workflow-v3](design/verification/workflow-v3/)。
+2026-10-03；原始数据见 [verification/workflow-v3](verification/workflow-v3/)。
 
 | 验证 | 结果 |
 | --- | --- |

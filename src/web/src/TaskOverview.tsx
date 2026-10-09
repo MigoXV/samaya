@@ -1,4 +1,4 @@
-import { useId, useState } from "react";
+import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import {
   execution,
@@ -10,12 +10,21 @@ import {
 import type { Observation } from "./monitor";
 import type { Pending } from "./types";
 
+function groupPreferences() {
+  try {
+    return JSON.parse(sessionStorage.getItem("samaya.overview.groups") || "{}");
+  } catch {
+    return {};
+  }
+}
+
 export function TaskOverview({
   records,
   requests,
   project,
   initialized,
   summary,
+  activityClass,
   open,
   all,
   controls,
@@ -26,6 +35,7 @@ export function TaskOverview({
   project: string;
   initialized: boolean;
   summary: (r: Observation) => string;
+  activityClass: (r: Observation) => string;
   open: (id: string) => void;
   all: () => void;
   controls: ReactNode;
@@ -43,6 +53,11 @@ export function TaskOverview({
   const pendingIds = new Set(
     requests.map((p) => rootId(p.params.threadId, records)),
   );
+  const questionIds = new Set(
+    requests
+      .filter((p) => p.params.questions?.length && !p.responseState)
+      .map((p) => rootId(p.params.threadId, records)),
+  );
   for (const r of records.values())
     if (
       waitingUnknown(
@@ -51,8 +66,23 @@ export function TaskOverview({
       )
     )
       pendingIds.add(rootId(r.thread.id, records));
-  const [limits, setLimits] = useState<Record<string, number>>({});
-  const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
+  const [limits, setLimits] = useState<Record<string, number>>(
+    () => groupPreferences().limits || {},
+  );
+  const [collapsed, setCollapsed] = useState<Record<string, boolean>>(
+    () => groupPreferences().collapsed || {},
+  );
+  const list = useRef<HTMLDivElement>(null);
+  const position = useRef(groupPreferences().scroll || 0);
+  useEffect(() => {
+    sessionStorage.setItem(
+      "samaya.overview.groups",
+      JSON.stringify({ limits, collapsed, scroll: position.current }),
+    );
+  }, [limits, collapsed]);
+  useLayoutEffect(() => {
+    if (initialized && list.current) list.current.scrollTop = position.current;
+  }, [initialized]);
   const prefix = useId();
   const activityAt = (r: Observation) =>
     r.thread.recencyAt ?? r.thread.updatedAt ?? 0;
@@ -84,18 +114,25 @@ export function TaskOverview({
     .sort((a, b) => b.updatedAt - a.updatedAt || a.cwd.localeCompare(b.cwd));
   const row = (r: Observation) => (
     <button
-      className={`overview-task${pendingIds.has(r.thread.id) ? " needs-attention" : ""}`}
+      className={`overview-task ${pendingIds.has(r.thread.id) ? "needs-attention" : ""} ${activityClass(r)}`}
       key={r.thread.id}
       data-task-id={r.thread.id}
+      aria-label={`${threadTitle(r.thread)} · ${summary(r) || execution(r)}`}
       onClick={() => open(r.thread.id)}
     >
       <span>
         <strong>{threadTitle(r.thread)}</strong>
         <small>
-          {projectName(r.thread)} · {summary(r) || execution(r)}
+          {projectName(r.thread)} ·{" "}
+          {(summary(r) || execution(r)).replace(/^(运行中|待你处理) · /, "")}
         </small>
       </span>
-      <span className="overview-action">进入对话</span>
+      <span className="overview-action">
+        {questionIds.has(r.thread.id) &&
+        activityClass(r).includes("task-attention-live")
+          ? "回答问题"
+          : "进入对话"}
+      </span>
     </button>
   );
   const footer = (
@@ -128,6 +165,18 @@ export function TaskOverview({
               <small>{workspaces.length} 个工作区</small>
             </header>
             <div
+              ref={list}
+              onScroll={(e) => {
+                position.current = e.currentTarget.scrollTop;
+                sessionStorage.setItem(
+                  "samaya.overview.groups",
+                  JSON.stringify({
+                    limits,
+                    collapsed,
+                    scroll: position.current,
+                  }),
+                );
+              }}
               className="overview-workspace-scroll"
               tabIndex={0}
               role="region"

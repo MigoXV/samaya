@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 import { api } from "./api";
 import { ItemView } from "./components";
 import { ToolSequence } from "./ToolSequence";
@@ -461,6 +461,15 @@ function TurnHistory({
   const files = items.flatMap(
     (i) => i.changes?.map((c) => ({ path: c.path, id: i.id })) || [],
   );
+  const authorIds = new Set<string>();
+  let needsAuthor = true;
+  for (const item of merged) {
+    if (item.type === "userMessage") needsAuthor = true;
+    else if (item.type === "agentMessage" && needsAuthor) {
+      authorIds.add(item.id);
+      needsAuthor = false;
+    }
+  }
   const renderItem = (item: Item) => {
     const fragment = live[item.id];
     const observed =
@@ -497,6 +506,7 @@ function TurnHistory({
         )}
         <ItemView
           item={observed}
+          showAgentAuthor={authorIds.has(item.id)}
           progress={
             fragment?.kind === "mcpToolCall" ? fragment.text : undefined
           }
@@ -576,7 +586,9 @@ function TurnHistory({
             {section.items.map(renderItem)}
           </ToolSequence>
         ) : (
-          section.items.map(renderItem)
+          <Fragment key={section.items[0].id}>
+            {section.items.map(renderItem)}
+          </Fragment>
         ),
       )}
       {tab === "work" && latest && working && turn.status === "inProgress" && (

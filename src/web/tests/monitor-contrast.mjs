@@ -17,8 +17,11 @@ for (const theme of ["vallum", "abyssus"]) {
   await p.locator(".monitor-nav-items button").first().hover();
   await p.locator(".message.user .prose").waitFor();
   const axe = await new AxeBuilder({ page: p }).analyze();
+  const idleBorder = await p
+    .locator(".composer-input")
+    .evaluate((el) => getComputedStyle(el).borderTopColor);
   await p.getByLabel("补充当前任务", { exact: true }).focus();
-  const ratios = await p.evaluate(() => {
+  const ratios = await p.evaluate((idleBorder) => {
     const rgb = (s) => s.match(/[\d.]+/g)?.map(Number);
     const bg = (e) => {
       for (let n = e; n; n = n.parentElement) {
@@ -57,24 +60,20 @@ for (const theme of ["vallum", "abyssus"]) {
           const e = document.querySelector(sel);
           if (
             sel === ".composer-input" &&
-            getComputedStyle(e).outlineStyle === "none"
+            getComputedStyle(e).borderTopColor === idleBorder
           )
             throw new Error("输入器应显示焦点指示");
           return {
             selector: sel,
             ratio: ratio(
-              rgb(
-                sel === ".composer-input"
-                  ? getComputedStyle(e).outlineColor
-                  : getComputedStyle(e).borderTopColor,
-              ),
+              rgb(getComputedStyle(e).borderTopColor),
               bg(e.parentElement),
             ),
           };
         },
       ),
     };
-  });
+  }, idleBorder);
   results.push({
     theme,
     ratios,

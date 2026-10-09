@@ -2,7 +2,7 @@ import { chromium, expect } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
 import { fixture, install } from "./monitor-fixture.mjs";
 import { mkdirSync, writeFileSync } from "node:fs";
-const out = "../../.samaya/figma-sync-v6";
+const out = "../../.samaya/workspace-layout";
 mkdirSync(out, { recursive: true });
 const browser = await chromium.launch({ args: ["--no-sandbox"] });
 const context = await browser.newContext({
@@ -111,8 +111,8 @@ const axis = await page.evaluate(() => {
 });
 expect(axis.title.width).toBe(880);
 expect(axis.body.x).toBe(axis.title.x);
-expect(axis.composer.x).toBe(axis.title.x);
-expect(axis.composer.width).toBe(880);
+expect(axis.composer.x).toBe(axis.title.x + 10);
+expect(axis.composer.width).toBe(860);
 const input = page.getByLabel("补充当前任务", { exact: true });
 await input.fill("草稿保持");
 await page.getByRole("button", { name: "改动与产物", exact: true }).click();

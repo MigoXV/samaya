@@ -179,7 +179,9 @@ await page
   .locator(".monitor-nav-items")
   .getByRole("button", { name: "任务总览", exact: true })
   .click();
-await page.getByRole("button", { name: "查看全部任务 →", exact: true }).click();
+await expect(
+  page.getByRole("button", { name: "返回工作区总览", exact: true }),
+).toBeVisible();
 await page.locator('[data-task-id="demo-0"] .task-open').click();
 await expect.poll(distance).toBeLessThan(2);
 await expect(page.locator('[data-turn-id="turn-old"]')).toHaveCount(0);

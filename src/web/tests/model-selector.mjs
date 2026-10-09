@@ -236,8 +236,8 @@ try {
   await page.keyboard.press("Escape");
 
   await expect(trigger).toContainText("Model A");
-  expect((await page.locator(".composer-input").boundingBox()).height).toBe(56);
-  expect((await input.boundingBox()).height).toBe(28);
+  expect((await page.locator(".composer-input").boundingBox()).height).toBe(58);
+  expect((await input.boundingBox()).height).toBe(24);
   await input.fill("保留我的草稿");
   await openModels();
   await expect(
@@ -343,14 +343,14 @@ try {
   );
   await page.keyboard.press("Escape");
   await input.fill("第一行\n第二行");
-  expect((await input.boundingBox()).height).toBe(56);
+  expect((await input.boundingBox()).height).toBe(48);
   await input.fill("长文本\n".repeat(30));
   expect((await input.boundingBox()).height).toBe(168);
   expect(await input.evaluate((el) => getComputedStyle(el).overflowY)).toBe(
     "auto",
   );
   await input.fill("");
-  expect((await page.locator(".composer-input").boundingBox()).height).toBe(56);
+  expect((await page.locator(".composer-input").boundingBox()).height).toBe(58);
   await expect(
     page.getByRole("button", { name: "开始下一轮", exact: true }),
   ).toBeDisabled();
@@ -387,7 +387,7 @@ try {
       ),
     ).toBe(true);
     expect((await page.locator(".composer-input").boundingBox()).height).toBe(
-      56,
+      58,
     );
     const modelBox = await trigger.boundingBox();
     const inputBox = await input.boundingBox();
@@ -402,6 +402,11 @@ try {
     await page.screenshot({ path: out + "/mobile-" + width + ".png" });
     await page.keyboard.press("Escape");
   }
+  await trigger.click();
+  await expect(page.locator(".panel-fast")).toBeVisible();
+  await expect(page.locator(".model-controls > .fast-toggle")).toBeHidden();
+  await page.keyboard.press("Escape");
+  await page.setViewportSize({ width: 1440, height: 960 });
   failSave = false;
   state.records.find((r) => r.thread.id === "demo-6").turn.status =
     "inProgress";

@@ -43,6 +43,7 @@ import type { Observation } from "./monitor";
 import type { Pending, Preview, Receipt, Status, Thread } from "./types";
 import "./monitor.css";
 import "./workspace-v5.css";
+import "./task-activity.css";
 import "./usage.css";
 import { ComposerInput } from "./ComposerInput";
 import { CommandDialog } from "./CommandDialog";
@@ -65,6 +66,7 @@ const preferences = () => {
     return {};
   }
 };
+const overviewPreferences = () => preferences().overview || preferences();
 const EMPTY: Pending[] = [];
 const TaskRow = memo(function TaskRow({
   record,
@@ -81,9 +83,11 @@ const TaskRow = memo(function TaskRow({
   pin,
   compact = false,
   summary = "",
+  activity = "",
 }: {
   compact?: boolean;
   summary?: string;
+  activity?: string;
   record: Observation;
   requests: Pending[];
   childrenCount: number;
@@ -103,7 +107,7 @@ const TaskRow = memo(function TaskRow({
   if (compact)
     return (
       <div
-        className={`task-row compact-task ${summary ? "has-status" : ""} ${selected ? "is-selected" : ""}`}
+        className={`task-row compact-task ${activity} ${summary ? "has-status" : ""} ${selected ? "is-selected" : ""}`}
         role="listitem"
         data-task-id={t.id}
       >
@@ -117,7 +121,9 @@ const TaskRow = memo(function TaskRow({
             {pinned ? "· " : ""}
             {threadTitle(t)}
           </strong>
-          {summary && <small>{summary}</small>}
+          {summary && (
+            <small>{summary.replace(/^(运行中|待你处理) · /, "")}</small>
+          )}
         </button>
         {(requests.length > 0 || unknown) && (
           <button
@@ -139,7 +145,7 @@ const TaskRow = memo(function TaskRow({
     );
   return (
     <div
-      className={`task-row ${selected ? "is-selected" : ""}`}
+      className={`task-row ${activity} ${selected ? "is-selected" : ""}`}
       role="listitem"
       data-task-id={t.id}
     >
@@ -235,10 +241,14 @@ export function MonitorWorkbench({ logout }: { logout: () => void }) {
           : "overview",
   );
   const [search, setSearch] = useState<string>(
-      () => preferences().search || "",
+      () => overviewPreferences().search || "",
     ),
-    [project, setProject] = useState<string>(() => preferences().project || ""),
-    [filter, setFilter] = useState<string>(() => preferences().filter || "all");
+    [project, setProject] = useState<string>(
+      () => overviewPreferences().project || "",
+    ),
+    [filter, setFilter] = useState<string>(
+      () => overviewPreferences().filter || "all",
+    );
   const [selected, setSelected] = useState<string>(
       () =>
         new URL(location.href).searchParams.get("thread") ||
@@ -248,7 +258,16 @@ export function MonitorWorkbench({ logout }: { logout: () => void }) {
     [focus, setFocus] = useState(false);
   const [taskTab, setTaskTab] = useState("work");
   const [readerVisit, setReaderVisit] = useState(0);
-  const [allTasks, setAllTasks] = useState(false);
+  const [allTasks, setAllTasks] = useState(
+    () => !!overviewPreferences().allTasks,
+  );
+  const savedOverview = useRef({
+    search,
+    project,
+    filter,
+    allTasks,
+    scroll: overviewPreferences().scroll || 0,
+  });
   const [opened, setOpened] = useState<string[]>([]);
   const [projectMenu, setProjectMenu] = useState(false);
   const [projectVisits, setProjectVisits] = useState<string[]>(() => {
@@ -311,7 +330,7 @@ export function MonitorWorkbench({ logout }: { logout: () => void }) {
       Number(localStorage.getItem("samaya.changes.seen") || 0),
     );
   const [tick, setTick] = useState(() => Date.now()),
-    [scroll, setScroll] = useState(() => preferences().scroll || 0),
+    [scroll, setScroll] = useState(() => overviewPreferences().scroll || 0),
     [viewport, setViewport] = useState(() => ({
       width: innerWidth,
       height: innerHeight,
@@ -512,6 +531,27 @@ export function MonitorWorkbench({ logout }: { logout: () => void }) {
     if (/失败|异常|未知|待确认|未映射/.test(state)) return state;
     return "";
   };
+  const activityClass = (r: Observation) => {
+    const pending = requestsByRoot.get(r.thread.id) || EMPTY;
+    const fresh = (record: Observation) =>
+      connected &&
+      !record.error &&
+      !!record.confirmedAt &&
+      tick - record.confirmedAt * 1000 <= 45000;
+    if (pending.length || unknownRoots.has(r.thread.id))
+      return `task-activity task-waiting ${
+        fresh(r) && pending.some((p) => !p.responseState && busy !== p.key)
+          ? "task-attention-live"
+          : ""
+      }`;
+    const running =
+      fresh(r) &&
+      (execution(r) === "执行中" ||
+        childMap
+          .get(r.thread.id)
+          ?.some((c) => fresh(c) && execution(c) === "执行中"));
+    return `task-activity ${running ? "task-running" : ""}`;
+  };
   const offsets = rowOffsets(
     filtered.map((r) =>
       workMode ? (sidebarSummary(r) ? 60 : 40) : narrow ? 124 : 64,
@@ -557,18 +597,24 @@ export function MonitorWorkbench({ logout }: { logout: () => void }) {
     };
   }, []);
   useEffect(() => {
+    if (view === "overview")
+      savedOverview.current = { search, project, filter, scroll, allTasks };
     sessionStorage.setItem(
       "samaya.monitor.view",
-      JSON.stringify({ search, project, filter, scroll, selected }),
+      JSON.stringify({
+        ...savedOverview.current,
+        selected,
+        overview: savedOverview.current,
+      }),
     );
-  }, [search, project, filter, scroll, selected]);
+  }, [view, search, project, filter, scroll, selected, allTasks]);
   useEffect(() => {
     localStorage.setItem("samaya.pins", JSON.stringify(pins));
   }, [pins]);
   useLayoutEffect(() => {
     if (scrollRef.current)
       scrollRef.current.scrollTop = workMode ? sidebarScroll : scroll;
-  }, [view, data?.initialized, workMode, sidebarScroll, scroll]);
+  }, [view, data?.initialized, workMode, sidebarScroll, scroll, allTasks]);
   const open = useCallback(
     (id: string) => {
       setError("");
@@ -580,15 +626,22 @@ export function MonitorWorkbench({ logout }: { logout: () => void }) {
       setReaderVisit((n) => n + 1);
       setSelected(id);
       setTaskNav(false);
+      if (view !== "overview") {
+        const saved = savedOverview.current;
+        setProject(saved.project);
+        setFilter(saved.filter);
+        setSearch(saved.search);
+        setAllTasks(saved.allTasks);
+        setScroll(saved.scroll);
+      }
       setView("overview");
       const u = new URL(location.href);
       u.searchParams.set("thread", id);
       history.replaceState(null, "", u);
     },
-    [records, visitProject],
+    [records, visitProject, view],
   );
   const closeDetail = () => {
-    setAllTasks(false);
     setSelected("");
     setFocus(false);
     const u = new URL(location.href);
@@ -620,10 +673,12 @@ export function MonitorWorkbench({ logout }: { logout: () => void }) {
     setView(v);
     if (v === "overview") {
       setSelected("");
-      setAllTasks(false);
-      setProject("");
-      setFilter("all");
-      setSearch("");
+      const saved = savedOverview.current;
+      setAllTasks(saved.allTasks);
+      setProject(saved.project);
+      setFilter(saved.filter);
+      setSearch(saved.search);
+      setScroll(saved.scroll);
     }
     if (v === "attention") setProject("");
     setProjectMenu(false);
@@ -782,8 +837,9 @@ export function MonitorWorkbench({ logout }: { logout: () => void }) {
     ]),
   ].slice(0, 4);
   const selectOverviewProject = (path: string) => {
-    const currentFilter = filter;
+    const currentFilter = savedOverview.current.filter;
     navigate("overview");
+    setAllTasks(false);
     setFilter(currentFilter);
     setProject(path);
     setScroll(0);
@@ -1018,6 +1074,7 @@ export function MonitorWorkbench({ logout }: { logout: () => void }) {
             project={project}
             initialized={!!data?.initialized}
             summary={sidebarSummary}
+            activityClass={activityClass}
             open={open}
             all={() => {
               setAllTasks(true);
@@ -1108,6 +1165,14 @@ export function MonitorWorkbench({ logout }: { logout: () => void }) {
                       </label>
                     )}
                     <div className="recent-scope">
+                      {view === "overview" && allTasks && (
+                        <button
+                          className="quiet"
+                          onClick={() => setAllTasks(false)}
+                        >
+                          返回工作区总览
+                        </button>
+                      )}
                       <span>
                         {view === "attention"
                           ? `${requests.length} 项未解决请求`
@@ -1278,6 +1343,7 @@ export function MonitorWorkbench({ logout }: { logout: () => void }) {
                               key={r.thread.id}
                               compact={workMode}
                               summary={sidebarSummary(r)}
+                              activity={activityClass(r)}
                               record={r}
                               requests={
                                 requestsByRoot.get(r.thread.id) || EMPTY
@@ -1405,13 +1471,37 @@ export function MonitorWorkbench({ logout }: { logout: () => void }) {
                           <h1 title={threadTitle(selectedRecord.thread)}>
                             {threadTitle(selectedRecord.thread)}
                           </h1>
+                          <nav className="detail-tabs" aria-label="任务内容">
+                            {[
+                              ["work", "对话"],
+                              ["result", "改动与产物"],
+                            ].map(([tab, label]) => (
+                              <button
+                                key={tab}
+                                className="quiet"
+                                aria-current={
+                                  taskTab === tab ? "page" : undefined
+                                }
+                                onClick={() => setTaskTab(tab)}
+                              >
+                                {label}
+                              </button>
+                            ))}
+                          </nav>
                           <div
                             className="task-live-status"
                             role="status"
-                            title={
+                            title={[
                               sidebarSummary(selectedRecord) ||
-                              execution(selectedRecord)
-                            }
+                                execution(selectedRecord),
+                              execution(selectedRecord) === "执行中" &&
+                              connected &&
+                              selectedRecord.progressAt
+                                ? `最近进展 ${clock(selectedRecord.progressAt)}`
+                                : "",
+                            ]
+                              .filter(Boolean)
+                              .join(" · ")}
                           >
                             <span>
                               {sidebarSummary(selectedRecord) ||
@@ -1426,23 +1516,6 @@ export function MonitorWorkbench({ logout }: { logout: () => void }) {
                               )}
                           </div>
                         </div>
-                        <nav className="detail-tabs" aria-label="任务内容">
-                          {[
-                            ["work", "对话"],
-                            ["result", "改动与产物"],
-                          ].map(([tab, label]) => (
-                            <button
-                              key={tab}
-                              className="quiet"
-                              aria-current={
-                                taskTab === tab ? "page" : undefined
-                              }
-                              onClick={() => setTaskTab(tab)}
-                            >
-                              {label}
-                            </button>
-                          ))}
-                        </nav>
                       </div>
                       <ReadingSurface
                         key={selected + taskTab + readerVisit}
@@ -1612,6 +1685,9 @@ export function MonitorWorkbench({ logout }: { logout: () => void }) {
                                 )}
                                 <RequestForm
                                   request={p}
+                                  attentionActive={activityClass(
+                                    selectedRecord,
+                                  ).includes("task-attention-live")}
                                   busy={
                                     !connected ||
                                     busy === p.key ||
@@ -1898,6 +1974,15 @@ export function MonitorWorkbench({ logout }: { logout: () => void }) {
               <RequestForm
                 key={activeRequest.key}
                 request={activeRequest}
+                attentionActive={(() => {
+                  const record = records.get(
+                    rootId(activeRequest.params.threadId, records),
+                  );
+                  return (
+                    !!record &&
+                    activityClass(record).includes("task-attention-live")
+                  );
+                })()}
                 busy={
                   !connected ||
                   busy === activeRequest.key ||

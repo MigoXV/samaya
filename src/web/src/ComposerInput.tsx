@@ -101,8 +101,13 @@ export function ComposerInput({
     const resize = () => {
       if (!el) return;
       el.style.height = "0px";
-      const limit = Math.min(168, window.innerHeight / 3);
-      el.style.height = Math.min(limit, Math.max(28, el.scrollHeight)) + "px";
+      const style = getComputedStyle(el);
+      const limit =
+        Number.parseFloat(style.maxHeight) ||
+        Math.min(168, window.innerHeight * 0.33);
+      const lineHeight = Number.parseFloat(style.lineHeight);
+      el.style.height =
+        Math.min(limit, Math.max(lineHeight, el.scrollHeight)) + "px";
       el.style.overflowY = el.scrollHeight > limit ? "auto" : "hidden";
     };
     resize();

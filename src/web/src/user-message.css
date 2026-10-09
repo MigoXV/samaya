@@ -1,6 +1,20 @@
 .history-view .user-message-text {
   line-height: 28px;
 }
+.question-reply-pair + .question-reply-pair {
+  margin-top: 24px;
+}
+.question-reply-question {
+  padding-left: 16px;
+  border-left: 2px solid var(--border-strong);
+}
+.question-reply-pair > .message.user {
+  margin-top: 16px;
+  margin-bottom: 0;
+}
+.question-reply .prose {
+  overflow-wrap: anywhere;
+}
 .user-message-text[data-collapsed="true"] {
   max-height: 168px;
   overflow: hidden;

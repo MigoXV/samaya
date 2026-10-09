@@ -122,7 +122,7 @@ pnpm --dir src/web exec node --test tests/mcp-schema.test.mjs
 
 ## 双主题增量验收（2026-10-03）
 
-先补齐 Figma 白垣／苍渊变量模式、页面与 ThemeSelect 组件，再同步到代码。节点记录见 [设计交付](design/README.md)，浏览器结果见 [theme-results.json](theme-results.json)。
+先补齐 Figma 白垣／苍渊变量模式、页面与 ThemeSelect 组件，再同步到代码。设计稿保留在线上 Figma，浏览器结果见 [theme-results.json](theme-results.json)。
 
 - 本次创建专用会话 `01a100c4-2846-7502-9c41-050a6187040d`，真实 Codex 执行 `pwd`，轮次完成并返回 `SAMAYA_THEME_READY`；主题浏览器检查从该真实历史开始。旧验收记录中的会话 ID 本次服务端已无法读取，因此没有把过期记录当作通过依据。
 - 首次访问即使系统为深色也默认白垣；选择苍渊后刷新保留；同源两标签页同步；“跟随系统”响应系统变化，显式选择不受系统变化影响。无效保存值回落白垣。
