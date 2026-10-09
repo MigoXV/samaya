@@ -6,13 +6,6 @@
 
 首次加载不会被标成断连，也不再出现顶部通栏提示。侧栏底部显示“正在连接…”；只有实际连接中断才显示“连接待恢复”和紧凑恢复入口，说明按需展开。连接确认后显示“已连接 Codex”；未确认的执行状态与提交限制继续保留。
 
-## 设计同步
-
-[Figma 对话工作区](https://www.figma.com/design/TZOGfIsv1ESAQckxwg4lpa?node-id=4-2)、[任务总览](https://www.figma.com/design/TZOGfIsv1ESAQckxwg4lpa?node-id=5-749)、[首次连接](https://www.figma.com/design/TZOGfIsv1ESAQckxwg4lpa?node-id=39-175)。
-
-已同步对话、执行中、待处理、统一搜索、苍渊、产物、状态待确认、命令、技能与应用共九个任务页面，复用总览导航组件和主题变量。总览筛选状态页同步连接文字；设计规范补充共用侧栏与连接生命周期。新增第 18 页展示首次连接。收起侧栏和手机对话页保留按需展开状态。
-
-[页面索引](design/figma-sync-v8/index.json)、[Figma 白垣](design/figma-sync-v8/figma-workspace.png)、[Figma 苍渊](design/figma-sync-v8/figma-workspace-abyssus.png)、[浏览器总览](design/figma-sync-v8/browser-overview.png)、[浏览器任务](design/figma-sync-v8/browser-workspace.png)、[手机共用侧栏](design/figma-sync-v8/browser-sidebar-mobile.png)、[打印稿](design/figma-sync-v8/browser-print.pdf)。设计和浏览器预览中的任务、数量均为隔离示例。
 
 ## 验证
 
@@ -21,4 +14,4 @@
 - 新增首次连接无断连提示、总览与任务导航一致、无重复任务侧栏，以及 1024/390/320px 共用抽屉、Escape 与搜索焦点验证。
 - 真实服务只读检查：550 条记录、550 条确认，无页面异常，提交任务操作 0。未重启共享 Codex daemon。
 
-验收结果位于 `docs/verification/figma-sync-v8/`。前端产物已构建到现有服务 `http://127.0.0.1:8765`，刷新页面即可加载。
+验收结果位于 `docs/verification/workspace-v8/`。前端产物已构建到现有服务 `http://127.0.0.1:8765`，刷新页面即可加载。

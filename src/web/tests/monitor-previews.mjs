@@ -7,7 +7,7 @@ await install(c, fixture());
 const p = await c.newPage();
 await p.goto(process.env.SAMAYA_UI_TEST_URL || "http://127.0.0.1:5175");
 await p.getByRole("list").waitFor();
-const dir = "../../docs/design/previews/workflow-v3";
+const dir = "../../.samaya/previews/workflow-v3";
 mkdirSync(dir, { recursive: true });
 for (const theme of ["vallum", "abyssus"]) {
   await p.evaluate((value) => window.samayaTheme.setPreference(value), theme);

@@ -1,4 +1,4 @@
-import { useId, useState } from "react";
+import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import {
   execution,
@@ -9,6 +9,14 @@ import {
 } from "./monitor";
 import type { Observation } from "./monitor";
 import type { Pending } from "./types";
+
+function groupPreferences() {
+  try {
+    return JSON.parse(sessionStorage.getItem("samaya.overview.groups") || "{}");
+  } catch {
+    return {};
+  }
+}
 
 export function TaskOverview({
   records,
@@ -51,8 +59,23 @@ export function TaskOverview({
       )
     )
       pendingIds.add(rootId(r.thread.id, records));
-  const [limits, setLimits] = useState<Record<string, number>>({});
-  const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
+  const [limits, setLimits] = useState<Record<string, number>>(
+    () => groupPreferences().limits || {},
+  );
+  const [collapsed, setCollapsed] = useState<Record<string, boolean>>(
+    () => groupPreferences().collapsed || {},
+  );
+  const list = useRef<HTMLDivElement>(null);
+  const position = useRef(groupPreferences().scroll || 0);
+  useEffect(() => {
+    sessionStorage.setItem(
+      "samaya.overview.groups",
+      JSON.stringify({ limits, collapsed, scroll: position.current }),
+    );
+  }, [limits, collapsed]);
+  useLayoutEffect(() => {
+    if (initialized && list.current) list.current.scrollTop = position.current;
+  }, [initialized]);
   const prefix = useId();
   const activityAt = (r: Observation) =>
     r.thread.recencyAt ?? r.thread.updatedAt ?? 0;
@@ -128,6 +151,18 @@ export function TaskOverview({
               <small>{workspaces.length} 个工作区</small>
             </header>
             <div
+              ref={list}
+              onScroll={(e) => {
+                position.current = e.currentTarget.scrollTop;
+                sessionStorage.setItem(
+                  "samaya.overview.groups",
+                  JSON.stringify({
+                    limits,
+                    collapsed,
+                    scroll: position.current,
+                  }),
+                );
+              }}
               className="overview-workspace-scroll"
               tabIndex={0}
               role="region"

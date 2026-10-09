@@ -1,6 +1,6 @@
 > 总览行为已更新为按最近活跃工作区分组，每组默认展开 5 个任务，结束任务保留原组。当前说明见 [工作区总览](chat-workspace-v5.md)；下文保留 v6 交付记录。
 
-# Samaya · Figma 全量同步 v6
+# Samaya · 对话工作区 v6
 
 本轮将已确认的总览和工作区设计同步至代码；沿用 MANAS 页面关系与苍渊·白垣语义 Token，没有修改后端协议或训练框架。
 
@@ -19,7 +19,7 @@
 - 新增 `test:figma`：总览展示上限、默认折叠、流式顺序稳定、未展示任务仍有后台状态、720px 几何、候选 28px／4px／8 行、静态图标加载和原始尺寸、页签与草稿、320/390/768/1440px 和低高度输入器。
 - 阅读回归增加两页签独立滚动恢复；保留断连、长内容、中文输入法、命令执行、请求处理、双主题 axe 和对比度检查。
 - 后端 `poetry run pytest -q`：74 项通过（1 条已有依赖弃用警告）；浏览器测试使用隔离 fixture，不向真实 Codex 提交任务。
-- 真实服务只读验收：549 条记录、549 条确认，连接正常，历史及刷新选择恢复成功，提交操作 0。详见 [只读报告](verification/figma-sync-v6/runtime-browser.json)。
+- 真实服务只读验收：549 条记录、549 条确认，连接正常，历史及刷新选择恢复成功，提交操作 0。详见 [只读报告](verification/workspace-v6/runtime-browser.json)。
 
 命令：
 
@@ -29,9 +29,3 @@ pnpm --dir src/web run build
 SAMAYA_UI_TEST_URL=http://127.0.0.1:8765 pnpm --dir src/web run test:browser
 poetry run pytest -q
 ```
-
-## 设计与交付
-
-[Figma 文件](https://www.figma.com/design/TZOGfIsv1ESAQckxwg4lpa)；[总览](https://www.figma.com/design/TZOGfIsv1ESAQckxwg4lpa?node-id=5-749)、[工作区](https://www.figma.com/design/TZOGfIsv1ESAQckxwg4lpa?node-id=4-2)、[技能菜单](https://www.figma.com/design/TZOGfIsv1ESAQckxwg4lpa?node-id=14-255)。完整页面节点见 [索引](design/figma-sync-v6/index.json)，截图与打印稿位于同目录。文件名 `figma-*` 是设计导出，`browser-*` 是隔离数据浏览器截图；字体沿用项目 Microsoft YaHei 优先栈，Figma 使用 Noto Sans SC。
-
-本轮在 `feature/chat-workspace-v5` 分批提交，现有 HTTP 服务从构建目录提供新版界面。没有发布 tag、推送远程或重启共享 Codex daemon。真实应用目录此前返回 403 的能力限制仍保留，本轮没有重新执行外部应用调用。

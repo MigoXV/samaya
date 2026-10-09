@@ -136,7 +136,9 @@ for (const width of [390, 320]) {
 // Restore while keeping the current state: no submission may be replayed.
 const before = calls.length;
 await page.reload();
-await page.getByRole("button", { name: "查看全部任务 →", exact: true }).click();
+await expect(
+  page.getByRole("button", { name: "返回工作区总览", exact: true }),
+).toBeVisible();
 await page.getByRole("list", { name: "任务列表" }).waitFor();
 expect(calls.length).toBe(before);
 const result = {

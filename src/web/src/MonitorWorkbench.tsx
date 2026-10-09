@@ -65,6 +65,7 @@ const preferences = () => {
     return {};
   }
 };
+const overviewPreferences = () => preferences().overview || preferences();
 const EMPTY: Pending[] = [];
 const TaskRow = memo(function TaskRow({
   record,
@@ -235,10 +236,14 @@ export function MonitorWorkbench({ logout }: { logout: () => void }) {
           : "overview",
   );
   const [search, setSearch] = useState<string>(
-      () => preferences().search || "",
+      () => overviewPreferences().search || "",
     ),
-    [project, setProject] = useState<string>(() => preferences().project || ""),
-    [filter, setFilter] = useState<string>(() => preferences().filter || "all");
+    [project, setProject] = useState<string>(
+      () => overviewPreferences().project || "",
+    ),
+    [filter, setFilter] = useState<string>(
+      () => overviewPreferences().filter || "all",
+    );
   const [selected, setSelected] = useState<string>(
       () =>
         new URL(location.href).searchParams.get("thread") ||
@@ -248,7 +253,16 @@ export function MonitorWorkbench({ logout }: { logout: () => void }) {
     [focus, setFocus] = useState(false);
   const [taskTab, setTaskTab] = useState("work");
   const [readerVisit, setReaderVisit] = useState(0);
-  const [allTasks, setAllTasks] = useState(false);
+  const [allTasks, setAllTasks] = useState(
+    () => !!overviewPreferences().allTasks,
+  );
+  const savedOverview = useRef({
+    search,
+    project,
+    filter,
+    allTasks,
+    scroll: overviewPreferences().scroll || 0,
+  });
   const [opened, setOpened] = useState<string[]>([]);
   const [projectMenu, setProjectMenu] = useState(false);
   const [projectVisits, setProjectVisits] = useState<string[]>(() => {
@@ -311,7 +325,7 @@ export function MonitorWorkbench({ logout }: { logout: () => void }) {
       Number(localStorage.getItem("samaya.changes.seen") || 0),
     );
   const [tick, setTick] = useState(() => Date.now()),
-    [scroll, setScroll] = useState(() => preferences().scroll || 0),
+    [scroll, setScroll] = useState(() => overviewPreferences().scroll || 0),
     [viewport, setViewport] = useState(() => ({
       width: innerWidth,
       height: innerHeight,
@@ -557,18 +571,24 @@ export function MonitorWorkbench({ logout }: { logout: () => void }) {
     };
   }, []);
   useEffect(() => {
+    if (view === "overview")
+      savedOverview.current = { search, project, filter, scroll, allTasks };
     sessionStorage.setItem(
       "samaya.monitor.view",
-      JSON.stringify({ search, project, filter, scroll, selected }),
+      JSON.stringify({
+        ...savedOverview.current,
+        selected,
+        overview: savedOverview.current,
+      }),
     );
-  }, [search, project, filter, scroll, selected]);
+  }, [view, search, project, filter, scroll, selected, allTasks]);
   useEffect(() => {
     localStorage.setItem("samaya.pins", JSON.stringify(pins));
   }, [pins]);
   useLayoutEffect(() => {
     if (scrollRef.current)
       scrollRef.current.scrollTop = workMode ? sidebarScroll : scroll;
-  }, [view, data?.initialized, workMode, sidebarScroll, scroll]);
+  }, [view, data?.initialized, workMode, sidebarScroll, scroll, allTasks]);
   const open = useCallback(
     (id: string) => {
       setError("");
@@ -580,15 +600,22 @@ export function MonitorWorkbench({ logout }: { logout: () => void }) {
       setReaderVisit((n) => n + 1);
       setSelected(id);
       setTaskNav(false);
+      if (view !== "overview") {
+        const saved = savedOverview.current;
+        setProject(saved.project);
+        setFilter(saved.filter);
+        setSearch(saved.search);
+        setAllTasks(saved.allTasks);
+        setScroll(saved.scroll);
+      }
       setView("overview");
       const u = new URL(location.href);
       u.searchParams.set("thread", id);
       history.replaceState(null, "", u);
     },
-    [records, visitProject],
+    [records, visitProject, view],
   );
   const closeDetail = () => {
-    setAllTasks(false);
     setSelected("");
     setFocus(false);
     const u = new URL(location.href);
@@ -620,10 +647,12 @@ export function MonitorWorkbench({ logout }: { logout: () => void }) {
     setView(v);
     if (v === "overview") {
       setSelected("");
-      setAllTasks(false);
-      setProject("");
-      setFilter("all");
-      setSearch("");
+      const saved = savedOverview.current;
+      setAllTasks(saved.allTasks);
+      setProject(saved.project);
+      setFilter(saved.filter);
+      setSearch(saved.search);
+      setScroll(saved.scroll);
     }
     if (v === "attention") setProject("");
     setProjectMenu(false);
@@ -782,8 +811,9 @@ export function MonitorWorkbench({ logout }: { logout: () => void }) {
     ]),
   ].slice(0, 4);
   const selectOverviewProject = (path: string) => {
-    const currentFilter = filter;
+    const currentFilter = savedOverview.current.filter;
     navigate("overview");
+    setAllTasks(false);
     setFilter(currentFilter);
     setProject(path);
     setScroll(0);
@@ -1108,6 +1138,14 @@ export function MonitorWorkbench({ logout }: { logout: () => void }) {
                       </label>
                     )}
                     <div className="recent-scope">
+                      {view === "overview" && allTasks && (
+                        <button
+                          className="quiet"
+                          onClick={() => setAllTasks(false)}
+                        >
+                          返回工作区总览
+                        </button>
+                      )}
                       <span>
                         {view === "attention"
                           ? `${requests.length} 项未解决请求`

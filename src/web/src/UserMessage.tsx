@@ -1,11 +1,44 @@
 import { useEffect, useId, useRef, useState } from "react";
 import type { Item } from "./types";
 import { preserveMessagePosition } from "./reading-position";
+import { userMessageParts } from "./question-reply";
 import "./user-message.css";
 
 export function UserMessage({ item }: { item: Item }) {
   const text =
     item.content?.map((c) => c.text || "").join("\n") || item.text || "";
+  const parts = userMessageParts(text);
+  return parts.map((part, index) =>
+    part.type === "text" ? (
+      <MessageText
+        key={index}
+        text={
+          parts.length > 1
+            ? part.text.replace(/^(?:\r?\n)+|(?:\r?\n)+$/g, "")
+            : part.text
+        }
+      />
+    ) : (
+      <section
+        className="message question-reply"
+        key={index}
+        aria-label="提问与回答"
+      >
+        {part.replies.map((reply, replyIndex) => (
+          <div className="question-reply-pair" key={replyIndex}>
+            <div className="question-reply-question">
+              <div className="eyebrow">Codex 提问</div>
+              <div className="prose">{reply.question}</div>
+            </div>
+            <MessageText text={reply.answer} label="你 · 已回答" />
+          </div>
+        ))}
+      </section>
+    ),
+  );
+}
+
+function MessageText({ text, label = "你" }: { text: string; label?: string }) {
   const [expanded, setExpanded] = useState(false);
   const [overflow, setOverflow] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -28,7 +61,7 @@ export function UserMessage({ item }: { item: Item }) {
   }, [text]);
   return (
     <section ref={message} className="message user">
-      <div className="eyebrow">你</div>
+      <div className="eyebrow">{label}</div>
       <div
         id={id}
         ref={ref}

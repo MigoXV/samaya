@@ -4,7 +4,7 @@
 
 ## 设计与代码
 
-在原文件新增 [09 阅读工作区 v4](https://www.figma.com/design/qaGSrQhakH253tizxKkoae/?node-id=52-2600)，保留 v3。双主题工作态、专注、窄屏、总览及决策/停止流程使用既有 Semantic 变量、Button、ActivityRow；设计内容是明确标记的演示数据，不连接运行时。核心节点、原型目标及状态契约见 [设计契约](design/reading-workspace-v4/README.md)。
+在原文件新增 [09 阅读工作区 v4](https://www.figma.com/design/qaGSrQhakH253tizxKkoae/?node-id=52-2600)，保留 v3。双主题工作态、专注、窄屏、总览及决策/停止流程使用既有 Semantic 变量、Button、ActivityRow；设计内容是明确标记的演示数据，不连接运行时。设计稿在线上文件中保留。
 
 前端继续 React / TypeScript / Vite；双主题共用 DOM 和布局，等线优先字体栈保持。主要变化：
 
@@ -22,7 +22,7 @@
 
 ## 实测结果
 
-2026-10-03，本机 Chromium。原始摘要见 [验证数据](design/verification/reading-workspace-v4/)。
+2026-10-03，本机 Chromium。原始摘要见 [验证数据](verification/reading-workspace-v4/)。
 
 | 验证 | 结果 |
 | --- | --- |

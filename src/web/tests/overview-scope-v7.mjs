@@ -59,7 +59,14 @@ await page
   .locator(".monitor-nav-items")
   .getByRole("button", { name: "任务总览", exact: true })
   .click();
-await expect(page.locator(".scope-trigger").first()).toContainText("所有项目");
+await expect(page.locator(".scope-trigger").first()).toContainText(
+  "project-28",
+);
+await page.locator(".scope-trigger").first().click();
+await page
+  .getByRole("region", { name: "选择项目", exact: true })
+  .getByRole("button", { name: "所有项目", exact: true })
+  .click();
 await page.locator(".scope-trigger").first().click();
 await page.keyboard.press("Escape");
 await expect(page.locator(".scope-trigger").first()).toBeFocused();
@@ -91,6 +98,19 @@ await expect(page.locator(".scope-trigger").nth(1)).toContainText("待我处理"
 await page
   .locator(".monitor-nav-items")
   .getByRole("button", { name: "任务总览", exact: true })
+  .click();
+await expect(page.locator(".scope-trigger").first()).toContainText("Samaya");
+await expect(page.locator(".scope-trigger").nth(1)).toContainText("待我处理");
+// Prepare an explicit unfiltered scope for the following layout checks.
+await page.locator(".scope-trigger").first().click();
+await page
+  .getByRole("region", { name: "选择项目", exact: true })
+  .getByRole("button", { name: "所有项目", exact: true })
+  .click();
+await page.locator(".scope-trigger").nth(1).click();
+await page
+  .getByRole("group", { name: "选择状态", exact: true })
+  .getByRole("button", { name: "全部状态", exact: true })
   .click();
 for (const theme of ["vallum", "abyssus"]) {
   await page.evaluate(
