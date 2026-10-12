@@ -92,8 +92,8 @@ try {
     "SAMAYA_THEME_READY",
     { timeout: 30000 },
   );
-  await expect(root).toHaveAttribute("data-theme", "vallum");
-  report.defaultWhiteEvenWithDarkOS = true;
+  await expect(root).toHaveAttribute("data-theme", "abyssus");
+  report.defaultFollowsDarkOS = true;
   await page.locator(".composer textarea").fill("切换主题时保留的消息草稿");
   const before = { posts, streams };
   const composer = await page.locator(".composer textarea").elementHandle();

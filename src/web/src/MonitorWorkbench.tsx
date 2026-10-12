@@ -17,7 +17,7 @@ import {
   useRef,
   useState,
 } from "react";
-import type { ReactNode } from "react";
+import type { Dispatch, ReactNode, SetStateAction } from "react";
 import { api, operation, pendingOperations, clearOperation } from "./api";
 import { DirectoryPicker, Modal, RequestForm } from "./components";
 import { ExecutionHistory } from "./ExecutionHistory";
@@ -46,8 +46,15 @@ import "./workspace-v5.css";
 import "./task-activity.css";
 import "./usage.css";
 import { ComposerInput } from "./ComposerInput";
+import { setImageDraft, useImageDraft } from "./composer-images";
+import type { InputImage } from "./composer-images";
 import { CommandDialog } from "./CommandDialog";
 import { ModelSelector } from "./ModelSelector";
+import { usePlanMode } from "./PlanMode";
+import {
+  NotificationSettings,
+  useTaskNotifications,
+} from "./task-notifications";
 import type { InputReference, SlashCommand } from "./composer-model";
 import { rowOffsets, visibleRange } from "./rowGeometry";
 
@@ -67,6 +74,17 @@ const preferences = () => {
   }
 };
 const overviewPreferences = () => preferences().overview || preferences();
+const workspaceFromUrl = () =>
+  new URL(location.href).searchParams.get("workspace") || "";
+const readWorkspaceDraft = (cwd: string) => {
+  try {
+    return JSON.parse(
+      sessionStorage.getItem("samaya.new-draft." + cwd) || "{}",
+    );
+  } catch {
+    return {};
+  }
+};
 const EMPTY: Pending[] = [];
 const TaskRow = memo(function TaskRow({
   record,
@@ -301,7 +319,14 @@ export function MonitorWorkbench({ logout }: { logout: () => void }) {
   const [taskNav, setTaskNav] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [sidebarScroll, setSidebarScroll] = useState(0);
-  const workMode = !!selected && ["overview", "pinned"].includes(view);
+  const [draftWorkspace, setDraftWorkspace] = useState(
+    () => new URL(location.href).searchParams.get("workspace") || "",
+  );
+  const [draftMode, setDraftMode] = useState(
+    () => readWorkspaceDraft(workspaceFromUrl()).mode || "default",
+  );
+  const workMode =
+    !!(selected || draftWorkspace) && ["overview", "pinned"].includes(view);
   const [pins, setPins] = useState<string[]>(() => {
     try {
       return JSON.parse(localStorage.getItem("samaya.pins") || "[]");
@@ -321,10 +346,18 @@ export function MonitorWorkbench({ logout }: { logout: () => void }) {
     [error, setError] = useState(""),
     [feedbackThread, setFeedbackThread] = useState(""),
     [busy, setBusy] = useState(""),
-    [cwd, setCwd] = useState(""),
-    [goal, setGoal] = useState(""),
+    [cwd, setCwd] = useState(workspaceFromUrl),
+    [goal, setGoal] = useState(
+      () => readWorkspaceDraft(workspaceFromUrl()).text || "",
+    ),
     [newName, setNewName] = useState("");
-  const [newReferences, setNewReferences] = useState<InputReference[]>([]);
+  const [confirmedCwd, setConfirmedCwd] = useState("");
+  const [newImages, setNewImages] = useImageDraft(
+    draftWorkspace ? "workspace:" + draftWorkspace : "create",
+  );
+  const [newReferences, setNewReferences] = useState<InputReference[]>(
+    () => readWorkspaceDraft(workspaceFromUrl()).references || [],
+  );
   const [receipts, setReceipts] = useState(pendingOperations),
     [seen, setSeen] = useState(() =>
       Number(localStorage.getItem("samaya.changes.seen") || 0),
@@ -624,6 +657,7 @@ export function MonitorWorkbench({ logout }: { logout: () => void }) {
       setOpened((old) => [id, ...old.filter((x) => x !== id)].slice(0, 30));
       setTaskTab("work");
       setReaderVisit((n) => n + 1);
+      setDraftWorkspace("");
       setSelected(id);
       setTaskNav(false);
       if (view !== "overview") {
@@ -636,12 +670,14 @@ export function MonitorWorkbench({ logout }: { logout: () => void }) {
       }
       setView("overview");
       const u = new URL(location.href);
+      u.searchParams.delete("workspace");
       u.searchParams.set("thread", id);
       history.replaceState(null, "", u);
     },
     [records, visitProject, view],
   );
   const closeDetail = () => {
+    setDraftWorkspace("");
     setSelected("");
     setFocus(false);
     const u = new URL(location.href);
@@ -667,6 +703,7 @@ export function MonitorWorkbench({ logout }: { logout: () => void }) {
     [],
   );
   const navigate = (v: View) => {
+    setDraftWorkspace("");
     setError("");
     setNotice("");
     setFeedbackThread("");
@@ -791,27 +828,56 @@ export function MonitorWorkbench({ logout }: { logout: () => void }) {
     !feedbackThread ||
     rootId(feedbackThread, records) === rootId(selected, records);
   async function create() {
+    if ((!goal.trim() && !newImages.length) || busy || !connected) return;
+    if (dialog === "create" && (!confirmedCwd || confirmedCwd !== cwd)) {
+      setError("请先点击“浏览目录”确认工作目录。");
+      return;
+    }
     const created = await run("create", { cwd, name: newName });
     if (!created) return;
     const id = String(created.result?.threadId || "");
     if (!id) return;
     recent.include(id);
-    open(id);
-    setDialog(null);
-    setView("overview");
+    setImageDraft("thread:" + id, newImages);
+    sessionStorage.setItem("samaya.draft." + id, goal);
+    sessionStorage.setItem(
+      "samaya.references." + id,
+      JSON.stringify(newReferences),
+    );
+    const finish = () => {
+      open(id);
+      setDialog(null);
+      setView("overview");
+    };
     if (created.result?.warning) {
+      finish();
       setNotice(String(created.result.warning));
-      sessionStorage.setItem("samaya.draft." + id, goal);
-      sessionStorage.setItem(
-        "samaya.references." + id,
-        JSON.stringify(newReferences),
-      );
       return;
+    }
+    if (draftWorkspace && draftMode === "plan") {
+      const configured = await run("command", {
+        threadId: id,
+        command: "plan",
+        args: { value: "plan" },
+        expectedTurnId: null,
+      });
+      if (
+        !configured ||
+        configured.result?.settingsPending ||
+        configured.result?.mode !== "plan"
+      ) {
+        finish();
+        setNotice(
+          "会话已创建，计划模式尚未确认；消息保留在草稿中，请先核对模式或回执。",
+        );
+        return;
+      }
     }
     const sent = await run("send", {
       threadId: id,
       text: goal,
       references: newReferences,
+      images: newImages.map(({ url }) => ({ url })),
       expectedCwd: cwd,
       expectedTurnId: null,
     });
@@ -827,9 +893,63 @@ export function MonitorWorkbench({ logout }: { logout: () => void }) {
     } else {
       setGoal("");
       setNewReferences([]);
+      setNewImages([]);
+      setImageDraft("thread:" + id, []);
       setNewName("");
+      sessionStorage.setItem("samaya.draft." + id, "");
+      sessionStorage.setItem("samaya.references." + id, "[]");
+      if (draftWorkspace)
+        sessionStorage.removeItem("samaya.new-draft." + draftWorkspace);
     }
+    finish();
   }
+  const startWorkspaceDraft = (path: string) => {
+    let saved: { text?: string; references?: InputReference[]; mode?: string } =
+      {};
+    try {
+      saved = JSON.parse(
+        sessionStorage.getItem("samaya.new-draft." + path) || "{}",
+      );
+    } catch {
+      /* Start an empty draft when local preferences are unreadable. */
+    }
+    setGoal(saved.text || "");
+    setNewReferences(saved.references || []);
+    setDraftMode(saved.mode || "default");
+    setCwd(path);
+    setNewName("");
+    setSelected("");
+    setDraftWorkspace(path);
+    setView("overview");
+    setTaskNav(false);
+    setError("");
+    setNotice("");
+    visitProject(path);
+    const url = new URL(location.href);
+    url.searchParams.delete("thread");
+    url.searchParams.set("workspace", path);
+    history.replaceState(null, "", url);
+  };
+  useEffect(() => {
+    if (draftWorkspace)
+      sessionStorage.setItem(
+        "samaya.new-draft." + draftWorkspace,
+        JSON.stringify({
+          text: goal,
+          references: newReferences,
+          mode: draftMode,
+        }),
+      );
+  }, [draftWorkspace, goal, newReferences, draftMode]);
+  useEffect(() => {
+    document.title =
+      workMode && draftWorkspace
+        ? `新会话 · ${shortProject(draftWorkspace)} — Samaya`
+        : workMode && selectedRecord
+          ? `${threadTitle(selectedRecord.thread)} · ${projectName(selectedRecord.thread)} — Samaya`
+          : `${{ overview: "任务总览", pinned: "置顶任务", attention: "待我处理", settings: "设置与连接", usage: "使用情况", records: "会话记录", changes: "最近变化" }[view]} — Samaya`;
+  }, [view, workMode, draftWorkspace, selectedRecord]);
+  useTaskNotifications(records, open);
   const recentProjects = [
     ...new Set([
       ...projectVisits.filter((p) => projects.includes(p)),
@@ -1068,6 +1188,8 @@ export function MonitorWorkbench({ logout }: { logout: () => void }) {
                 }}
               />
             }
+            create={startWorkspaceDraft}
+            connected={!!connected}
             visibleIds={new Set(matching.map((r) => r.thread.id))}
             records={records}
             requests={requests}
@@ -1386,7 +1508,23 @@ export function MonitorWorkbench({ logout }: { logout: () => void }) {
                   aria-label="任务详情"
                   inert={taskNav && viewport.width < 1100}
                 >
-                  {selectedRecord ? (
+                  {draftWorkspace ? (
+                    <WorkspaceDraft
+                      cwd={draftWorkspace}
+                      value={goal}
+                      change={setGoal}
+                      references={newReferences}
+                      onReferences={setNewReferences}
+                      images={newImages}
+                      onImages={setNewImages}
+                      mode={draftMode}
+                      onMode={setDraftMode}
+                      disabled={!connected || !!busy}
+                      submit={() => void create()}
+                      back={() => navigate("overview")}
+                      feedback={operationFeedback}
+                    />
+                  ) : selectedRecord ? (
                     <>
                       <header className="task-heading">
                         <button
@@ -1528,6 +1666,11 @@ export function MonitorWorkbench({ logout }: { logout: () => void }) {
                             <div className="task-context">
                               {selectedRecord.error && (
                                 <p role="status">{selectedRecord.error}</p>
+                              )}
+                              {selectedRecord.thread.historyNotice && (
+                                <p role="status">
+                                  {selectedRecord.thread.historyNotice}
+                                </p>
                               )}
                               {selectedRecord.turn?.error?.message && (
                                 <details className="task-error">
@@ -2016,7 +2159,11 @@ export function MonitorWorkbench({ logout }: { logout: () => void }) {
               void create();
             }}
           >
-            <DirectoryPicker value={cwd} onChange={setCwd} />
+            <DirectoryPicker
+              value={cwd}
+              onChange={setCwd}
+              onValidated={setConfirmedCwd}
+            />
             <div className="task-composer">
               <ComposerInput
                 label="工作要求"
@@ -2024,8 +2171,10 @@ export function MonitorWorkbench({ logout }: { logout: () => void }) {
                 onChange={setGoal}
                 references={newReferences}
                 onReferences={setNewReferences}
-                cwd={cwd}
-                disabled={!!busy || !connected || !cwd}
+                images={newImages}
+                onImages={setNewImages}
+                cwd={confirmedCwd === cwd ? cwd : ""}
+                disabled={!!busy || !connected || !cwd || confirmedCwd !== cwd}
                 onSubmit={() => void create()}
                 onCommand={() =>
                   setError("先创建任务，再使用会话命令；技能与应用可直接选择。")
@@ -2244,6 +2393,7 @@ function TaskComposer({
   navigateCommand: (name: string) => void;
 }) {
   const id = record.thread.id;
+  const [images, setImages] = useImageDraft("thread:" + id);
   const [draft, setDraft] = useState(
     () => sessionStorage.getItem("samaya.draft." + id) || "",
   );
@@ -2263,6 +2413,17 @@ function TaskComposer({
   const [localError, setLocalError] = useState("");
   const [goalRefresh, setGoalRefresh] = useState(0);
   const active = record.turn?.status === "inProgress";
+  const mode = usePlanMode({
+    tid: id,
+    turnId: record.turn?.id,
+    disabled:
+      !connected ||
+      record.thread.canAcceptDirectInput === false ||
+      record.thread.historyAvailable === false ||
+      !!record.error,
+    busy,
+    run: runSettings,
+  });
   useEffect(() => {
     sessionStorage.setItem("samaya.draft." + id, draft);
     sessionStorage.setItem(
@@ -2276,6 +2437,7 @@ function TaskComposer({
       threadId: id,
       text: draft,
       references,
+      images: images.map(({ url }) => ({ url })),
       expectedCwd: record.thread.cwd,
       expectedTurnId: record.turn?.id || null,
     });
@@ -2283,6 +2445,9 @@ function TaskComposer({
       setDraft((current) => (current === submitted ? "" : current));
       setReferences((current) =>
         current.filter((r) => !references.includes(r)),
+      );
+      setImages((current) =>
+        current.filter((image) => !images.includes(image)),
       );
     }
   };
@@ -2346,6 +2511,8 @@ function TaskComposer({
         onChange={setDraft}
         references={references}
         onReferences={setReferences}
+        images={images}
+        onImages={setImages}
         cwd={record.thread.cwd}
         threadId={id}
         modelSelector={
@@ -2359,18 +2526,23 @@ function TaskComposer({
             disabled={
               !connected ||
               record.thread.canAcceptDirectInput === false ||
+              record.thread.historyAvailable === false ||
               !!record.error
             }
             run={runSettings}
             inspectReceipts={inspectReceipts}
           />
         }
+        submitDisabled={mode.pending}
+        modeControl={mode.control}
+        onToggleMode={() => void mode.toggle()}
         active={active}
         placeholder={!connected || record.error ? "等待连接恢复…" : undefined}
         disabled={
           !connected ||
-          busy ||
+          (busy && !mode.pending) ||
           record.thread.canAcceptDirectInput === false ||
+          record.thread.historyAvailable === false ||
           !!record.error
         }
         onSubmit={() => void submit()}
@@ -2386,6 +2558,8 @@ function TaskComposer({
           run={run}
           done={(r) => {
             setGoalRefresh((n) => n + 1);
+            if ((command.item.alias || command.item.name) === "plan")
+              window.dispatchEvent(new Event("focus"));
             if (draft.trim().startsWith("/")) {
               setDraft((current) => (current === draft ? "" : current));
               setReferences((current) =>
@@ -2422,11 +2596,12 @@ function SettingsView({
   return (
     <section className="monitor-page settings-page">
       <h2>设置与连接</h2>
-      <p className="usage-caption">管理界面外观和连接状态</p>
+      <p className="usage-caption">管理界面外观、通知和连接状态</p>
       <section className="settings-section">
         <h3>界面外观</h3>
         <ThemeSelect segmented />
       </section>
+      <NotificationSettings />
       <section className="settings-section">
         <h3>连接</h3>
         {error && <p role="alert">{error}</p>}
@@ -2725,5 +2900,85 @@ function Records({
         </Modal>
       )}
     </section>
+  );
+}
+
+function WorkspaceDraft({
+  cwd,
+  value,
+  change,
+  references,
+  onReferences,
+  images,
+  onImages,
+  mode,
+  onMode,
+  disabled,
+  submit,
+  back,
+  feedback,
+}: {
+  cwd: string;
+  value: string;
+  change: (value: string) => void;
+  references: InputReference[];
+  onReferences: (value: InputReference[]) => void;
+  images: InputImage[];
+  onImages: Dispatch<SetStateAction<InputImage[]>>;
+  mode: string;
+  onMode: (value: string) => void;
+  disabled: boolean;
+  submit: () => void;
+  back: () => void;
+  feedback: ReactNode;
+}) {
+  const [commandError, setCommandError] = useState("");
+  const plan = usePlanMode({
+    disabled,
+    busy: false,
+    value: mode,
+    onChange: onMode,
+  });
+  return (
+    <div className="workspace-draft">
+      <header className="draft-heading">
+        <button className="quiet" onClick={back}>
+          任务总览
+        </button>
+        <h1>{shortProject(cwd)} / 新会话</h1>
+      </header>
+      <div className="draft-introduction">
+        <h2>新会话 · {shortProject(cwd)}</h2>
+        <p>写下这次要做的事。</p>
+        <small>{cwd}</small>
+      </div>
+      <footer className="detail-footer">
+        <div className="task-composer">
+          {feedback}
+          {commandError && <p role="alert">{commandError}</p>}
+          <ComposerInput
+            label="新会话工作要求"
+            value={value}
+            onChange={change}
+            references={references}
+            onReferences={onReferences}
+            images={images}
+            onImages={onImages}
+            cwd={cwd}
+            disabled={disabled}
+            submitDisabled={plan.pending}
+            placeholder={`在 ${shortProject(cwd)} 中发送消息…`}
+            modeControl={plan.control}
+            onToggleMode={() => void plan.toggle()}
+            onSubmit={submit}
+            onCommand={() =>
+              setCommandError(
+                "先发送工作要求创建会话，再使用会话命令；计划模式可直接在输入框内切换。",
+              )
+            }
+          />
+        </div>
+      </footer>
+    </div>
   );
 }

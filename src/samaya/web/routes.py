@@ -7,6 +7,7 @@ from fastapi import FastAPI, HTTPException, Query
 from pydantic import BaseModel, Field
 
 from samaya.composer.commands import registry
+from samaya.composer.images import MAX_TOTAL_IMAGE_BYTES
 from samaya.config import Settings
 from samaya.runtime import Runtime
 
@@ -37,6 +38,21 @@ def register_routes(application: FastAPI, config: Settings) -> None:
     @application.get("/api/threads/{tid}/model-settings")
     async def model_settings(tid: str):
         return await service().commands.model_settings(tid, refresh=True)
+
+    @application.get("/api/collaboration-modes")
+    async def collaboration_modes():
+        return await service().connection.rpc("collaborationMode/list", {})
+
+    @application.get("/api/threads/{tid}/mode-settings")
+    async def mode_settings(tid: str):
+        context = await service().commands.context(tid, "plan")
+        field = context["fields"][0]
+        return {
+            "current": field["value"],
+            "modes": field["options"],
+            "expectedTurnId": context["expectedTurnId"],
+            "editable": not context["readOnly"],
+        }
 
     @application.get("/api/status")
     async def status():
@@ -123,7 +139,16 @@ def register_routes(application: FastAPI, config: Settings) -> None:
     @application.post("/api/operations")
     async def operation(body: Operation):
         # Bound message/request size independently of frontend controls.
-        if len(json.dumps(body.body)) > 200000:
+        envelope = body.body
+        if body.action in ("send", "steer") and body.body.get("images"):
+            envelope = {
+                key: value for key, value in body.body.items() if key != "images"
+            }
+            # Base64 expands binary image data by 4/3, plus bounded JSON/URL overhead.
+            image_limit = 4 * ((MAX_TOTAL_IMAGE_BYTES + 2) // 3) + 5 * 128
+            if len(json.dumps(body.body["images"])) > image_limit:
+                raise HTTPException(413, "图片消息过大，图片总大小不能超过 10 MB")
+        if len(json.dumps(envelope)) > 200000:
             raise HTTPException(413, "请求过大")
         return await service().operations.execute(
             body.operationId, body.action, body.body

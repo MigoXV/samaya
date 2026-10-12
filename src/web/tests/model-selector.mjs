@@ -387,12 +387,14 @@ try {
       ),
     ).toBe(true);
     expect((await page.locator(".composer-input").boundingBox()).height).toBe(
-      58,
+      width <= 360 ? 90 : 58,
     );
     const modelBox = await trigger.boundingBox();
     const inputBox = await input.boundingBox();
     expect(inputBox.width).toBeGreaterThan(40);
-    expect(inputBox.x + inputBox.width).toBeLessThanOrEqual(modelBox.x);
+    if (width <= 360)
+      expect(inputBox.y + inputBox.height).toBeLessThanOrEqual(modelBox.y);
+    else expect(inputBox.x + inputBox.width).toBeLessThanOrEqual(modelBox.x);
     expect(modelBox.x + modelBox.width).toBeLessThanOrEqual(width);
 
     await openModels();

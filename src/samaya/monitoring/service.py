@@ -144,15 +144,40 @@ class Monitor:
             )
             try:
                 # Only subscribe to already loaded sessions; monitoring never loads history into execution.
-                if tid in self.loaded and tid not in self.joined:
-                    await self.queries.join(tid)
-                    self.joined.add(tid)
                 thread = (
                     await self.connection.rpc(
                         "thread/read", {"threadId": tid, "includeTurns": False}
                     )
                 )["thread"]
                 thread = self.queries.with_settings(normalize(thread))
+                page = await self.queries.turns(tid, limit=1)
+                if page.get("historyAvailable") is False:
+                    thread.update(
+                        historyAvailable=False,
+                        historyNotice=page["historyNotice"],
+                    )
+                    if (
+                        generation != self.connection.generation
+                        or version != self.projection.versions.get(tid, 0)
+                    ):
+                        return
+                    previous = self.projection.records.get(tid, {})
+                    self.projection.records[tid] = {
+                        **previous,
+                        "thread": thread,
+                        "turn": previous.get("turn"),
+                        "terminals": previous.get("terminals", []),
+                        "confirmedAt": time.time(),
+                        "progressAt": previous.get("progressAt"),
+                        "historyAvailable": False,
+                        "historyNotice": thread["historyNotice"],
+                        "error": None,
+                    }
+                    self.projection.dirty.add(tid)
+                    return
+                if tid in self.loaded and tid not in self.joined:
+                    await self.queries.join(tid)
+                    self.joined.add(tid)
                 if tid not in self.projection.records:
                     self.projection.records[tid] = {
                         "thread": thread,
@@ -162,7 +187,6 @@ class Monitor:
                         "progressAt": None,
                         "error": "正在核对历史",
                     }
-                page = await self.queries.turns(tid, limit=1)
                 turn = self.projection.compact(next(iter(page.get("data", [])), None))
                 item_times = []
                 if turn:

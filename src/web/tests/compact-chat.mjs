@@ -106,7 +106,10 @@ try {
     for (const width of [1550, 1440, 1024, 390, 320]) {
       await page.setViewportSize({ width, height: 960 });
       await input.fill("");
-      await expect(composer).toHaveCSS("height", "58px");
+      await expect(composer).toHaveCSS(
+        "height",
+        width <= 360 ? "90px" : "58px",
+      );
       await expect(composer).toHaveCSS("border-radius", "24px");
       await expect(input).toHaveCSS("height", "24px");
       const geometry = await page.evaluate(() => {

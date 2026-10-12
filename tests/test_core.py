@@ -117,6 +117,10 @@ def web(tmp_path, monkeypatch):
 
 def test_spa_api_and_actual_assets(web):
     with TestClient(create_app(web)) as client:
+        assert (
+            "font-src 'self' data:"
+            in client.get("/").headers["Content-Security-Policy"]
+        )
         for path in ["/", "/sessions", "/settings/deep"]:
             assert (
                 client.get(path, headers={"Accept": "text/html"}).text
@@ -140,6 +144,62 @@ def test_spa_api_and_actual_assets(web):
             client.get("/api/status", headers={"Host": "attacker.example"}).status_code
             == 403
         )
+
+
+def test_two_screenshots_can_pass_http_operation_limit(web):
+    import base64
+
+    image = (
+        "data:image/png;base64,"
+        + base64.b64encode(b"\x89PNG\r\n\x1a\n" + b"x" * 300000).decode()
+    )
+    with TestClient(create_app(web)) as client:
+        operations = client.app.state.runtime.operations
+        operations.execute = AsyncMock(return_value={"state": "succeeded"})
+        csrf = client.get("/api/auth").json()["csrf"]
+        body = {
+            "threadId": "t",
+            "text": "检查两张截图",
+            "images": [{"url": image}] * 2,
+            "expectedTurnId": "turn",
+        }
+        for action in ("send", "steer"):
+            response = client.post(
+                "/api/operations",
+                headers={"X-Samaya-CSRF": csrf},
+                json={
+                    "operationId": "screenshot-limit-test",
+                    "action": action,
+                    "body": body,
+                },
+            )
+            assert response.status_code == 200
+            operations.execute.assert_awaited_with(
+                "screenshot-limit-test", action, body
+            )
+        body["text"] = "x" * 200001
+        response = client.post(
+            "/api/operations",
+            headers={"X-Samaya-CSRF": csrf},
+            json={
+                "operationId": "screenshot-limit-test",
+                "action": "send",
+                "body": body,
+            },
+        )
+        assert response.status_code == 413
+        body["text"] = ""
+        body["images"] = [{"url": "x" * (15 * 1024 * 1024)}]
+        response = client.post(
+            "/api/operations",
+            headers={"X-Samaya-CSRF": csrf},
+            json={
+                "operationId": "screenshot-limit-test",
+                "action": "send",
+                "body": body,
+            },
+        )
+        assert response.status_code == 413
 
 
 def test_auth_csrf_and_cross_site(web):
@@ -235,7 +295,10 @@ async def test_created_thread_identity_survives_optional_setup_failure(tmp_path)
         )
     )
     service.connection.rpc = AsyncMock(
-        side_effect=InvalidRequestError(-32600, "settings unavailable")
+        side_effect=[
+            {"thread": {"id": "created-once", "historyMode": "paginated"}},
+            InvalidRequestError(-32600, "settings unavailable"),
+        ]
     )
     result = await service.operations.execute(
         "create-once", "create", {"cwd": str(tmp_path)}
@@ -243,6 +306,9 @@ async def test_created_thread_identity_survives_optional_setup_failure(tmp_path)
     assert result["state"] == "succeeded"
     assert result["result"]["threadId"] == "created-once"
     assert result["result"]["warning"]
+    assert (
+        service.connection.rpc.call_args_list[0].args[1]["historyMode"] == "paginated"
+    )
     store.close()
 
 

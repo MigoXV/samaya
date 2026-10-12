@@ -3,7 +3,6 @@
 import asyncio
 import logging
 
-from openai_codex import ApprovalMode, Sandbox
 from openai_codex.errors import CodexError
 
 from samaya.codex.connection import Connection
@@ -37,35 +36,44 @@ class SessionActions:
         tid = b.get("threadId", "")
         if action == "create":
             cwd = str(self.config.directory(b["cwd"]))
-            thread = await adapter.sdk.thread_start(
-                cwd=cwd,
-                approval_mode=ApprovalMode.deny_all,
-                sandbox=Sandbox.workspace_write,
-                service_name="samaya",
+            started = await self.connection.rpc(
+                "thread/start",
+                {
+                    "cwd": cwd,
+                    "approvalPolicy": "never",
+                    "sandbox": "workspace-write",
+                    "serviceName": "samaya",
+                    "historyMode": "paginated",
+                    "threadSource": "user",
+                    "ephemeral": False,
+                },
             )
-            self.store.watch(thread.id)
+            thread = started["thread"]
+            created_id = thread["id"]
+            self.store.watch(created_id)
+            self.queries.created(started)
             try:
                 await self.connection.rpc(
                     "thread/settings/update",
                     {
-                        "threadId": thread.id,
+                        "threadId": created_id,
                         "approvalPolicy": "on-request",
                         "approvalsReviewer": "user",
                     },
                 )
                 if b.get("name"):
                     await self.connection.rpc(
-                        "thread/name/set", {"threadId": thread.id, "name": b["name"]}
+                        "thread/name/set", {"threadId": created_id, "name": b["name"]}
                     )
             except (CodexError, asyncio.TimeoutError, ConnectionError) as exc:
                 logger.warning(
                     "Thread created; setup incomplete: %s", type(exc).__name__
                 )
                 return {
-                    "threadId": thread.id,
+                    "threadId": created_id,
                     "warning": "会话已创建，但附加设置未全部确认。请先核查会话，不要重复创建。",
                 }
-            return {"threadId": thread.id}
+            return {"threadId": created_id}
         if action == "send":
             await self.queries.join(tid)
             thread = await self.queries.idle(tid)
@@ -75,18 +83,22 @@ class SessionActions:
             latest = thread.get("turns", [])[-1]["id"] if thread.get("turns") else None
             if b.get("expectedTurnId") != latest:
                 raise ValueError("其他客户端已更新会话，请刷新后再发送")
-            if not b.get("text", "").strip():
-                raise ValueError("消息不能为空")
             self.store.watch(tid)
-            return await self.connection.rpc(
+            result = await self.connection.rpc(
                 "turn/start",
                 {
                     "threadId": tid,
                     "input": await self.catalog.inputs(
-                        tid, b["text"], b.get("references", []), b.get("expectedCwd")
+                        tid,
+                        b.get("text", ""),
+                        b.get("references", []),
+                        b.get("expectedCwd"),
+                        b.get("images", []),
                     ),
                 },
             )
+            self.queries.fresh_threads.discard((self.connection.connection_id, tid))
+            return result
         if action == "steer":
             thread = (await self.queries.read(tid))["thread"]
             self.config.directory(thread["cwd"])
@@ -101,7 +113,11 @@ class SessionActions:
                     "threadId": tid,
                     "expectedTurnId": current["id"],
                     "input": await self.catalog.inputs(
-                        tid, b["text"], b.get("references", []), b.get("expectedCwd")
+                        tid,
+                        b.get("text", ""),
+                        b.get("references", []),
+                        b.get("expectedCwd"),
+                        b.get("images", []),
                     ),
                 },
             )

@@ -22,12 +22,13 @@ export function GoalStatus({
     let alive = true;
     const load = async () => {
       try {
-        const result = await api<{ data: { goal: Goal | null } }>(
-          `/threads/${encodeURIComponent(tid)}/command-context?command=goal`,
-        );
+        const result = await api<{
+          available?: boolean;
+          data: { goal: Goal | null };
+        }>(`/threads/${encodeURIComponent(tid)}/command-context?command=goal`);
         if (alive) {
-          setGoal(result.data.goal);
-          setStale(false);
+          if (result.available !== false) setGoal(result.data.goal);
+          setStale(result.available === false);
         }
       } catch {
         if (alive) setStale(true);

@@ -906,6 +906,16 @@ dialog::backdrop {
 .markdown > :last-child {
   margin-bottom: 0;
 }
+.markdown .katex-display {
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 8px 0;
+}
+.markdown .katex-error {
+  color: var(--text-primary) !important;
+  white-space: pre-wrap;
+}
 .markdown h1,
 .markdown h2 {
   font-size: 18px;

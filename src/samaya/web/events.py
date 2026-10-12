@@ -22,14 +22,14 @@ def register_events(application: FastAPI) -> None:
             nonlocal cursor
             monitor_cursor = service().monitor.revision
             # Every reconnect requests authoritative snapshots; replay alone is insufficient.
-            yield "event: snapshot\ndata: {}\n\n"
+            yield f"event: snapshot\ndata: {json.dumps({'cursor': application.state.store.cursor()})}\n\n"
             while not await request.is_disconnected():
                 monitor = service().monitor
                 if (
                     monitor.patches
                     and monitor_cursor < monitor.patches[0]["revision"] - 1
                 ):
-                    yield "event: snapshot\ndata: {}\n\n"
+                    yield f"event: snapshot\ndata: {json.dumps({'cursor': application.state.store.cursor()})}\n\n"
                     monitor_cursor = monitor.revision
                 for patch in list(monitor.patches):
                     if patch["revision"] > monitor_cursor:

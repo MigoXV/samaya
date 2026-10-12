@@ -275,7 +275,20 @@ export async function install(context, state) {
         active: false,
         editable: true,
       };
-    else if (p.endsWith("/command-context"))
+    else if (p === "/api/collaboration-modes")
+      body = { data: [{ mode: "default" }, { mode: "plan" }] };
+    else if (p.endsWith("/mode-settings")) {
+      const record = state.records.find((r) => r.thread.id === p.split("/")[3]);
+      body = {
+        current: record?.thread.collaborationMode?.mode || "default",
+        modes: [
+          { value: "default", label: "默认" },
+          { value: "plan", label: "计划" },
+        ],
+        expectedTurnId: record?.turn?.id || null,
+        editable: true,
+      };
+    } else if (p.endsWith("/command-context"))
       body = { data: { goal: null }, fields: [], readOnly: true };
     else if (p === "/api/status")
       body = {
@@ -286,7 +299,10 @@ export async function install(context, state) {
         socket: "isolated fixture",
       };
     else if (p === "/api/directories")
-      body = { data: [{ name: "演示项目", path: "/demo/Samaya" }] };
+      body = {
+        path: url.searchParams.get("path"),
+        data: [{ name: "演示项目", path: "/demo/Samaya" }],
+      };
     else if (p === "/api/operations" && method === "POST") {
       const op = route.request().postDataJSON();
       calls.push(op);
@@ -313,6 +329,11 @@ export async function install(context, state) {
         r.turn = null;
         state.records.unshift(r);
         result = { threadId: "demo-created" };
+      }
+      if (op.action === "command" && op.body.command === "plan") {
+        const r = state.records.find((r) => r.thread.id === op.body.threadId);
+        r.thread.collaborationMode = { mode: op.body.args.value };
+        result = { mode: op.body.args.value };
       }
       if (op.action === "send") {
         const r = state.records.find((r) => r.thread.id === op.body.threadId);

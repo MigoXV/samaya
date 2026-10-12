@@ -1,6 +1,20 @@
 import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
-import type { ReactNode } from "react";
+import type {
+  ClipboardEvent,
+  Dispatch,
+  ReactNode,
+  SetStateAction,
+} from "react";
+import {
+  IMAGE_TYPES,
+  MAX_IMAGES,
+  MAX_IMAGE_BYTES,
+  MAX_TOTAL_IMAGE_BYTES,
+  readImage,
+} from "./composer-images";
+import type { InputImage } from "./composer-images";
 import { api } from "./api";
+import { Modal } from "./components";
 import { hasReference, inputTrigger, slashInput } from "./composer-model";
 import type {
   InputCatalog,
@@ -24,6 +38,8 @@ export function ComposerInput({
   onChange,
   references,
   onReferences,
+  images,
+  onImages,
   cwd,
   threadId,
   active = false,
@@ -34,11 +50,16 @@ export function ComposerInput({
   label = "补充当前任务",
   placeholder,
   modelSelector,
+  modeControl,
+  onToggleMode,
+  submitDisabled = false,
 }: {
   value: string;
   onChange: (s: string) => void;
   references: InputReference[];
   onReferences: (r: InputReference[]) => void;
+  images: InputImage[];
+  onImages: Dispatch<SetStateAction<InputImage[]>>;
   cwd: string;
   threadId?: string;
   active?: boolean;
@@ -49,6 +70,9 @@ export function ComposerInput({
   label?: string;
   placeholder?: string;
   modelSelector?: ReactNode;
+  modeControl?: ReactNode;
+  onToggleMode?: () => void;
+  submitDisabled?: boolean;
 }) {
   const [catalog, setCatalog] = useState<InputCatalog | null>(null),
     [error, setError] = useState(""),
@@ -61,8 +85,137 @@ export function ComposerInput({
     [literal, setLiteral] = useState(false);
   const input = useRef<HTMLTextAreaElement>(null),
     menu = useRef<HTMLDivElement>(null),
+    imagePicker = useRef<HTMLInputElement>(null),
     id = useId();
   const identity = threadId || cwd;
+  const [previewImage, setPreviewImage] = useState<InputImage | null>(null);
+  const [imageState, setImageState] = useState({
+    identity,
+    reading: false,
+    error: "",
+  });
+  const readingImages = imageState.identity === identity && imageState.reading;
+  const imageError = imageState.identity === identity ? imageState.error : "";
+  const setReadingImages = (reading: boolean) =>
+    setImageState((state) => ({
+      identity,
+      reading,
+      error: state.identity === identity ? state.error : "",
+    }));
+  const setImageError = (error: string) =>
+    setImageState((state) => ({
+      identity,
+      reading: state.identity === identity && state.reading,
+      error,
+    }));
+  const pendingImages = useRef({ count: 0, bytes: 0 });
+  const imageGeneration = useRef(0);
+  useEffect(() => {
+    imageGeneration.current++;
+    pendingImages.current = { count: 0, bytes: 0 };
+    const scope = imageGeneration;
+    return () => {
+      scope.current++;
+    };
+  }, [identity]);
+  async function pasteImages(event: ClipboardEvent<HTMLTextAreaElement>) {
+    if (disabled) return;
+    const items = Array.from(event.clipboardData.items)
+      .filter((item) => item.kind === "file" && item.type.startsWith("image/"))
+      .map((item) => item.getAsFile())
+      .filter((file): file is File => !!file);
+    const files = items.length
+      ? items
+      : Array.from(event.clipboardData.files).filter((file) =>
+          file.type.startsWith("image/"),
+        );
+    if (!files.length) {
+      // Some screenshot tools expose no File in the paste event. Read the OS
+      // clipboard during this user gesture, without interfering with text paste.
+      if (event.clipboardData.getData("text/plain")) return;
+      event.preventDefault();
+      if (!navigator.clipboard?.read) {
+        setImageError("浏览器未提供截图，请重新复制截图或使用“添加图片”。");
+        return;
+      }
+      const generation = imageGeneration.current;
+      setReadingImages(true);
+      setImageError("");
+      try {
+        const clipboard = await navigator.clipboard.read();
+        const images: File[] = [];
+        for (const item of clipboard) {
+          const type = item.types.find((type) => IMAGE_TYPES.includes(type));
+          if (type)
+            images.push(
+              new File(
+                [await item.getType(type)],
+                "粘贴图片." + type.split("/")[1],
+                { type },
+              ),
+            );
+        }
+        if (generation !== imageGeneration.current) return;
+        if (!images.length) {
+          setImageError("剪贴板中未找到图片，请重新复制截图或使用“添加图片”。");
+          return;
+        }
+        await addImages(images);
+      } catch {
+        if (generation === imageGeneration.current)
+          setImageError(
+            "无法读取截图，请允许浏览器读取剪贴板后重试，或使用“添加图片”。",
+          );
+      } finally {
+        if (generation === imageGeneration.current)
+          setReadingImages(pendingImages.current.count > 0);
+      }
+      return;
+    }
+    event.preventDefault();
+    await addImages(files);
+  }
+  async function addImages(files: File[]) {
+    if (disabled || !files.length) return;
+    setDismissed(true);
+    setManual(null);
+    const bytes = files.reduce((sum, file) => sum + file.size, 0);
+    const message = files.some((file) => !IMAGE_TYPES.includes(file.type))
+      ? "支持粘贴 PNG、JPEG、WebP 或 GIF 图片。"
+      : files.some((file) => !file.size || file.size > MAX_IMAGE_BYTES)
+        ? "每张图片应小于等于 5 MB，且不能为空。"
+        : images.length + pendingImages.current.count + files.length >
+            MAX_IMAGES
+          ? "每条消息最多添加 5 张图片。"
+          : images.reduce((sum, image) => sum + image.size, 0) +
+                pendingImages.current.bytes +
+                bytes >
+              MAX_TOTAL_IMAGE_BYTES
+            ? "每条消息的图片总大小不能超过 10 MB。"
+            : "";
+    if (message) {
+      setImageError(message);
+      return;
+    }
+    const generation = imageGeneration.current;
+    pendingImages.current.count += files.length;
+    pendingImages.current.bytes += bytes;
+    setReadingImages(true);
+    setImageError("");
+    try {
+      const added = await Promise.all(files.map(readImage));
+      if (generation === imageGeneration.current)
+        onImages((current) => [...current, ...added]);
+    } catch (error) {
+      if (generation === imageGeneration.current) setImageError(String(error));
+    } finally {
+      if (generation === imageGeneration.current) {
+        pendingImages.current.count -= files.length;
+        pendingImages.current.bytes -= bytes;
+        setReadingImages(pendingImages.current.count > 0);
+      }
+    }
+  }
   useEffect(() => {
     let alive = true;
     const controller = new AbortController();
@@ -124,7 +277,10 @@ export function ComposerInput({
       ?.querySelector('[aria-selected="true"]')
       ?.scrollIntoView({ block: "nearest" });
   }, [selected]);
-  const trigger = dismissed ? null : inputTrigger(value, caret);
+  const trigger =
+    dismissed || (images.length && value.trimStart().startsWith("/"))
+      ? null
+      : inputTrigger(value, caret);
   const mode = manual ? (manual === "commands" ? "/" : "$") : trigger?.mode;
   const query = manual ? "" : trigger?.query.toLowerCase() || "";
   const ready = catalog?.cwd === cwd;
@@ -243,8 +399,9 @@ export function ComposerInput({
     return true;
   }
   function submit() {
-    if (disabled || !value.trim() || stale) return;
-    const cmd = !literal && slashInput(value);
+    if (submitDisabled || readingImages) return;
+    if (disabled || (!value.trim() && !images.length) || stale) return;
+    const cmd = !literal && !images.length && slashInput(value);
     if (cmd) {
       const c = catalog?.commands?.find((c) => c.name === cmd.name);
       if (c) {
@@ -293,8 +450,36 @@ export function ComposerInput({
     setManual(null);
     setDismissed(true);
   }
+  const stopMode = active && !!onStop && !value.trim() && !images.length;
   return (
     <div className="composer-shell">
+      <input
+        ref={imagePicker}
+        type="file"
+        accept={IMAGE_TYPES.join(",")}
+        multiple
+        hidden
+        onChange={(event) => {
+          const files = Array.from(event.currentTarget.files || []);
+          event.currentTarget.value = "";
+          void addImages(files);
+        }}
+      />
+      {previewImage && (
+        <Modal
+          title="图片预览"
+          className="image-preview-dialog"
+          close={() => setPreviewImage(null)}
+        >
+          <img src={previewImage.url} alt={previewImage.name} />
+        </Modal>
+      )}
+      {readingImages && <small role="status">正在读取图片…</small>}
+      {imageError && (
+        <small className="composer-error" role="alert">
+          {imageError}
+        </small>
+      )}
       {references.length > 0 && (
         <details className="composer-references">
           <summary title={references.map((r) => r.label).join("、")}>
@@ -331,6 +516,38 @@ export function ComposerInput({
         aria-haspopup="listbox"
         aria-controls={mode ? id : undefined}
       >
+        {!!images.length && (
+          <div className="composer-images" aria-label="待发送图片">
+            {images.map((image, index) => (
+              <div className="composer-image" key={image.id}>
+                <button
+                  type="button"
+                  className="composer-image-preview"
+                  aria-label={`放大查看图片 ${index + 1}`}
+                  onClick={() => setPreviewImage(image)}
+                >
+                  <img
+                    src={image.url}
+                    alt={`待发送图片 ${index + 1}：${image.name}`}
+                  />
+                </button>
+                <button
+                  type="button"
+                  className="quiet composer-image-remove"
+                  aria-label={`移除图片 ${index + 1}`}
+                  disabled={disabled}
+                  onClick={() =>
+                    onImages((current) =>
+                      current.filter((item) => item.id !== image.id),
+                    )
+                  }
+                >
+                  ×
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
         {mode && (
           <div
             className="composer-popup"
@@ -381,6 +598,16 @@ export function ComposerInput({
             <img src="/figma/plus.svg" alt="" />
           </summary>
           <div>
+            <button
+              type="button"
+              disabled={disabled}
+              onClick={(event) => {
+                event.currentTarget.closest("details")?.removeAttribute("open");
+                imagePicker.current?.click();
+              }}
+            >
+              添加图片
+            </button>
             {[
               ["skills", "技能 $"],
               ["apps", "应用 $"],
@@ -421,9 +648,25 @@ export function ComposerInput({
             setCaret(e.target.selectionStart);
           }}
           onSelect={(e) => setCaret(e.currentTarget.selectionStart)}
+          onPaste={(event) => void pasteImages(event)}
           placeholder={placeholder ?? (active ? "追加当前指令…" : "发送消息…")}
           onKeyDown={(e) => {
             if (e.nativeEvent.isComposing || e.keyCode === 229) return;
+            if (
+              e.key === "Tab" &&
+              e.shiftKey &&
+              !e.ctrlKey &&
+              !e.metaKey &&
+              !e.altKey &&
+              onToggleMode
+            ) {
+              e.preventDefault();
+              e.stopPropagation();
+              setManual(null);
+              setDismissed(true);
+              onToggleMode();
+              return;
+            }
             if (mode && e.key === "Escape") {
               e.preventDefault();
               e.stopPropagation();
@@ -459,6 +702,7 @@ export function ComposerInput({
             }
           }}
         />
+        {modeControl}
         {modelSelector && (
           <div
             className="composer-model-slot"
@@ -491,27 +735,34 @@ export function ComposerInput({
           </div>
         )}
         <div className="composer-actions">
-          {active && onStop && (
-            <button
-              type="button"
-              className="quiet stop-button"
-              aria-label="停止当前轮次"
-              disabled={disabled}
-              onClick={onStop}
-            >
-              □
-            </button>
-          )}
           <button
             type="button"
             className="primary composer-send"
+            data-action={stopMode ? "stop" : "send"}
             aria-label={
-              active ? "追加指令" : threadId ? "开始下一轮" : "派发任务"
+              stopMode
+                ? "停止当前轮次"
+                : active
+                  ? "追加指令"
+                  : threadId
+                    ? "开始下一轮"
+                    : "派发任务"
             }
-            disabled={disabled || !value.trim() || stale}
-            onClick={submit}
+            disabled={
+              stopMode
+                ? disabled
+                : disabled ||
+                  submitDisabled ||
+                  readingImages ||
+                  (!value.trim() && !images.length) ||
+                  stale
+            }
+            onClick={stopMode ? onStop : submit}
           >
-            <img src="/figma/arrow.svg" alt="" />
+            <img
+              src={stopMode ? "/figma/stop.svg" : "/figma/arrow.svg"}
+              alt=""
+            />
           </button>
         </div>
       </div>

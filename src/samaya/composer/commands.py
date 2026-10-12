@@ -172,6 +172,16 @@ class CommandService:
         if command not in NATIVE:
             raise ValueError(UNAVAILABLE.get(command, "此命令没有原生操作"))
         thread = (await self.queries.read(tid))["thread"]
+        if thread.get("historyAvailable") is False:
+            return {
+                "command": command,
+                "fields": [],
+                "readOnly": True,
+                "available": False,
+                "historyNotice": thread["historyNotice"],
+                "description": thread["historyNotice"],
+                "data": {"goal": None},
+            }
         cwd = str(self.catalog.config.directory(thread["cwd"]))
         result = {
             "command": command,
@@ -182,7 +192,20 @@ class CommandService:
         }
         rpc = self.connection.rpc
         model = thread.get("model")
-        if command in ("model", "reasoning", "fast", "plan"):
+        if command == "plan":
+            configured = await self.queries.settings(tid, refresh=True)
+            modes = (await rpc("collaborationMode/list", {}))["data"]
+            result["planModel"] = configured.get("model") or thread.get("model")
+            result["planEffort"] = configured.get("reasoningEffort")
+            result["fields"] = [
+                field(
+                    "value",
+                    "协作模式（下一轮）",
+                    choices(modes, "mode"),
+                    (configured.get("collaborationMode") or {}).get("mode", "default"),
+                )
+            ]
+        elif command in ("model", "reasoning", "fast"):
             settings = await self.model_settings(tid, thread=thread)
             result["modelSettings"] = settings
             models = settings["models"]
@@ -220,11 +243,6 @@ class CommandService:
                         [{"value": "default", "label": "标准"}, *choices(tiers)],
                         settings["current"]["serviceTier"],
                     )
-                ]
-            else:
-                modes = (await rpc("collaborationMode/list", {}))["data"]
-                result["fields"] = [
-                    field("value", "协作模式（下一轮）", choices(modes, "mode"), "plan")
                 ]
         elif command == "permissions":
             rows = await self.pages("permissionProfile/list", {"cwd": cwd})
@@ -372,6 +390,8 @@ class CommandService:
         if not isinstance(args, dict):
             raise ValueError("无效命令参数")  # noqa: TRY004 - definite operation rejection
         context = await self.context(tid, cmd)
+        if context.get("available") is False:
+            raise ValueError(context["historyNotice"])
         if context["readOnly"]:
             raise ValueError("只读命令不需要执行")
         if b.get("expectedTurnId") != context["expectedTurnId"]:
@@ -395,12 +415,14 @@ class CommandService:
             value = args.get("value")
             patch = {"threadId": tid}
             if cmd == "plan":
-                thread = (await self.queries.read(tid))["thread"]
+                current_mode = context["fields"][0]["value"]
+                if "expectedMode" in b and b["expectedMode"] != current_mode:
+                    raise ValueError("计划模式已被其他客户端改变，请重新读取设置")
                 patch["collaborationMode"] = {
                     "mode": value,
                     "settings": {
-                        "model": thread["model"],
-                        "reasoning_effort": thread.get("reasoningEffort"),
+                        "model": context["planModel"],
+                        "reasoning_effort": context["planEffort"],
                         "developer_instructions": None,
                     },
                 }
@@ -432,6 +454,19 @@ class CommandService:
                         else "default"
                     )
             result = await rpc("thread/settings/update", patch)
+            if cmd == "plan":
+                try:
+                    confirmed = await self.queries.settings(tid, refresh=True)
+                    actual = (confirmed.get("collaborationMode") or {}).get(
+                        "mode", "default"
+                    )
+                    return {
+                        **result,
+                        "mode": actual,
+                        "settingsPending": actual != value,
+                    }
+                except Exception:  # noqa: BLE001 - write acknowledged; do not invite replay
+                    return {**result, "settingsPending": True}
             if cmd in ("model", "reasoning", "fast"):
                 try:
                     confirmed = await self.model_settings(tid, refresh=True)

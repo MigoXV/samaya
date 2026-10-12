@@ -60,6 +60,7 @@ export function ExecutionHistory({
     [visible, setVisible] = useState(1),
     [paging, setPaging] = useState<Record<string, HistoryPage>>({}),
     [error, setError] = useState(""),
+    [historyNotice, setHistoryNotice] = useState(""),
     [turnsReady, setTurnsReady] = useState(historyCache.has(tid)),
     [retrySource, setRetrySource] = useState("latest");
   const version = useRef(0),
@@ -88,11 +89,25 @@ export function ExecutionHistory({
     const controller = new AbortController();
     requests.current.add(controller);
     try {
-      const r = await api<{ data: Turn[]; nextCursor: string | null }>(
-        `/threads/${encodeURIComponent(tid)}/turns?limit=1`,
-        { signal: controller.signal },
-      );
+      const r = await api<{
+        data: Turn[];
+        nextCursor: string | null;
+        historyAvailable?: boolean;
+        historyNotice?: string;
+      }>(`/threads/${encodeURIComponent(tid)}/turns?limit=1`, {
+        signal: controller.signal,
+      });
       if (!alive.current || request !== version.current) return;
+      if (r.historyAvailable === false) {
+        setHistoryNotice(
+          r.historyNotice ||
+            "历史暂时不可用，将自动重试；会话及已有消息已保留。",
+        );
+        setError("");
+        setTurnsReady(true);
+        return;
+      }
+      setHistoryNotice("");
       setTurns((old) => [
         ...r.data,
         ...old.filter((t) => !r.data.some((n) => n.id === t.id)),
@@ -116,6 +131,11 @@ export function ExecutionHistory({
   useEffect(() => {
     queueMicrotask(() => void refreshTurns());
   }, [refreshTurns, turnId, turnStatus]);
+  useEffect(() => {
+    if (!historyNotice) return;
+    const timer = setInterval(() => void refreshTurns(), 15000);
+    return () => clearInterval(timer);
+  }, [historyNotice, refreshTurns]);
   const older = useCallback(async () => {
     if (!alive.current || turnsFailure.current) return 0;
     if (visible < turns.length) {
@@ -205,7 +225,8 @@ export function ExecutionHistory({
           startedAt={t.id === turnId ? turnStartedAt : undefined}
         />
       ))}
-      {!turns.length && !error && (
+      {historyNotice && <p role="status">{historyNotice}</p>}
+      {!turns.length && !error && !historyNotice && (
         <p>{turnId ? "加载执行记录…" : "尚无执行轮次"}</p>
       )}
     </section>
