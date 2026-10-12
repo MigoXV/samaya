@@ -23,7 +23,7 @@ class InputCatalog:
 
     async def directory(self, tid: str | None, cwd: str | None) -> str:
         if tid:
-            cwd = (await self.queries.read(tid))["thread"]["cwd"]
+            cwd = (await self.queries.read(tid, include_turns=False))["thread"]["cwd"]
         if not cwd:
             raise ValueError("先选择工作目录")
         return str(self.config.directory(cwd))

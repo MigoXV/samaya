@@ -94,6 +94,7 @@ export function useMonitor() {
     alive.current = true;
     queueMicrotask(() => void refresh());
     const es = new EventSource("/api/events");
+    let notificationFloor = Infinity;
     es.onopen = () => {
       setOnline(true);
       setDisconnected(false);
@@ -103,7 +104,9 @@ export function useMonitor() {
       setOnline(false);
       setRecovering(true);
     };
-    es.addEventListener("snapshot", () => {
+    es.addEventListener("snapshot", (e) => {
+      const snapshot = JSON.parse((e as MessageEvent).data);
+      notificationFloor = snapshot.cursor ?? current.current?.cursor ?? 0;
       setRecovering(true);
       void refresh();
     });
@@ -128,6 +131,14 @@ export function useMonitor() {
     });
     es.onmessage = (e) => {
       const event = JSON.parse(e.data);
+      if (
+        event.method === "turn/completed" &&
+        event.params?.turn?.status === "completed" &&
+        Number(e.lastEventId) > notificationFloor
+      )
+        window.dispatchEvent(
+          new CustomEvent("samaya:turn-completed", { detail: event.params }),
+        );
       if (
         event.method === "samaya/connection" ||
         event.method === "samaya/requestChanged" ||

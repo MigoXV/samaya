@@ -235,7 +235,10 @@ async def test_created_thread_identity_survives_optional_setup_failure(tmp_path)
         )
     )
     service.connection.rpc = AsyncMock(
-        side_effect=InvalidRequestError(-32600, "settings unavailable")
+        side_effect=[
+            {"thread": {"id": "created-once", "historyMode": "paginated"}},
+            InvalidRequestError(-32600, "settings unavailable"),
+        ]
     )
     result = await service.operations.execute(
         "create-once", "create", {"cwd": str(tmp_path)}
@@ -243,6 +246,7 @@ async def test_created_thread_identity_survives_optional_setup_failure(tmp_path)
     assert result["state"] == "succeeded"
     assert result["result"]["threadId"] == "created-once"
     assert result["result"]["warning"]
+    assert service.connection.rpc.call_args_list[0].args[1]["historyMode"] == "paginated"
     store.close()
 
 

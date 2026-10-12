@@ -56,10 +56,25 @@ codex app-server daemon version
 | `SAMAYA_DATA_DIR` | `.samaya` | Samaya 辅助数据，不是 Codex 数据目录 |
 | `SAMAYA_TOKEN` | 空 | 单用户网页访问口令 |
 | `SAMAYA_SECURE_COOKIE` | `false` | HTTPS 部署时设为 `true` |
+| `SAMAYA_SSL_CERTFILE` | 空 | HTTPS PEM 证书路径，必须与私钥同时配置 |
+| `SAMAYA_SSL_KEYFILE` | 空 | HTTPS PEM 私钥路径；相对路径以启动目录为准 |
+| `SAMAYA_SSL_KEYFILE_PASSWORD` | 空 | 加密私钥的密码，未加密时留空 |
 
-本机空口令模式只接受回环客户端和 localhost/回环 Host。远程监听必须配置长随机 `SAMAYA_TOKEN`；远程使用 HTTPS 反向代理，保留原始 Host，并设置 secure cookie。建议由受限网络或 SSH 隧道访问。登录后使用 HttpOnly、SameSite=Strict 的一天有效会话 Cookie；修改操作校验 CSRF 和 Origin。Codex 登录凭据只由服务器已有 Codex 管理，网页不索取 API key。
+本机空口令模式只接受回环客户端和 localhost/回环 Host。远程监听必须配置长随机 `SAMAYA_TOKEN`；远程可使用服务原生 HTTPS，或使用 HTTPS 反向代理并保留原始 Host，两种方式都应设置 secure cookie。建议由受限网络或 SSH 隧道访问。登录后使用 HttpOnly、SameSite=Strict 的一天有效会话 Cookie；修改操作校验 CSRF 和 Origin。Codex 登录凭据只由服务器已有 Codex 管理，网页不索取 API key。
+
+原生 HTTPS：将证书和私钥放入已被 Git 忽略的 `model-bin/ca`，在 `.env` 设置以下配置，然后重启 `poetry run samaya serve`（已有实例使用其他端口时保留原端口）：
+
+```dotenv
+SAMAYA_SSL_CERTFILE=model-bin/ca/server.crt
+SAMAYA_SSL_KEYFILE=model-bin/ca/server.key
+SAMAYA_SECURE_COOKIE=true
+```
+
+配置后通过 `https://服务器地址:端口` 访问。证书与私钥必须成对配置；文件不存在、私钥密码错误或证书与私钥不匹配时，启动会明确报错。自签名证书需要客户端信任，访问地址必须包含在证书 SAN 中；新增域名或 IP 时需重新签发。证书更换后需要重启服务。
 
 只启动**一个 Python worker／一个 Samaya 实例使用该数据目录**；应用使用文件锁拒绝重复实例。开发时不要用自动 reload 运行重要验收任务；不要为网页请求临时创建 SDK 客户端。`SAMAYA_ROOTS` 仅提供常用目录入口；任何存在的目录均可选择，读取遵循 Samaya 进程的文件系统权限，任务执行沿用 Codex 的权限配置。
+
+新建任务时，手动输入服务器目录后点击“浏览目录”确认，再填写工作要求并派发；可以选择服务器用户的 home（例如 `/root`）。正在编辑的路径不会触发技能目录查询。新会话与 CLI 一样使用原生 `paginated` 历史模式，可在 CLI 和网页之间继续同一个会话。新建会话直接发送首轮，不在历史文件生成前重复恢复。已有会话通过原生接口恢复并检查最近一轮；分页接口不可用时尝试官方完整历史，完整历史不可用时尝试分页完整轮次视图。暂时无法读取历史时保留会话及已确认状态并自动重试；不会把未知历史当作空历史，也不需要重新创建。
 
 ## 已实现
 
@@ -67,6 +82,9 @@ codex app-server daemon version
 - 最近 10/20 个主任务、全局待处理、范围外请求入口、筛选后取最近、稳定集合与手动更新、独立置顶视图、最近变化；详情按需展开。
 - 运行中追加当前轮次、按会话保存草稿、按请求范围追踪回执；答复发送与服务端消除请求分别确认。
 - 任务总览按工作区分组，独立展开／折叠，待处理任务在所属工作区顶部标出；标题和筛选固定，任务列表局部滚动。
+- 每个工作区提供独立的新建会话入口，折叠时仍可使用；草稿按工作区保存，首次发送才创建原生会话。
+- 输入框内 Shift+Tab 切换默认／计划模式，保留文本和光标；模式确认后再发送，浏览器标签显示当前任务与工作区。
+- 设置中可主动开启系统任务通知；完成提醒可点击返回对应任务，历史重放不提醒，多标签页去重。通知需要支持通知的浏览器和 HTTPS 或 localhost，页面保持连接时接收完成事件。
 - 连续工具调用默认合并为一行摘要，可展开原始记录；执行时显示 `Working · xx s`，优先采用原生轮次开始时间，缺失时明确标为本次观察时长。
 - 模型、推理强度和 Fast 设置在选择器内显示读取／保存转圈，确认回执后更新当前值；普通成功不弹出全局提示栏，失败与重试保留在组件内。
 

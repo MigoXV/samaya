@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
-import Markdown from "react-markdown";
-import remarkGfm from "remark-gfm";
+import { MarkdownContent } from "./MarkdownContent";
 import { ToolSummary } from "./ToolSummary";
 import { UserMessage } from "./UserMessage";
 import { api } from "./api";
@@ -50,26 +49,36 @@ export function Modal({
 export function DirectoryPicker({
   value,
   onChange,
+  onValidated,
 }: {
   value: string;
   onChange: (v: string) => void;
+  onValidated?: (v: string) => void;
 }) {
+  const initialPath = useRef(value);
+  const revision = useRef(0);
   const [listing, setListing] = useState<{
+    path?: string | null;
     parent?: string;
     data: { name: string; path: string }[];
   }>({ data: [] });
   const [error, setError] = useState("");
   async function browse(path?: string) {
+    const request = ++revision.current;
+    onValidated?.("");
     try {
-      setListing(
-        await api(
-          `/directories${path ? `?path=${encodeURIComponent(path)}` : ""}`,
-        ),
+      const result = await api<typeof listing>(
+        `/directories${path ? `?path=${encodeURIComponent(path)}` : ""}`,
       );
+      if (request !== revision.current) return;
+      setListing(result);
       setError("");
-      if (path) onChange(path);
+      if (path) {
+        onChange(result.path || path);
+        onValidated?.(result.path || path);
+      }
     } catch (e) {
-      setError(String(e));
+      if (request === revision.current) setError(String(e));
     }
   }
   useEffect(() => {
@@ -77,6 +86,20 @@ export function DirectoryPicker({
       .then(setListing)
       .catch((e) => setError(String(e)));
   }, []);
+  useEffect(() => {
+    const path = initialPath.current;
+    if (!path || !onValidated) return;
+    const request = revision.current;
+    let alive = true;
+    void api<{ path: string }>(`/directories?path=${encodeURIComponent(path)}`)
+      .then((result) => {
+        if (alive && request === revision.current) onValidated(result.path);
+      })
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, [onValidated]);
   return (
     <div className="directory-picker">
       <label>
@@ -84,7 +107,11 @@ export function DirectoryPicker({
         <input
           autoFocus
           value={value}
-          onChange={(e) => onChange(e.target.value)}
+          onChange={(e) => {
+            revision.current++;
+            onValidated?.("");
+            onChange(e.target.value);
+          }}
           placeholder="/workspace/项目目录"
         />
       </label>
@@ -98,6 +125,7 @@ export function DirectoryPicker({
           </button>
         )}
       </div>
+      {onValidated && <p>输入目录后点击“浏览目录”确认，再创建任务。</p>}
       {error && <p role="alert">{error}</p>}
       <div className="directory-list">
         {listing.data.map((d) => (
@@ -115,17 +143,6 @@ export function DirectoryPicker({
     </div>
   );
 }
-function MarkdownPre({ children }: { children?: ReactNode }) {
-  return (
-    <pre tabIndex={0} aria-label="代码">
-      {children}
-    </pre>
-  );
-}
-function MarkdownTable({ children }: { children?: ReactNode }) {
-  return <table tabIndex={0}>{children}</table>;
-}
-const markdownComponents = { pre: MarkdownPre, table: MarkdownTable };
 function AgentReply({ item, showAuthor }: { item: Item; showAuthor: boolean }) {
   const [notice, setNotice] = useState("");
   useEffect(() => {
@@ -137,11 +154,7 @@ function AgentReply({ item, showAuthor }: { item: Item; showAuthor: boolean }) {
     <section className="message agent-reply">
       {showAuthor && <div className="eyebrow agent-reply-author">Codex</div>}
       <div className="agent-reply-body">
-        <div className="markdown">
-          <Markdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
-            {item.text || ""}
-          </Markdown>
-        </div>
+        <MarkdownContent text={item.text || ""} />
         <div className="response-actions">
           <button
             type="button"
@@ -205,11 +218,7 @@ export function ItemView({
     return (
       <details className="tool">
         <summary>执行计划</summary>
-        <div className="markdown">
-          <Markdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
-            {item.text || ""}
-          </Markdown>
-        </div>
+        <MarkdownContent text={item.text || ""} />
       </details>
     );
   if (/collab|agent/i.test(item.type))

@@ -70,6 +70,8 @@ export function execution(r: Observation): string {
     turn = r.turn;
   if (status === "systemError") return "会话异常";
   if (status === "active") return "执行中";
+  if (r.thread.historyAvailable === false)
+    return status === "idle" ? "空闲 · 历史不可用" : "历史不可用";
   if (turn?.status === "inProgress")
     return status === "idle" ? "状态待确认" : "执行中";
   if (turn?.status === "completed") return "本轮已结束";

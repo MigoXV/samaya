@@ -74,6 +74,7 @@ await page
 await returnToOverview(page);
 await page.getByRole("button", { name: "新建任务", exact: true }).click();
 await page.getByLabel("服务器目录").fill("/demo/Samaya");
+await page.getByRole("button", { name: "浏览目录", exact: true }).click();
 await page.getByLabel("工作要求").fill("演示：新任务目标");
 await page.getByRole("button", { name: "派发任务", exact: true }).click();
 await expect(page.locator(".task-reading-heading h1")).toContainText("新任务");

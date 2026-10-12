@@ -29,6 +29,8 @@ export function TaskOverview({
   all,
   controls,
   visibleIds,
+  create,
+  connected,
 }: {
   records: Map<string, Observation>;
   requests: Pending[];
@@ -40,6 +42,8 @@ export function TaskOverview({
   all: () => void;
   controls: ReactNode;
   visibleIds: Set<string>;
+  create: (cwd: string) => void;
+  connected: boolean;
 }) {
   const allRoots = [...records.values()].filter(
     (r) => !r.thread.parentThreadId || !records.has(r.thread.parentThreadId),
@@ -248,6 +252,17 @@ export function TaskOverview({
                           </small>
                         </button>
                       </h3>
+                      <button
+                        type="button"
+                        className="workspace-create"
+                        disabled={!connected || !cwd}
+                        aria-label={`在 ${name} 工作区新建会话`}
+                        title={`在 ${name} 工作区新建会话`}
+                        onClick={() => create(cwd)}
+                      >
+                        <span aria-hidden="true">＋</span>
+                        <span className="workspace-create-label">新建会话</span>
+                      </button>
                     </header>
                     <div
                       id={bodyId}

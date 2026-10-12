@@ -1,5 +1,7 @@
 """Native thread identity and turn helpers shared by session consumers."""
 
+HISTORY_UNAVAILABLE = "历史暂时不可用，将自动重试；会话及已有消息已保留。"
+
 
 def parent_id(thread: dict) -> str | None:
     source = thread.get("source")

@@ -30,6 +30,8 @@ export type Thread = {
   parentThreadId?: string;
   turns?: Turn[];
   canAcceptDirectInput?: boolean;
+  historyAvailable?: boolean;
+  historyNotice?: string;
   archived?: boolean;
   model?: string | null;
   reasoningEffort?: string | null;

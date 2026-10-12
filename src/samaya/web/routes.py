@@ -38,6 +38,21 @@ def register_routes(application: FastAPI, config: Settings) -> None:
     async def model_settings(tid: str):
         return await service().commands.model_settings(tid, refresh=True)
 
+    @application.get("/api/collaboration-modes")
+    async def collaboration_modes():
+        return await service().connection.rpc("collaborationMode/list", {})
+
+    @application.get("/api/threads/{tid}/mode-settings")
+    async def mode_settings(tid: str):
+        context = await service().commands.context(tid, "plan")
+        field = context["fields"][0]
+        return {
+            "current": field["value"],
+            "modes": field["options"],
+            "expectedTurnId": context["expectedTurnId"],
+            "editable": not context["readOnly"],
+        }
+
     @application.get("/api/status")
     async def status():
         return service().status()

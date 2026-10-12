@@ -34,6 +34,9 @@ export function ComposerInput({
   label = "补充当前任务",
   placeholder,
   modelSelector,
+  modeControl,
+  onToggleMode,
+  submitDisabled = false,
 }: {
   value: string;
   onChange: (s: string) => void;
@@ -49,6 +52,9 @@ export function ComposerInput({
   label?: string;
   placeholder?: string;
   modelSelector?: ReactNode;
+  modeControl?: ReactNode;
+  onToggleMode?: () => void;
+  submitDisabled?: boolean;
 }) {
   const [catalog, setCatalog] = useState<InputCatalog | null>(null),
     [error, setError] = useState(""),
@@ -243,6 +249,7 @@ export function ComposerInput({
     return true;
   }
   function submit() {
+    if (submitDisabled) return;
     if (disabled || !value.trim() || stale) return;
     const cmd = !literal && slashInput(value);
     if (cmd) {
@@ -424,6 +431,21 @@ export function ComposerInput({
           placeholder={placeholder ?? (active ? "追加当前指令…" : "发送消息…")}
           onKeyDown={(e) => {
             if (e.nativeEvent.isComposing || e.keyCode === 229) return;
+            if (
+              e.key === "Tab" &&
+              e.shiftKey &&
+              !e.ctrlKey &&
+              !e.metaKey &&
+              !e.altKey &&
+              onToggleMode
+            ) {
+              e.preventDefault();
+              e.stopPropagation();
+              setManual(null);
+              setDismissed(true);
+              onToggleMode();
+              return;
+            }
             if (mode && e.key === "Escape") {
               e.preventDefault();
               e.stopPropagation();
@@ -459,6 +481,7 @@ export function ComposerInput({
             }
           }}
         />
+        {modeControl}
         {modelSelector && (
           <div
             className="composer-model-slot"
@@ -508,7 +531,7 @@ export function ComposerInput({
             aria-label={
               active ? "追加指令" : threadId ? "开始下一轮" : "派发任务"
             }
-            disabled={disabled || !value.trim() || stale}
+            disabled={disabled || submitDisabled || !value.trim() || stale}
             onClick={submit}
           >
             <img src="/figma/arrow.svg" alt="" />
