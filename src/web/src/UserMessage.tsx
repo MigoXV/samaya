@@ -8,33 +8,50 @@ export function UserMessage({ item }: { item: Item }) {
   const text =
     item.content?.map((c) => c.text || "").join("\n") || item.text || "";
   const parts = userMessageParts(text);
-  return parts.map((part, index) =>
-    part.type === "text" ? (
-      <MessageText
-        key={index}
-        text={
-          parts.length > 1
-            ? part.text.replace(/^(?:\r?\n)+|(?:\r?\n)+$/g, "")
-            : part.text
-        }
-      />
-    ) : (
-      <section
-        className="message question-reply"
-        key={index}
-        aria-label="提问与回答"
-      >
-        {part.replies.map((reply, replyIndex) => (
-          <div className="question-reply-pair" key={replyIndex}>
-            <div className="question-reply-question">
-              <div className="eyebrow">Codex 提问</div>
-              <div className="prose">{reply.question}</div>
-            </div>
-            <MessageText text={reply.answer} label="你 · 已回答" />
-          </div>
-        ))}
-      </section>
-    ),
+  const images =
+    item.content?.filter(
+      (content) =>
+        content.type === "image" &&
+        /^data:image\/(png|jpeg|webp|gif);base64,/.test(content.url || ""),
+    ) || [];
+  return (
+    <>
+      {!!images.length && (
+        <div className="user-message-images" aria-label="已发送图片">
+          {images.map((image, index) => (
+            <img key={index} src={image.url} alt={`已发送图片 ${index + 1}`} />
+          ))}
+        </div>
+      )}
+      {parts.map((part, index) =>
+        part.type === "text" ? (
+          <MessageText
+            key={index}
+            text={
+              parts.length > 1
+                ? part.text.replace(/^(?:\r?\n)+|(?:\r?\n)+$/g, "")
+                : part.text
+            }
+          />
+        ) : (
+          <section
+            className="message question-reply"
+            key={index}
+            aria-label="提问与回答"
+          >
+            {part.replies.map((reply, replyIndex) => (
+              <div className="question-reply-pair" key={replyIndex}>
+                <div className="question-reply-question">
+                  <div className="eyebrow">Codex 提问</div>
+                  <div className="prose">{reply.question}</div>
+                </div>
+                <MessageText text={reply.answer} label="你 · 已回答" />
+              </div>
+            ))}
+          </section>
+        ),
+      )}
+    </>
   );
 }
 

@@ -83,15 +83,17 @@ class SessionActions:
             latest = thread.get("turns", [])[-1]["id"] if thread.get("turns") else None
             if b.get("expectedTurnId") != latest:
                 raise ValueError("其他客户端已更新会话，请刷新后再发送")
-            if not b.get("text", "").strip():
-                raise ValueError("消息不能为空")
             self.store.watch(tid)
             result = await self.connection.rpc(
                 "turn/start",
                 {
                     "threadId": tid,
                     "input": await self.catalog.inputs(
-                        tid, b["text"], b.get("references", []), b.get("expectedCwd")
+                        tid,
+                        b.get("text", ""),
+                        b.get("references", []),
+                        b.get("expectedCwd"),
+                        b.get("images", []),
                     ),
                 },
             )
@@ -111,7 +113,11 @@ class SessionActions:
                     "threadId": tid,
                     "expectedTurnId": current["id"],
                     "input": await self.catalog.inputs(
-                        tid, b["text"], b.get("references", []), b.get("expectedCwd")
+                        tid,
+                        b.get("text", ""),
+                        b.get("references", []),
+                        b.get("expectedCwd"),
+                        b.get("images", []),
                     ),
                 },
             )

@@ -3,7 +3,7 @@ export type Item = {
   id: string;
   type: string;
   text?: string;
-  content?: { type: string; text?: string }[];
+  content?: { type: string; text?: string; url?: string; path?: string }[];
   command?: string;
   cwd?: string;
   status?: string;

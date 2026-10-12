@@ -2,10 +2,10 @@
 (() => {
   const key = "samaya.theme";
   const normalize = (value) =>
-    ["vallum", "abyssus", "system"].includes(value) ? value : "vallum";
+    ["vallum", "abyssus", "system"].includes(value) ? value : "system";
   const media = window.matchMedia("(prefers-color-scheme: dark)");
   const listeners = new Set();
-  let preference = "vallum";
+  let preference = "system";
   let persistent = true;
   let snapshot;
   try {

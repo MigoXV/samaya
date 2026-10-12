@@ -10,6 +10,8 @@ from samaya.codex.connection import Connection
 from samaya.config import Settings
 from samaya.sessions.queries import SessionQueries
 
+from .images import message_inputs
+
 
 class InputCatalog:
     def __init__(
@@ -135,10 +137,12 @@ class InputCatalog:
                 continue
         return result
 
-    async def inputs(self, tid: str, text: str, references: list, expected_cwd=None):
+    async def inputs(
+        self, tid: str, text: str, references: list, expected_cwd=None, images=None
+    ):
         if not isinstance(references, list) or len(references) > 32:
             raise ValueError("无效的技能或应用引用")
-        inputs = [{"type": "text", "text": text}]
+        inputs = message_inputs(text, images if images is not None else [])
         if not references:
             return inputs
         current = await self.discover(tid, refresh=True)

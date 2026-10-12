@@ -17,7 +17,7 @@ import {
   useRef,
   useState,
 } from "react";
-import type { ReactNode } from "react";
+import type { Dispatch, ReactNode, SetStateAction } from "react";
 import { api, operation, pendingOperations, clearOperation } from "./api";
 import { DirectoryPicker, Modal, RequestForm } from "./components";
 import { ExecutionHistory } from "./ExecutionHistory";
@@ -46,6 +46,8 @@ import "./workspace-v5.css";
 import "./task-activity.css";
 import "./usage.css";
 import { ComposerInput } from "./ComposerInput";
+import { setImageDraft, useImageDraft } from "./composer-images";
+import type { InputImage } from "./composer-images";
 import { CommandDialog } from "./CommandDialog";
 import { ModelSelector } from "./ModelSelector";
 import { usePlanMode } from "./PlanMode";
@@ -350,6 +352,9 @@ export function MonitorWorkbench({ logout }: { logout: () => void }) {
     ),
     [newName, setNewName] = useState("");
   const [confirmedCwd, setConfirmedCwd] = useState("");
+  const [newImages, setNewImages] = useImageDraft(
+    draftWorkspace ? "workspace:" + draftWorkspace : "create",
+  );
   const [newReferences, setNewReferences] = useState<InputReference[]>(
     () => readWorkspaceDraft(workspaceFromUrl()).references || [],
   );
@@ -823,7 +828,7 @@ export function MonitorWorkbench({ logout }: { logout: () => void }) {
     !feedbackThread ||
     rootId(feedbackThread, records) === rootId(selected, records);
   async function create() {
-    if (!goal.trim() || busy || !connected) return;
+    if ((!goal.trim() && !newImages.length) || busy || !connected) return;
     if (dialog === "create" && (!confirmedCwd || confirmedCwd !== cwd)) {
       setError("请先点击“浏览目录”确认工作目录。");
       return;
@@ -833,6 +838,7 @@ export function MonitorWorkbench({ logout }: { logout: () => void }) {
     const id = String(created.result?.threadId || "");
     if (!id) return;
     recent.include(id);
+    setImageDraft("thread:" + id, newImages);
     sessionStorage.setItem("samaya.draft." + id, goal);
     sessionStorage.setItem(
       "samaya.references." + id,
@@ -871,6 +877,7 @@ export function MonitorWorkbench({ logout }: { logout: () => void }) {
       threadId: id,
       text: goal,
       references: newReferences,
+      images: newImages.map(({ url }) => ({ url })),
       expectedCwd: cwd,
       expectedTurnId: null,
     });
@@ -886,6 +893,8 @@ export function MonitorWorkbench({ logout }: { logout: () => void }) {
     } else {
       setGoal("");
       setNewReferences([]);
+      setNewImages([]);
+      setImageDraft("thread:" + id, []);
       setNewName("");
       sessionStorage.setItem("samaya.draft." + id, "");
       sessionStorage.setItem("samaya.references." + id, "[]");
@@ -1506,6 +1515,8 @@ export function MonitorWorkbench({ logout }: { logout: () => void }) {
                       change={setGoal}
                       references={newReferences}
                       onReferences={setNewReferences}
+                      images={newImages}
+                      onImages={setNewImages}
                       mode={draftMode}
                       onMode={setDraftMode}
                       disabled={!connected || !!busy}
@@ -2160,6 +2171,8 @@ export function MonitorWorkbench({ logout }: { logout: () => void }) {
                 onChange={setGoal}
                 references={newReferences}
                 onReferences={setNewReferences}
+                images={newImages}
+                onImages={setNewImages}
                 cwd={confirmedCwd === cwd ? cwd : ""}
                 disabled={!!busy || !connected || !cwd || confirmedCwd !== cwd}
                 onSubmit={() => void create()}
@@ -2380,6 +2393,7 @@ function TaskComposer({
   navigateCommand: (name: string) => void;
 }) {
   const id = record.thread.id;
+  const [images, setImages] = useImageDraft("thread:" + id);
   const [draft, setDraft] = useState(
     () => sessionStorage.getItem("samaya.draft." + id) || "",
   );
@@ -2423,6 +2437,7 @@ function TaskComposer({
       threadId: id,
       text: draft,
       references,
+      images: images.map(({ url }) => ({ url })),
       expectedCwd: record.thread.cwd,
       expectedTurnId: record.turn?.id || null,
     });
@@ -2430,6 +2445,9 @@ function TaskComposer({
       setDraft((current) => (current === submitted ? "" : current));
       setReferences((current) =>
         current.filter((r) => !references.includes(r)),
+      );
+      setImages((current) =>
+        current.filter((image) => !images.includes(image)),
       );
     }
   };
@@ -2493,6 +2511,8 @@ function TaskComposer({
         onChange={setDraft}
         references={references}
         onReferences={setReferences}
+        images={images}
+        onImages={setImages}
         cwd={record.thread.cwd}
         threadId={id}
         modelSelector={
@@ -2889,6 +2909,8 @@ function WorkspaceDraft({
   change,
   references,
   onReferences,
+  images,
+  onImages,
   mode,
   onMode,
   disabled,
@@ -2901,6 +2923,8 @@ function WorkspaceDraft({
   change: (value: string) => void;
   references: InputReference[];
   onReferences: (value: InputReference[]) => void;
+  images: InputImage[];
+  onImages: Dispatch<SetStateAction<InputImage[]>>;
   mode: string;
   onMode: (value: string) => void;
   disabled: boolean;
@@ -2938,6 +2962,8 @@ function WorkspaceDraft({
             onChange={change}
             references={references}
             onReferences={onReferences}
+            images={images}
+            onImages={onImages}
             cwd={cwd}
             disabled={disabled}
             submitDisabled={plan.pending}

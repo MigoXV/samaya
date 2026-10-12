@@ -6,6 +6,7 @@ from collections.abc import Awaitable, Callable
 
 from openai_codex.errors import JsonRpcError
 
+from samaya.composer.images import message_inputs
 from samaya.store import Store
 
 
@@ -30,8 +31,8 @@ class Operations:
         required = {
             "command": ["threadId", "command"],
             "create": ["cwd"],
-            "send": ["threadId", "text"],
-            "steer": ["threadId", "text", "expectedTurnId"],
+            "send": ["threadId"],
+            "steer": ["threadId", "expectedTurnId"],
             "interrupt": ["threadId", "turnId"],
             "workspace": ["threadId", "cwd", "expectedCwd"],
             "terminate": ["threadId", "processId"],
@@ -47,6 +48,8 @@ class Operations:
                 raise ValueError(f"缺少有效参数：{field}")
         if action == "respond" and not isinstance(body.get("response"), dict):
             raise ValueError("无效的输入响应")
+        if action in ("send", "steer"):
+            message_inputs(body.get("text", ""), body.get("images", []))
         if action == "send" and "expectedTurnId" not in body:
             raise ValueError("缺少会话版本，请刷新")
 
