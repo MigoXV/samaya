@@ -54,8 +54,8 @@ await expect(page.locator(".command-record")).toHaveCount(5);
 const sequence = page.locator(".tool-sequence");
 await expect(sequence).toHaveCount(1);
 await expect(sequence).not.toHaveAttribute("open");
-await expect(sequence.locator(":scope > summary")).toHaveText(
-  "已进行一系列工具调用查看详情",
+await expect(sequence.locator(".tool-sequence-label")).toHaveText(
+  "正在进行 6 次工具调用",
 );
 expect(
   await sequence

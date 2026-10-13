@@ -128,9 +128,11 @@ const assets = await page.locator('img[src^="/figma/"]').evaluateAll((nodes) =>
     natural: n.naturalWidth,
   })),
 );
-expect(assets.every((a) => a.loaded && Math.abs(a.width - a.natural) < 1)).toBe(
-  true,
-);
+expect(
+  assets.every(
+    (a) => a.loaded && (a.width === 0 || Math.abs(a.width - a.natural) < 1),
+  ),
+).toBe(true);
 await input.fill("$");
 await expect(page.getByRole("listbox").getByRole("option")).toHaveCount(12);
 const menu = await page.locator(".composer-popup").boundingBox(),

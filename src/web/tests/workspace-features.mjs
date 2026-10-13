@@ -37,13 +37,35 @@ const group = page.locator('[data-workspace="/demo/Laya"]');
 await group.locator(".workspace-toggle").click();
 await expect(group.locator(".workspace-create")).toBeVisible();
 await group.locator(".workspace-create").click();
-await expect(page.locator(".workspace-draft h1")).toHaveText("Laya / 新会话");
+await expect(page.locator(".task-reading-heading h1")).toHaveText(
+  "Laya / 新会话",
+);
 await expect(page).toHaveTitle("新会话 · Laya — Samaya");
 expect(calls).toHaveLength(0);
 const input = page.getByRole("textbox", {
   name: "新会话工作要求",
   exact: true,
 });
+await expect(page.locator(".global-pending")).toBeVisible();
+await expect(page.locator(".task-heading")).toHaveCSS("height", "40px");
+await expect(page.locator(".task-reading-heading")).toHaveCSS("height", "40px");
+await input.fill("页签切换保留草稿");
+await page.getByRole("button", { name: "改动与产物", exact: true }).click();
+await expect(page.getByRole("region", { name: "改动与结果" })).toContainText(
+  "发送工作要求创建会话后",
+);
+await expect(input).toHaveValue("页签切换保留草稿");
+await page.getByRole("button", { name: "对话", exact: true }).click();
+await expect(page.locator(".draft-introduction h2")).toHaveText(
+  "新会话 · Laya",
+);
+await page.getByRole("button", { name: "收起任务侧栏", exact: true }).click();
+await expect(page.locator(".monitor-nav")).toBeHidden();
+await expect(
+  page.getByRole("button", { name: "展开任务侧栏", exact: true }),
+).toBeFocused();
+await page.getByRole("button", { name: "展开任务侧栏", exact: true }).click();
+await expect(page.locator(".monitor-nav")).toBeVisible();
 await expect(page.locator(".plan-mode-button")).toBeEnabled();
 await input.fill("工作区草稿与引用需要保留。");
 await input.press("Shift+Tab");

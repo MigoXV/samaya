@@ -52,7 +52,7 @@
 .task-detail .history-view .tool-sequence > summary {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 8px;
   min-height: 32px;
   padding: 6px 0;
   line-height: 20px;
@@ -66,8 +66,23 @@
 .tool-sequence > summary::before {
   display: none;
 }
-.tool-sequence-action {
-  font-size: 12px;
+.tool-sequence-state,
+.tool-sequence-disclosure {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 12px;
+  height: 12px;
+}
+.tool-sequence .tool-icon-dark,
+[data-theme="abyssus"] .tool-sequence .tool-icon-light {
+  display: none;
+}
+[data-theme="abyssus"] .tool-sequence .tool-icon-dark {
+  display: block;
+}
+.tool-sequence[open] .tool-sequence-disclosure {
+  transform: rotate(90deg);
 }
 .tool-sequence > summary:hover,
 .tool-sequence > summary:focus-visible {

@@ -603,7 +603,7 @@ function TurnHistory({
       )}
       {sections.map((section) =>
         section.tools ? (
-          <ToolSequence key={section.items[0].id} count={section.items.length}>
+          <ToolSequence key={section.items[0].id} items={section.items}>
             {section.items.map(renderItem)}
           </ToolSequence>
         ) : (

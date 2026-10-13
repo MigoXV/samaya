@@ -57,9 +57,10 @@
   z-index: 5;
 }
 .workspace-draft .draft-introduction {
-  padding: 24px var(--reading-gutter);
+  padding: 12px var(--reading-gutter);
   flex: 1;
   min-height: 0;
+  overflow-y: auto;
 }
 .workspace-draft .draft-introduction p {
   color: var(--text-secondary);
@@ -69,14 +70,10 @@
   color: var(--text-secondary);
   overflow-wrap: anywhere;
 }
-.workspace-draft .draft-heading {
-  display: flex;
-  gap: 16px;
-  align-items: center;
-  padding: 12px var(--reading-gutter);
-}
-.workspace-draft h1 {
+.workspace-draft .draft-introduction h2 {
+  margin: 0 0 12px;
   font-size: 18px;
+  font-weight: 500;
 }
 @media (max-width: 799px) {
   .workspace-create-label,
@@ -93,7 +90,7 @@
 .workspace-draft {
   display: flex;
   flex-direction: column;
-  height: 100%;
+  flex: 1;
   min-height: 0;
 }
 .composer-input:has(.plan-mode) {

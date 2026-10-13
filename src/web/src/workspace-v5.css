@@ -671,6 +671,10 @@
   flex: 0 0 16px;
   color: var(--text-secondary);
 }
+.nav-pending-count {
+  margin-left: auto;
+  font-size: 12px;
+}
 .monitor-nav button[aria-current="page"] .lucide {
   color: var(--text-primary);
 }
@@ -863,12 +867,23 @@
   grid-template-columns: 272px minmax(0, 1fr);
 }
 .monitor-shell .monitor-nav {
-  padding: 24px 12px 16px;
-  gap: 12px;
+  padding: 16px 12px;
+  gap: 4px;
   border: 0;
 }
 .monitor-shell .monitor-brand {
-  padding: 0 12px 12px;
+  height: 48px;
+  flex-shrink: 0;
+  padding: 0 12px;
+}
+.monitor-shell .monitor-brand .nav-collapse {
+  min-height: 32px;
+  width: 32px;
+  padding: 0;
+  margin-left: auto;
+  text-align: center;
+  color: var(--text-secondary);
+  flex-shrink: 0;
 }
 .monitor-shell .monitor-nav button {
   min-height: 36px;
@@ -876,6 +891,7 @@
 }
 .monitor-shell .monitor-nav-items {
   gap: 4px;
+  margin-top: 16px;
 }
 .monitor-shell .monitor-nav button[aria-current="page"] {
   border-color: transparent;
@@ -891,11 +907,22 @@
 .task-is-open > .monitor-nav {
   display: flex;
 }
-.task-is-open.focus-mode {
+.monitor-shell.focus-mode {
   grid-template-columns: minmax(0, 1fr);
 }
-.task-is-open.focus-mode > .monitor-nav {
+.monitor-shell.focus-mode > .monitor-nav {
   display: none;
+}
+@media (min-width: 1100px) {
+  .monitor-shell:not(.focus-mode) .task-heading .task-sidebar-toggle {
+    display: none;
+  }
+  .monitor-shell.focus-mode:not(.task-is-open) .monitor-toolbar {
+    display: flex;
+  }
+  .monitor-shell.focus-mode .mobile-nav-button {
+    display: block;
+  }
 }
 @media (max-width: 1099px) {
   .mobile-nav-button {
