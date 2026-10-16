@@ -1,17 +1,17 @@
 .composer-input {
-  --composer-height: 58px;
+  --composer-height: 118px;
   --composer-radius: 24px;
   --composer-padding-x: 16px;
-  --composer-padding-y: 10px;
+  --composer-padding-y: 12px;
   --composer-gap: 8px;
-  --composer-attachment-size: 120px;
+  --composer-attachment-size: 96px;
   --composer-action-bg: var(--button-bg);
   --composer-action-text: var(--button-text);
   position: relative;
   min-width: 0;
-  display: grid;
-  grid-template-columns: 36px minmax(0, 1fr) auto;
-  align-items: end;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
   gap: var(--composer-gap);
   min-height: var(--composer-height);
   padding: var(--composer-padding-y) var(--composer-padding-x);
@@ -28,12 +28,10 @@
   background: transparent;
   line-height: 24px;
   font-size: 16px;
-  min-height: 24px;
+  min-height: 48px;
   max-height: min(168px, 33dvh);
-  grid-column: 2;
-  grid-row: 1;
-  align-self: center;
-  padding: 0;
+  flex: none;
+  padding: 0 8px 0 0;
 }
 .composer-popup {
   position: absolute;
@@ -182,11 +180,25 @@
   text-align: left;
 }
 .composer-input .composer-actions {
-  display: contents;
+  display: flex;
+  flex: none;
+  height: 36px;
+  margin: 0;
 }
-.composer-input .composer-add {
-  grid-column: 1;
-  grid-row: 1;
+.composer-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 36px;
+  flex: none;
+}
+.composer-toolbar-right {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  min-width: 0;
 }
 .composer-input .composer-actions > button {
   display: flex;
@@ -199,9 +211,6 @@
   min-height: 36px;
   border-radius: 18px;
   grid-row: 1;
-}
-.composer-input:has(.stop-button) {
-  grid-template-columns: 36px minmax(0, 1fr) 36px 36px;
 }
 .composer-input .composer-send:disabled {
   background: var(--button-bg);
@@ -286,49 +295,18 @@
 .composer-model-slot {
   display: contents;
 }
-.composer-input:has(.model-selector) {
-  grid-template-columns: 36px minmax(0, 1fr) auto 36px;
-}
-.composer-input:has(.model-selector):has(.stop-button) {
-  grid-template-columns: 36px minmax(0, 1fr) auto 36px 36px;
-}
 .composer-input textarea:placeholder-shown {
   white-space: pre;
 }
-@media (max-width: 360px) {
-  .composer-input:has(.model-selector):has(.stop-button) {
-    grid-template-columns: 36px minmax(0, 1fr) 36px 36px;
-  }
-  .composer-input:has(.model-selector):has(.stop-button) textarea {
-    grid-column: 1 / -1;
-    grid-row: 1;
-  }
-  .composer-input:has(.model-selector):has(.stop-button) .composer-add {
-    grid-row: 2;
-  }
-  .composer-input:has(.model-selector):has(.stop-button) .model-selector {
-    grid-column: 2;
-    grid-row: 2;
-    justify-self: end;
-  }
-  .composer-input:has(.model-selector):has(.stop-button) .stop-button {
-    grid-column: 3;
-    grid-row: 2;
-  }
-  .composer-input:has(.model-selector):has(.stop-button) .composer-send {
-    grid-column: 4;
-    grid-row: 2;
-  }
-}
 .composer-images {
-  order: 0;
-  flex: 1 0 100%;
+  flex: none;
   width: 100%;
   min-width: 0;
   display: flex;
   gap: 8px;
   padding: 0;
-  overflow-x: auto;
+  flex-wrap: wrap;
+  overflow: visible;
 }
 .composer-image {
   position: relative;
@@ -350,7 +328,7 @@
 .composer-image-preview > img {
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  object-fit: contain;
   border-radius: inherit;
 }
 .composer-input .composer-image-remove {
@@ -369,43 +347,6 @@
   background: var(--surface);
   color: var(--text-primary);
 }
-.composer-input:has(.composer-images) {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-}
-.composer-input:has(.composer-images) textarea {
-  order: 1;
-  flex: 1 0 100%;
-}
-.composer-input:has(.composer-images) .composer-add {
-  order: 2;
-}
-.composer-input:has(.composer-images) .plan-mode {
-  order: 3;
-}
-.composer-input:has(.composer-images) .model-selector {
-  order: 4;
-  flex: 0 1 auto;
-  max-width: 240px;
-  margin-left: auto;
-}
-.composer-input:has(.composer-images) .model-controls .model-trigger {
-  flex: 1 1 0;
-  min-width: 0;
-  max-width: 100%;
-}
-.composer-input:has(.composer-images) .stop-button {
-  order: 5;
-}
-.composer-input:has(.composer-images) .composer-send {
-  order: 6;
-  margin-left: 0;
-}
-.composer-input:has(.composer-images) > [role="alert"] {
-  order: 7;
-  flex: 1 0 100%;
-}
 .image-preview-dialog {
   width: min(1200px, calc(100vw - 32px));
   max-width: calc(100vw - 32px);
@@ -418,9 +359,115 @@
   object-fit: contain;
   margin: 0 auto;
 }
+
+/* Only the text scrolls; controls and thumbnails remain outside its viewport. */
+.composer-input textarea {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--text-secondary) 25%, transparent)
+    transparent;
+}
+@supports selector(::-webkit-scrollbar) {
+  .composer-input textarea {
+    scrollbar-width: auto;
+    scrollbar-color: auto;
+  }
+  .composer-input textarea::-webkit-scrollbar {
+    width: 4px;
+  }
+  .composer-input textarea::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .composer-input textarea::-webkit-scrollbar-thumb {
+    border-radius: 2px;
+    background: color-mix(in srgb, var(--text-secondary) 25%, transparent);
+  }
+  .composer-input textarea:hover::-webkit-scrollbar-thumb {
+    background: color-mix(in srgb, var(--text-secondary) 40%, transparent);
+  }
+  .composer-input textarea::-webkit-scrollbar-button {
+    display: none;
+    width: 0;
+    height: 0;
+  }
+}
 @media (max-width: 799px) {
-  .composer-input:has(.composer-images) .model-selector {
-    flex: 1 1 0;
-    max-width: 102px;
+  .composer-input {
+    --composer-height: 110px;
+  }
+  .composer-input textarea {
+    min-height: 40px;
+  }
+}
+@media (max-height: 600px) {
+  .composer-input {
+    --composer-attachment-size: 64px;
+  }
+}
+.composer-files {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  flex: none;
+}
+.composer-file {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 308px;
+  max-width: 100%;
+  min-width: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface-subtle);
+}
+.composer-file > svg {
+  flex-shrink: 0;
+}
+.composer-file-info {
+  flex: 1;
+  min-width: 0;
+}
+.composer-file-name,
+.composer-file-info small {
+  display: block;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  line-height: 20px;
+}
+.composer-file-name {
+  font-size: 13px;
+}
+.composer-file-info small {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+.composer-file .quiet {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+}
+.composer-input.is-dragging {
+  border-color: var(--focus-ring);
+  box-shadow: inset 0 0 0 1px var(--focus-ring);
+}
+.composer-drop-hint {
+  position: absolute;
+  right: 16px;
+  bottom: 56px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  background: var(--surface-subtle);
+  pointer-events: none;
+  font-size: 12px;
+}
+@media (forced-colors: active) {
+  .composer-input textarea {
+    scrollbar-color: auto;
   }
 }

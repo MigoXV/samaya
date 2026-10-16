@@ -60,47 +60,70 @@ try {
   await page.locator('[data-task-id="demo-5"] .task-open').click();
   const replies = page.locator(".agent-reply");
   await expect(replies).toHaveCount(4);
-  await expect(page.locator(".agent-reply-author")).toHaveCount(2);
+  await expect(page.locator(".agent-reply-author")).toHaveCount(0);
   await expect(replies.nth(1).locator("pre")).toContainText(
     "const value = 42;",
   );
   await expect(replies.nth(1).locator("table")).toHaveCount(1);
+  await expect(page.getByText("会话摘要与身份", { exact: true })).toHaveCount(
+    0,
+  );
+  await expect(page.getByRole("button", { name: "复制本轮回复" })).toHaveCount(
+    2,
+  );
+  for (const index of [0, 1]) {
+    await replies.nth(index).hover();
+    await expect(replies.nth(index).locator(".response-actions")).toHaveCount(
+      0,
+    );
+    await expect(replies.nth(index).getByRole("button")).toHaveCount(0);
+  }
+  const finalReply = replies.nth(2);
   await page.mouse.move(0, 0);
-  await expect(replies.first().locator(".response-actions")).toHaveCSS(
+  await expect(finalReply.locator(".response-actions")).toHaveCSS(
     "opacity",
     "0",
   );
-  await replies.first().hover();
-  const copy = replies.first().getByRole("button", { name: "复制这条回复" });
-  await expect(replies.first().locator(".response-actions")).toHaveCSS(
+  await finalReply.hover();
+  const copy = finalReply.getByRole("button", { name: "复制本轮回复" });
+  await expect(finalReply.locator(".response-actions")).toHaveCSS(
     "opacity",
     "1",
   );
-  const height = (await replies.first().boundingBox()).height;
+  const height = (await finalReply.boundingBox()).height;
   await copy.click();
-  expect(await page.evaluate(() => window.__copied)).toBe(items[1].text);
+  expect(await page.evaluate(() => window.__copied)).toBe(
+    [items[1].text, items[3].text, items[4].text].join("\n\n"),
+  );
   await expect(copy).toHaveText("✓");
-  expect((await replies.first().boundingBox()).height).toBe(height);
-  const secondCopy = replies
-    .nth(1)
-    .getByRole("button", { name: "复制这条回复" });
-  await secondCopy.focus();
-  await expect(replies.nth(1).locator(".response-actions")).toHaveCSS(
+  expect((await finalReply.boundingBox()).height).toBe(height);
+  await page.mouse.move(0, 0);
+  await copy.focus();
+  await expect(finalReply.locator(".response-actions")).toHaveCSS(
     "opacity",
     "1",
   );
   await page.keyboard.press("Enter");
-  expect(await page.evaluate(() => window.__copied)).toBe(items[3].text);
+  expect(await page.evaluate(() => window.__copied)).toBe(
+    [items[1].text, items[3].text, items[4].text].join("\n\n"),
+  );
+  const nextCopy = replies.nth(3).getByRole("button", { name: "复制本轮回复" });
+  await nextCopy.focus();
+  await page.keyboard.press("Enter");
+  expect(await page.evaluate(() => window.__copied)).toBe(items[6].text);
   await page.evaluate(() => {
     window.__copyFails = true;
   });
+  await finalReply.hover();
   await copy.click();
-  await expect(replies.first().getByRole("status")).toHaveText(
+  await expect(finalReply.getByRole("status")).toHaveText(
     "复制失败，请选择正文复制",
   );
-  expect((await replies.first().boundingBox()).height).toBe(height);
+  expect((await finalReply.boundingBox()).height).toBe(height);
   const input = page.locator(".task-composer textarea");
   const composer = page.locator(".task-composer .composer-input");
+  await expect(composer.locator(".plan-shortcut")).toHaveCount(0);
+  await expect(composer.locator(".plan-mode-button svg")).toHaveCount(0);
   for (const theme of ["vallum", "abyssus"]) {
     await page.evaluate((t) => window.samayaTheme.setPreference(t), theme);
     for (const width of [1550, 1440, 1024, 390, 320]) {
@@ -108,10 +131,10 @@ try {
       await input.fill("");
       await expect(composer).toHaveCSS(
         "height",
-        width <= 360 ? "90px" : "58px",
+        width < 800 ? "110px" : "118px",
       );
       await expect(composer).toHaveCSS("border-radius", "24px");
-      await expect(input).toHaveCSS("height", "24px");
+      await expect(input).toHaveCSS("height", width < 800 ? "40px" : "48px");
       const geometry = await page.evaluate(() => {
         const box = (s) => document.querySelector(s).getBoundingClientRect();
         const c = box(".composer-input"),
@@ -120,19 +143,24 @@ try {
           width: c.width,
           center: (c.left + c.right) / 2,
           mainCenter: (main.left + main.right) / 2,
-          heading: box(".task-reading-heading").height,
+          heading: box(".task-heading").height,
           overflow: document.documentElement.scrollWidth > innerWidth,
+          textBottom: box(".composer-input textarea").bottom,
+          toolbarTop: box(".composer-toolbar").top,
+          textWidth: box(".composer-input textarea").width,
         };
       });
       expect(geometry.width).toBeLessThanOrEqual(860);
       expect(
         Math.abs(geometry.center - geometry.mainCenter),
       ).toBeLessThanOrEqual(1);
-      expect(geometry.heading).toBe(width < 800 ? 64 : 40);
+      expect(geometry.heading).toBe(width < 800 ? 108 : 48);
       expect(geometry.overflow).toBe(false);
+      expect(geometry.textBottom).toBeLessThanOrEqual(geometry.toolbarTop);
+      expect(geometry.textWidth).toBe(geometry.width - 34);
       if (width === 1550) expect(geometry.width).toBe(860);
       if (width === 320)
-        await expect(replies.first().locator(".response-actions")).toHaveCSS(
+        await expect(finalReply.locator(".response-actions")).toHaveCSS(
           "opacity",
           "1",
         );
@@ -144,7 +172,7 @@ try {
   const idle = await composer.boundingBox();
   await input.fill("第一行\n第二行\n第三行\n第四行");
   await expect(input).toHaveCSS("height", "96px");
-  await expect(composer).toHaveCSS("height", "118px");
+  await expect(composer).toHaveCSS("height", "166px");
   const expanded = await composer.boundingBox();
   expect(expanded.y + expanded.height).toBe(idle.y + idle.height);
   await input.fill("很多输入\n".repeat(30));
@@ -185,7 +213,7 @@ try {
     expect(controls[i].left).toBeGreaterThanOrEqual(controls[i - 1].right);
   expect(calls).toHaveLength(0);
   console.log(
-    "compact chat: author grouping, independent Markdown/copy, keyboard/failure feedback, dual themes, 320–1550 layouts and upwards growth passed",
+    "compact chat: author grouping, whole-answer copy without intermediate hover controls, keyboard/failure feedback, dual themes, 320–1550 layouts and upwards growth passed",
   );
 } finally {
   await browser.close();

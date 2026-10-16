@@ -204,8 +204,8 @@ try {
     };
   });
   expect(layout.height).toBeGreaterThan(compactHeight + 100);
-  expect(layout.thumbnailWidth).toBe(120);
-  await expect(thumbnails.first()).toHaveCSS("object-fit", "cover");
+  expect(layout.thumbnailWidth).toBe(96);
+  await expect(thumbnails.first()).toHaveCSS("object-fit", "contain");
   expect(layout.contained).toBe(true);
   const actionGap = await page
     .locator(".composer-input")
@@ -397,6 +397,18 @@ try {
       await page.evaluate(() => document.documentElement.scrollWidth),
     ).toBeLessThanOrEqual(320);
     await expect(thumbnails.first()).toBeVisible();
+    const attachmentLayout = await page
+      .locator(".composer-images")
+      .evaluate((el) => ({
+        hasHorizontalOverflow: el.scrollWidth > el.clientWidth,
+        overflowY: getComputedStyle(el).overflowY,
+        wrap: getComputedStyle(el).flexWrap,
+      }));
+    expect(attachmentLayout).toEqual({
+      hasHorizontalOverflow: false,
+      overflowY: "visible",
+      wrap: "wrap",
+    });
     const toolbar = await page.locator(".composer-input").evaluate((el) => ({
       add: el.querySelector(".composer-add").getBoundingClientRect().top,
       send: el.querySelector(".composer-send").getBoundingClientRect().top,

@@ -146,7 +146,15 @@ export function DirectoryPicker({
     </div>
   );
 }
-function AgentReply({ item, showAuthor }: { item: Item; showAuthor: boolean }) {
+function AgentReply({
+  item,
+  showAuthor,
+  copyText,
+}: {
+  item: Item;
+  showAuthor: boolean;
+  copyText?: string;
+}) {
   const [notice, setNotice] = useState("");
   useEffect(() => {
     if (notice !== "已复制") return;
@@ -155,35 +163,39 @@ function AgentReply({ item, showAuthor }: { item: Item; showAuthor: boolean }) {
   }, [notice]);
   return (
     <section className="message agent-reply">
-      {showAuthor && <div className="eyebrow agent-reply-author">Codex</div>}
-      <div className="agent-reply-body">
+      {showAuthor && <div className="sr-only">Codex</div>}
+      <div
+        className={`agent-reply-body${copyText === undefined ? " agent-reply-body-only" : ""}`}
+      >
         <MarkdownContent text={item.text || ""} />
-        <div className="response-actions">
-          <button
-            type="button"
-            className="quiet"
-            aria-label="复制这条回复"
-            title={notice || "复制这条回复"}
-            onClick={() => {
-              void navigator.clipboard
-                .writeText(item.text || "")
-                .then(() => setNotice("已复制"))
-                .catch(() => setNotice("复制失败，请选择正文复制"));
-            }}
-          >
-            {notice === "已复制" ? (
-              <span aria-hidden="true">✓</span>
-            ) : (
-              <img src="/figma/copy.svg" alt="" />
-            )}
-          </button>
-          <small
-            className={notice === "已复制" ? "sr-only" : "response-notice"}
-            role="status"
-          >
-            {notice}
-          </small>
-        </div>
+        {copyText !== undefined && (
+          <div className="response-actions">
+            <button
+              type="button"
+              className="quiet"
+              aria-label="复制本轮回复"
+              title={notice || "复制本轮回复"}
+              onClick={() => {
+                void navigator.clipboard
+                  .writeText(copyText)
+                  .then(() => setNotice("已复制"))
+                  .catch(() => setNotice("复制失败，请选择正文复制"));
+              }}
+            >
+              {notice === "已复制" ? (
+                <span aria-hidden="true">✓</span>
+              ) : (
+                <img src="/figma/copy.svg" alt="" />
+              )}
+            </button>
+            <small
+              className={notice === "已复制" ? "sr-only" : "response-notice"}
+              role="status"
+            >
+              {notice}
+            </small>
+          </div>
+        )}
       </div>
     </section>
   );
@@ -193,16 +205,24 @@ export function ItemView({
   item,
   progress,
   showAgentAuthor = true,
+  agentCopyText,
 }: {
   item: Item;
   progress?: string;
   showAgentAuthor?: boolean;
+  agentCopyText?: string;
 }) {
   if (item.type === "mcpToolCall")
     return <McpTool item={item} progress={progress} />;
   if (item.type === "userMessage") return <UserMessage item={item} />;
   if (item.type === "agentMessage")
-    return <AgentReply item={item} showAuthor={showAgentAuthor} />;
+    return (
+      <AgentReply
+        item={item}
+        showAuthor={showAgentAuthor}
+        copyText={agentCopyText}
+      />
+    );
   if (item.type === "reasoning") return null;
   if (item.type === "commandExecution") return <CommandRecord item={item} />;
   if (item.type === "fileChange")

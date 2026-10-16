@@ -10,6 +10,7 @@ from samaya.codex.connection import Connection
 from samaya.config import Settings
 from samaya.sessions.queries import SessionQueries
 
+from .files import attachment_text, file_ids
 from .images import message_inputs
 
 
@@ -138,10 +139,26 @@ class InputCatalog:
         return result
 
     async def inputs(
-        self, tid: str, text: str, references: list, expected_cwd=None, images=None
+        self,
+        tid: str,
+        text: str,
+        references: list,
+        expected_cwd=None,
+        images=None,
+        files=None,
     ):
         if not isinstance(references, list) or len(references) > 32:
             raise ValueError("无效的技能或应用引用")
+        uploaded = files if files is not None else []
+        if file_ids(uploaded):
+            directory = await self.directory(tid, None)
+            if not isinstance(expected_cwd, str) or self.config.directory(
+                expected_cwd
+            ) != Path(directory):
+                raise ValueError("工作目录已变化，请重新上传附件")
+            text = text + await asyncio.to_thread(
+                attachment_text, Path(directory), uploaded
+            )
         inputs = message_inputs(text, images if images is not None else [])
         if not references:
             return inputs

@@ -47,6 +47,12 @@ import "./task-activity.css";
 import "./usage.css";
 import { ComposerInput } from "./ComposerInput";
 import { setImageDraft, useImageDraft } from "./composer-images";
+import {
+  fileReferences,
+  fileScope,
+  setFileDraft,
+  useFileDraft,
+} from "./composer-files";
 import type { InputImage } from "./composer-images";
 import { CommandDialog } from "./CommandDialog";
 import { ModelSelector } from "./ModelSelector";
@@ -354,6 +360,9 @@ export function MonitorWorkbench({ logout }: { logout: () => void }) {
   const [confirmedCwd, setConfirmedCwd] = useState("");
   const [newImages, setNewImages] = useImageDraft(
     draftWorkspace ? "workspace:" + draftWorkspace : "create",
+  );
+  const [newFiles, setNewFiles] = useFileDraft(
+    fileScope(draftWorkspace || cwd),
   );
   const [newReferences, setNewReferences] = useState<InputReference[]>(
     () => readWorkspaceDraft(workspaceFromUrl()).references || [],
@@ -828,7 +837,13 @@ export function MonitorWorkbench({ logout }: { logout: () => void }) {
     !feedbackThread ||
     rootId(feedbackThread, records) === rootId(selected, records);
   async function create() {
-    if ((!goal.trim() && !newImages.length) || busy || !connected) return;
+    if (
+      (!goal.trim() && !newImages.length && !newFiles.length) ||
+      newFiles.some((file) => file.status !== "ready") ||
+      busy ||
+      !connected
+    )
+      return;
     if (dialog === "create" && (!confirmedCwd || confirmedCwd !== cwd)) {
       setError("请先点击“浏览目录”确认工作目录。");
       return;
@@ -839,6 +854,7 @@ export function MonitorWorkbench({ logout }: { logout: () => void }) {
     if (!id) return;
     recent.include(id);
     setImageDraft("thread:" + id, newImages);
+    setFileDraft("thread:" + id, newFiles);
     sessionStorage.setItem("samaya.draft." + id, goal);
     sessionStorage.setItem(
       "samaya.references." + id,
@@ -878,6 +894,7 @@ export function MonitorWorkbench({ logout }: { logout: () => void }) {
       text: goal,
       references: newReferences,
       images: newImages.map(({ url }) => ({ url })),
+      files: fileReferences(newFiles),
       expectedCwd: cwd,
       expectedTurnId: null,
     });
@@ -894,6 +911,8 @@ export function MonitorWorkbench({ logout }: { logout: () => void }) {
       setGoal("");
       setNewReferences([]);
       setNewImages([]);
+      setNewFiles([]);
+      setFileDraft("thread:" + id, []);
       setImageDraft("thread:" + id, []);
       setNewName("");
       sessionStorage.setItem("samaya.draft." + id, "");
@@ -920,6 +939,8 @@ export function MonitorWorkbench({ logout }: { logout: () => void }) {
     setNewName("");
     setSelected("");
     setDraftWorkspace(path);
+    setTaskTab("work");
+    setFocus(false);
     setView("overview");
     setTaskNav(false);
     setError("");
@@ -995,7 +1016,7 @@ export function MonitorWorkbench({ logout }: { logout: () => void }) {
     : EMPTY;
   return (
     <div
-      className={`monitor-shell ${focus && workMode ? "focus-mode" : ""} ${workMode ? "task-is-open" : ""} ${taskNav ? "task-nav-open" : ""} ${overviewMode ? "overview-mode" : ""} ${["settings", "usage"].includes(view) ? "settings-mode" : ""} `}
+      className={`monitor-shell ${focus ? "focus-mode" : ""} ${workMode ? "task-is-open" : ""} ${taskNav ? "task-nav-open" : ""} ${overviewMode ? "overview-mode" : ""} ${["settings", "usage"].includes(view) ? "settings-mode" : ""} `}
     >
       <a className="skip-link" href="#monitor-main">
         跳到任务总览
@@ -1013,13 +1034,33 @@ export function MonitorWorkbench({ logout }: { logout: () => void }) {
         role={taskNav && viewport.width < 1100 ? "dialog" : undefined}
         aria-modal={taskNav && viewport.width < 1100 ? true : undefined}
         inert={
-          (workMode && focus && viewport.width >= 1100) ||
+          (focus && viewport.width >= 1100) ||
           (viewport.width < 1100 && !taskNav)
         }
       >
         <div className="monitor-brand">
           <img src="/figma/samaya-symbol.svg" alt="" />
           Samaya
+          <button
+            type="button"
+            className="quiet nav-collapse"
+            aria-label={workMode ? "收起任务侧栏" : "收起工作台侧栏"}
+            onClick={() => {
+              if (viewport.width < 1100) setTaskNav(false);
+              else {
+                setFocus(true);
+                requestAnimationFrame(() =>
+                  document
+                    .querySelector<HTMLElement>(
+                      workMode ? ".task-sidebar-toggle" : ".mobile-nav-button",
+                    )
+                    ?.focus(),
+                );
+              }
+            }}
+          >
+            ☰
+          </button>
         </div>
         <button
           className="quiet"
@@ -1095,9 +1136,12 @@ export function MonitorWorkbench({ logout }: { logout: () => void }) {
         <header className="monitor-toolbar">
           <button
             className="mobile-nav-button"
-            onClick={() => setTaskNav(true)}
+            onClick={() => {
+              if (viewport.width >= 1100) setFocus(false);
+              else setTaskNav(true);
+            }}
           >
-            导航
+            {focus ? "展开工作台侧栏" : "导航"}
           </button>
           <h1>
             {
@@ -1508,124 +1552,61 @@ export function MonitorWorkbench({ logout }: { logout: () => void }) {
                   aria-label="任务详情"
                   inert={taskNav && viewport.width < 1100}
                 >
-                  {draftWorkspace ? (
-                    <WorkspaceDraft
-                      cwd={draftWorkspace}
-                      value={goal}
-                      change={setGoal}
-                      references={newReferences}
-                      onReferences={setNewReferences}
-                      images={newImages}
-                      onImages={setNewImages}
-                      mode={draftMode}
-                      onMode={setDraftMode}
-                      disabled={!connected || !!busy}
-                      submit={() => void create()}
-                      back={() => navigate("overview")}
-                      feedback={operationFeedback}
-                    />
-                  ) : selectedRecord ? (
-                    <>
-                      <header className="task-heading">
-                        <button
-                          className="quiet task-sidebar-toggle"
-                          aria-label={
-                            focus || (viewport.width < 1100 && !taskNav)
-                              ? "展开任务侧栏"
-                              : "收起任务侧栏"
+                  <header className="task-heading">
+                    <button
+                      className="quiet task-sidebar-toggle"
+                      aria-label={
+                        focus || (viewport.width < 1100 && !taskNav)
+                          ? "展开任务侧栏"
+                          : "收起任务侧栏"
+                      }
+                      onClick={() => {
+                        if (viewport.width < 1100) {
+                          setFocus(false);
+                          setTaskNav(!taskNav);
+                        } else {
+                          setTaskNav(false);
+                          setFocus(!focus);
+                        }
+                      }}
+                    >
+                      ☰
+                    </button>
+                    <div className="task-reading-heading">
+                      <div className="task-title-status">
+                        <h1
+                          title={
+                            draftWorkspace
+                              ? `${shortProject(draftWorkspace)} / 新会话`
+                              : selectedRecord
+                                ? threadTitle(selectedRecord.thread)
+                                : "正在载入任务…"
                           }
-                          onClick={() => {
-                            if (viewport.width < 1100) {
-                              setFocus(false);
-                              setTaskNav(!taskNav);
-                            } else {
-                              setTaskNav(false);
-                              setFocus(!focus);
-                            }
-                          }}
                         >
-                          ☰
-                        </button>
-                        <span className="toolbar-space" />
-                        {receiptEntry}
-                        {error &&
-                          !feedbackForCurrentTask &&
-                          !unresolvedReceipts.length && (
+                          {draftWorkspace
+                            ? `${shortProject(draftWorkspace)} / 新会话`
+                            : selectedRecord
+                              ? threadTitle(selectedRecord.thread)
+                              : "正在载入任务…"}
+                        </h1>
+                        <nav className="detail-tabs" aria-label="任务内容">
+                          {[
+                            ["work", "对话"],
+                            ["result", "改动与产物"],
+                          ].map(([tab, label]) => (
                             <button
-                              className="quiet operation-receipts"
-                              onClick={() => setDialog("receipts")}
-                              aria-label="查看操作反馈"
-                              title="查看操作反馈"
+                              key={tab}
+                              className="quiet"
+                              aria-current={
+                                taskTab === tab ? "page" : undefined
+                              }
+                              onClick={() => setTaskTab(tab)}
                             >
-                              {narrow ? "反馈" : "查看操作反馈"}
+                              {label}
                             </button>
-                          )}
-
-                        <button
-                          className={
-                            waitingCount || unknownCount
-                              ? "request-action global-pending"
-                              : "quiet global-pending"
-                          }
-                          onClick={() => navigate("attention")}
-                        >
-                          <img src="/figma/bell.svg" alt="" /> 待处理{" "}
-                          {waitingCount}
-                          {unknownCount ? ` · ${unknownCount} 待核对` : ""}
-                        </button>
-                        <button
-                          className="quiet workspace-exceptions"
-                          onClick={() => {
-                            navigate("overview");
-                            closeDetail();
-                            setAllTasks(true);
-                            setFilter("issues");
-                            setProject("");
-                          }}
-                        >
-                          <img src="/figma/alert.svg" alt="" />{" "}
-                          <span className="sr-only">异常</span>{" "}
-                          {
-                            ordered.filter(
-                              (r) =>
-                                /失败|异常/.test(execution(r)) ||
-                                !connected ||
-                                !!r.error ||
-                                !r.confirmedAt ||
-                                tick - r.confirmedAt * 1000 > 45000,
-                            ).length
-                          }
-                        </button>
-                        <button
-                          className="quiet project-context"
-                          onClick={() => setDialog("context")}
-                          aria-label="工作区与状态详情"
-                        >
-                          <img src="/figma/more.svg" alt="" />
-                        </button>
-                      </header>
-                      <div className="task-reading-heading">
-                        <div className="task-title-status">
-                          <h1 title={threadTitle(selectedRecord.thread)}>
-                            {threadTitle(selectedRecord.thread)}
-                          </h1>
-                          <nav className="detail-tabs" aria-label="任务内容">
-                            {[
-                              ["work", "对话"],
-                              ["result", "改动与产物"],
-                            ].map(([tab, label]) => (
-                              <button
-                                key={tab}
-                                className="quiet"
-                                aria-current={
-                                  taskTab === tab ? "page" : undefined
-                                }
-                                onClick={() => setTaskTab(tab)}
-                              >
-                                {label}
-                              </button>
-                            ))}
-                          </nav>
+                          ))}
+                        </nav>
+                        {!draftWorkspace && selectedRecord && (
                           <div
                             className="task-live-status"
                             role="status"
@@ -1653,8 +1634,84 @@ export function MonitorWorkbench({ logout }: { logout: () => void }) {
                                 </time>
                               )}
                           </div>
-                        </div>
+                        )}
                       </div>
+                    </div>
+
+                    {receiptEntry}
+                    {error &&
+                      !feedbackForCurrentTask &&
+                      !unresolvedReceipts.length && (
+                        <button
+                          className="quiet operation-receipts"
+                          onClick={() => setDialog("receipts")}
+                          aria-label="查看操作反馈"
+                          title="查看操作反馈"
+                        >
+                          {narrow ? "反馈" : "查看操作反馈"}
+                        </button>
+                      )}
+
+                    <button
+                      className={
+                        waitingCount || unknownCount
+                          ? "request-action global-pending"
+                          : "quiet global-pending"
+                      }
+                      onClick={() => navigate("attention")}
+                    >
+                      <img src="/figma/bell.svg" alt="" /> 待处理 {waitingCount}
+                      {unknownCount ? ` · ${unknownCount} 待核对` : ""}
+                    </button>
+                    <button
+                      className="quiet workspace-exceptions"
+                      onClick={() => {
+                        navigate("overview");
+                        closeDetail();
+                        setAllTasks(true);
+                        setFilter("issues");
+                        setProject("");
+                      }}
+                    >
+                      <img src="/figma/alert.svg" alt="" />{" "}
+                      <span className="sr-only">异常</span>{" "}
+                      {
+                        ordered.filter(
+                          (r) =>
+                            /失败|异常/.test(execution(r)) ||
+                            !connected ||
+                            !!r.error ||
+                            !r.confirmedAt ||
+                            tick - r.confirmedAt * 1000 > 45000,
+                        ).length
+                      }
+                    </button>
+                    <button
+                      className="quiet project-context"
+                      onClick={() => setDialog("context")}
+                      aria-label="工作区与状态详情"
+                    >
+                      <img src="/figma/more.svg" alt="" />
+                    </button>
+                  </header>
+                  {draftWorkspace ? (
+                    <WorkspaceDraft
+                      cwd={draftWorkspace}
+                      value={goal}
+                      change={setGoal}
+                      references={newReferences}
+                      onReferences={setNewReferences}
+                      images={newImages}
+                      onImages={setNewImages}
+                      mode={draftMode}
+                      onMode={setDraftMode}
+                      disabled={!connected || !!busy}
+                      submit={() => void create()}
+                      tab={taskTab}
+                      feedback={operationFeedback}
+                    />
+                  ) : selectedRecord ? (
+                    <>
                       <ReadingSurface
                         key={selected + taskTab + readerVisit}
                         visit={readerVisit}
@@ -1846,14 +1903,6 @@ export function MonitorWorkbench({ logout }: { logout: () => void }) {
                                 />
                               </div>
                             ))}
-                        <details>
-                          <summary>会话摘要与身份</summary>
-                          <p>
-                            {selectedRecord.thread.preview ||
-                              "原生会话未提供摘要"}
-                          </p>
-                          <code>{selected}</code>
-                        </details>
                       </ReadingSurface>
                       <div className="detail-footer">
                         <TaskComposer
@@ -2360,8 +2409,11 @@ function NavButtons({
           absoluteStrokeWidth
           aria-hidden="true"
         />
-        待我处理 · {count}
-        {unknown ? " · 待核对" : ""}
+        <span>待我处理</span>
+        <span className="nav-pending-count">
+          {count}
+          {unknown ? " · 待核对" : ""}
+        </span>
       </button>
     </nav>
   );
@@ -2394,6 +2446,7 @@ function TaskComposer({
 }) {
   const id = record.thread.id;
   const [images, setImages] = useImageDraft("thread:" + id);
+  const [files, setFiles] = useFileDraft("thread:" + id);
   const [draft, setDraft] = useState(
     () => sessionStorage.getItem("samaya.draft." + id) || "",
   );
@@ -2432,16 +2485,19 @@ function TaskComposer({
     );
   }, [id, draft, references]);
   const submit = async () => {
+    if (files.some((file) => file.status !== "ready")) return;
     const submitted = draft;
     const r = await run(active ? "steer" : "send", {
       threadId: id,
       text: draft,
       references,
       images: images.map(({ url }) => ({ url })),
+      files: fileReferences(files),
       expectedCwd: record.thread.cwd,
       expectedTurnId: record.turn?.id || null,
     });
     if (r) {
+      setFiles((current) => current.filter((file) => !files.includes(file)));
       setDraft((current) => (current === submitted ? "" : current));
       setReferences((current) =>
         current.filter((r) => !references.includes(r)),
@@ -2915,7 +2971,7 @@ function WorkspaceDraft({
   onMode,
   disabled,
   submit,
-  back,
+  tab,
   feedback,
 }: {
   cwd: string;
@@ -2929,7 +2985,7 @@ function WorkspaceDraft({
   onMode: (value: string) => void;
   disabled: boolean;
   submit: () => void;
-  back: () => void;
+  tab: string;
   feedback: ReactNode;
 }) {
   const [commandError, setCommandError] = useState("");
@@ -2941,16 +2997,18 @@ function WorkspaceDraft({
   });
   return (
     <div className="workspace-draft">
-      <header className="draft-heading">
-        <button className="quiet" onClick={back}>
-          任务总览
-        </button>
-        <h1>{shortProject(cwd)} / 新会话</h1>
-      </header>
       <div className="draft-introduction">
-        <h2>新会话 · {shortProject(cwd)}</h2>
-        <p>写下这次要做的事。</p>
-        <small>{cwd}</small>
+        {tab === "work" ? (
+          <>
+            <h2>新会话 · {shortProject(cwd)}</h2>
+            <p>写下这次要做的事。</p>
+            <small>{cwd}</small>
+          </>
+        ) : (
+          <section aria-label="改动与结果">
+            <p>发送工作要求创建会话后，这里显示改动与产物。</p>
+          </section>
+        )}
       </div>
       <footer className="detail-footer">
         <div className="task-composer">

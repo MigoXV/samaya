@@ -6,6 +6,7 @@ from collections.abc import Awaitable, Callable
 
 from openai_codex.errors import JsonRpcError
 
+from samaya.composer.files import file_ids
 from samaya.composer.images import message_inputs
 from samaya.store import Store
 
@@ -49,7 +50,10 @@ class Operations:
         if action == "respond" and not isinstance(body.get("response"), dict):
             raise ValueError("无效的输入响应")
         if action in ("send", "steer"):
-            message_inputs(body.get("text", ""), body.get("images", []))
+            uploaded = file_ids(body.get("files", []))
+            message_inputs(
+                body.get("text", ""), body.get("images", []), allow_empty=bool(uploaded)
+            )
         if action == "send" and "expectedTurnId" not in body:
             raise ValueError("缺少会话版本，请刷新")
 

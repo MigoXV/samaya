@@ -30,7 +30,7 @@
   gap: 4px;
   min-height: 32px;
   padding: 4px 6px;
-  font-size: 12px;
+  font-size: 13px;
   line-height: 20px;
   background: transparent;
   border: 0;
@@ -39,9 +39,6 @@
 }
 .plan-mode-button[aria-pressed="true"] {
   color: var(--text-primary);
-}
-.plan-shortcut {
-  font-size: 10px;
 }
 .plan-mode-error {
   position: absolute;
@@ -57,9 +54,10 @@
   z-index: 5;
 }
 .workspace-draft .draft-introduction {
-  padding: 24px var(--reading-gutter);
+  padding: 12px var(--reading-gutter);
   flex: 1;
   min-height: 0;
+  overflow-y: auto;
 }
 .workspace-draft .draft-introduction p {
   color: var(--text-secondary);
@@ -69,18 +67,13 @@
   color: var(--text-secondary);
   overflow-wrap: anywhere;
 }
-.workspace-draft .draft-heading {
-  display: flex;
-  gap: 16px;
-  align-items: center;
-  padding: 12px var(--reading-gutter);
-}
-.workspace-draft h1 {
+.workspace-draft .draft-introduction h2 {
+  margin: 0 0 12px;
   font-size: 18px;
+  font-weight: 500;
 }
 @media (max-width: 799px) {
-  .workspace-create-label,
-  .plan-shortcut {
+  .workspace-create-label {
     display: none;
   }
   .overview-workspace > header {
@@ -93,17 +86,8 @@
 .workspace-draft {
   display: flex;
   flex-direction: column;
-  height: 100%;
+  flex: 1;
   min-height: 0;
-}
-.composer-input:has(.plan-mode) {
-  grid-template-columns: 36px minmax(0, 1fr) auto 36px;
-}
-.composer-input:has(.plan-mode):has(.model-selector) {
-  grid-template-columns: 36px minmax(0, 1fr) auto auto 36px;
-}
-.composer-input:has(.plan-mode):has(.model-selector):has(.stop-button) {
-  grid-template-columns: 36px minmax(0, 1fr) auto auto 36px 36px;
 }
 .plan-indicator,
 .plan-indicator svg {
@@ -120,73 +104,9 @@
     animation: none;
   }
 }
-.composer-input:has(.plan-mode) .plan-mode {
-  grid-column: 3;
-  grid-row: 1;
-}
-.composer-input:has(.plan-mode):has(.model-selector) .model-selector {
-  grid-column: 4;
-  grid-row: 1;
-}
-.composer-input:has(.plan-mode) .composer-send {
-  grid-column: 4;
-  grid-row: 1;
-}
-.composer-input:has(.plan-mode):has(.model-selector) .composer-send {
-  grid-column: 5;
-  grid-row: 1;
-}
-.composer-input:has(.plan-mode):has(.model-selector):has(.stop-button)
-  .stop-button {
-  grid-column: 5;
-  grid-row: 1;
-}
-.composer-input:has(.plan-mode):has(.model-selector):has(.stop-button)
-  .composer-send {
-  grid-column: 6;
-  grid-row: 1;
-}
-@media (max-width: 360px) {
-  .composer-input:has(.plan-mode):has(.model-selector) {
-    grid-template-columns: 36px auto minmax(0, 1fr) 36px;
-  }
-  .composer-input:has(.plan-mode):has(.model-selector):has(.stop-button) {
-    grid-template-columns: 36px auto minmax(0, 1fr) 36px 36px;
-  }
-  .composer-input:has(.plan-mode):has(.model-selector) textarea {
-    grid-column: 1 / -1;
-    grid-row: 1;
-  }
-  .composer-input:has(.plan-mode):has(.model-selector) .composer-add {
-    grid-column: 1;
-    grid-row: 2;
-  }
-  .composer-input:has(.plan-mode):has(.model-selector) .plan-mode {
-    grid-column: 2;
-    grid-row: 2;
-  }
-  .composer-input:has(.plan-mode):has(.model-selector) .model-selector {
-    grid-column: 3;
-    grid-row: 2;
-  }
-  .composer-input:has(.plan-mode):has(.model-selector) .composer-send {
-    grid-column: 4;
-    grid-row: 2;
-  }
-  .composer-input:has(.plan-mode):has(.model-selector):has(.stop-button)
-    .stop-button {
-    grid-column: 4;
-    grid-row: 2;
-  }
-  .composer-input:has(.plan-mode):has(.model-selector):has(.stop-button)
-    .composer-send {
-    grid-column: 5;
-    grid-row: 2;
-  }
-}
 .composer-input .plan-mode-button {
-  min-height: 32px;
   height: 32px;
+  min-height: 32px;
   padding: 4px 6px;
-  font-size: 12px;
+  font-size: 13px;
 }

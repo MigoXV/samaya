@@ -3,10 +3,11 @@
 import json
 import time
 
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 
 from samaya.composer.commands import registry
+from samaya.composer.files import UploadTooLarge, save_upload
 from samaya.composer.images import MAX_TOTAL_IMAGE_BYTES
 from samaya.config import Settings
 from samaya.runtime import Runtime
@@ -21,6 +22,21 @@ class Operation(BaseModel):
 def register_routes(application: FastAPI, config: Settings) -> None:
     def service() -> Runtime:
         return application.state.runtime
+
+    @application.post("/api/uploads")
+    async def upload(
+        request: Request,
+        filename: str,
+        cwd: str | None = None,
+        threadId: str | None = None,
+    ):
+        directory = config.directory(await service().catalog.directory(threadId, cwd))
+        if cwd is not None and config.directory(cwd) != directory:
+            raise ValueError("工作目录已变化，请重新上传文件")
+        try:
+            return await save_upload(directory, filename, request.stream())
+        except UploadTooLarge as exc:
+            raise HTTPException(413, str(exc)) from exc
 
     @application.get("/api/input-catalog")
     async def input_catalog(

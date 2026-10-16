@@ -1,12 +1,16 @@
 import { useEffect, useId, useRef, useState } from "react";
 import type { Item } from "./types";
+import { FileText } from "lucide-react";
+import { fileMessage } from "./file-message";
+import { formatFileSize } from "./composer-files";
 import { preserveMessagePosition } from "./reading-position";
 import { userMessageParts } from "./question-reply";
 import "./user-message.css";
 
 export function UserMessage({ item }: { item: Item }) {
-  const text =
-    item.content?.map((c) => c.text || "").join("\n") || item.text || "";
+  const { text, files } = fileMessage(
+    item.content?.map((c) => c.text || "").join("\n") || item.text || "",
+  );
   const parts = userMessageParts(text);
   const images =
     item.content?.filter(
@@ -16,6 +20,21 @@ export function UserMessage({ item }: { item: Item }) {
     ) || [];
   return (
     <>
+      {!!files.length && (
+        <div className="user-message-files" aria-label="已发送文件">
+          {files.map((file) => (
+            <div className="composer-file" key={file.id}>
+              <FileText size={18} aria-hidden="true" />
+              <div className="composer-file-info">
+                <span className="composer-file-name" title={file.name}>
+                  {file.name}
+                </span>
+                <small>{formatFileSize(file.size)}</small>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
       {!!images.length && (
         <div className="user-message-images" aria-label="已发送图片">
           {images.map((image, index) => (
@@ -42,7 +61,7 @@ export function UserMessage({ item }: { item: Item }) {
             {part.replies.map((reply, replyIndex) => (
               <div className="question-reply-pair" key={replyIndex}>
                 <div className="question-reply-question">
-                  <div className="eyebrow">Codex 提问</div>
+                  <div className="sr-only">Codex 提问</div>
                   <div className="prose">{reply.question}</div>
                 </div>
                 <MessageText text={reply.answer} label="你 · 已回答" />
@@ -78,7 +97,7 @@ function MessageText({ text, label = "你" }: { text: string; label?: string }) 
   }, [text]);
   return (
     <section ref={message} className="message user">
-      <div className="eyebrow">{label}</div>
+      <div className="sr-only">{label}</div>
       <div
         id={id}
         ref={ref}

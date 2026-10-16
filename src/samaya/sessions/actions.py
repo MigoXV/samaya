@@ -94,6 +94,7 @@ class SessionActions:
                         b.get("references", []),
                         b.get("expectedCwd"),
                         b.get("images", []),
+                        b.get("files", []),
                     ),
                 },
             )
@@ -118,6 +119,7 @@ class SessionActions:
                         b.get("references", []),
                         b.get("expectedCwd"),
                         b.get("images", []),
+                        b.get("files", []),
                     ),
                 },
             )

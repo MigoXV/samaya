@@ -14,6 +14,8 @@ import {
 } from "./composer-images";
 import type { InputImage } from "./composer-images";
 import { api } from "./api";
+import { fileScope, queueFiles, useFileDraft } from "./composer-files";
+import { FileAttachments } from "./FileAttachments";
 import { Modal } from "./components";
 import { hasReference, inputTrigger, slashInput } from "./composer-model";
 import type {
@@ -88,6 +90,26 @@ export function ComposerInput({
     imagePicker = useRef<HTMLInputElement>(null),
     id = useId();
   const identity = threadId || cwd;
+  const attachmentScope = fileScope(cwd, threadId);
+  const [files] = useFileDraft(attachmentScope);
+  const filesPending = files.some((file) => file.status !== "ready");
+  const [dragging, setDragging] = useState(false);
+  function addSelected(selected: File[]) {
+    if (disabled || !selected.length) return;
+    const pictures = selected.filter((file) => IMAGE_TYPES.includes(file.type));
+    const documents = selected.filter(
+      (file) => !IMAGE_TYPES.includes(file.type),
+    );
+    try {
+      if (documents.length)
+        queueFiles(attachmentScope, documents, cwd, threadId);
+      setImageError("");
+      if (pictures.length) void addImages(pictures);
+    } catch (error) {
+      setImageError(error instanceof Error ? error.message : "文件上传失败");
+    }
+  }
+
   const [previewImage, setPreviewImage] = useState<InputImage | null>(null);
   const [imageState, setImageState] = useState({
     identity,
@@ -120,6 +142,12 @@ export function ComposerInput({
   }, [identity]);
   async function pasteImages(event: ClipboardEvent<HTMLTextAreaElement>) {
     if (disabled) return;
+    const clipboardFiles = Array.from(event.clipboardData.files);
+    if (clipboardFiles.some(file => !file.type.startsWith("image/"))) {
+      event.preventDefault();
+      addSelected(clipboardFiles);
+      return;
+    }
     const items = Array.from(event.clipboardData.items)
       .filter((item) => item.kind === "file" && item.type.startsWith("image/"))
       .map((item) => item.getAsFile())
@@ -135,7 +163,7 @@ export function ComposerInput({
       if (event.clipboardData.getData("text/plain")) return;
       event.preventDefault();
       if (!navigator.clipboard?.read) {
-        setImageError("浏览器未提供截图，请重新复制截图或使用“添加图片”。");
+        setImageError("浏览器未提供截图，请重新复制截图或使用“上传文件”。");
         return;
       }
       const generation = imageGeneration.current;
@@ -157,14 +185,14 @@ export function ComposerInput({
         }
         if (generation !== imageGeneration.current) return;
         if (!images.length) {
-          setImageError("剪贴板中未找到图片，请重新复制截图或使用“添加图片”。");
+          setImageError("剪贴板中未找到图片，请重新复制截图或使用“上传文件”。");
           return;
         }
         await addImages(images);
       } catch {
         if (generation === imageGeneration.current)
           setImageError(
-            "无法读取截图，请允许浏览器读取剪贴板后重试，或使用“添加图片”。",
+            "无法读取截图，请允许浏览器读取剪贴板后重试，或使用“上传文件”。",
           );
       } finally {
         if (generation === imageGeneration.current)
@@ -260,7 +288,13 @@ export function ComposerInput({
         Math.min(168, window.innerHeight * 0.33);
       const lineHeight = Number.parseFloat(style.lineHeight);
       el.style.height =
-        Math.min(limit, Math.max(lineHeight, el.scrollHeight)) + "px";
+        Math.min(
+          limit,
+          Math.max(
+            Number.parseFloat(style.minHeight) || lineHeight,
+            el.scrollHeight,
+          ),
+        ) + "px";
       el.style.overflowY = el.scrollHeight > limit ? "auto" : "hidden";
     };
     resize();
@@ -399,9 +433,11 @@ export function ComposerInput({
     return true;
   }
   function submit() {
-    if (submitDisabled || readingImages) return;
-    if (disabled || (!value.trim() && !images.length) || stale) return;
-    const cmd = !literal && !images.length && slashInput(value);
+    if (submitDisabled || readingImages || filesPending) return;
+    if (disabled || (!value.trim() && !images.length && !files.length) || stale)
+      return;
+    const cmd =
+      !literal && !images.length && !files.length && slashInput(value);
     if (cmd) {
       const c = catalog?.commands?.find((c) => c.name === cmd.name);
       if (c) {
@@ -450,19 +486,19 @@ export function ComposerInput({
     setManual(null);
     setDismissed(true);
   }
-  const stopMode = active && !!onStop && !value.trim() && !images.length;
+  const stopMode =
+    active && !!onStop && !value.trim() && !images.length && !files.length;
   return (
     <div className="composer-shell">
       <input
         ref={imagePicker}
         type="file"
-        accept={IMAGE_TYPES.join(",")}
         multiple
         hidden
         onChange={(event) => {
           const files = Array.from(event.currentTarget.files || []);
           event.currentTarget.value = "";
-          void addImages(files);
+          addSelected(files);
         }}
       />
       {previewImage && (
@@ -509,13 +545,39 @@ export function ComposerInput({
         </details>
       )}
       <div
-        className="composer-input"
+        className={`composer-input${dragging ? " is-dragging" : ""}`}
+        onDragOver={(event) => {
+          if (!event.dataTransfer.types.includes("Files")) return;
+          event.preventDefault();
+          event.dataTransfer.dropEffect = disabled ? "none" : "copy";
+          if (!disabled) setDragging(true);
+        }}
+        onDragLeave={(event) => {
+          if (!event.currentTarget.contains(event.relatedTarget as Node | null))
+            setDragging(false);
+        }}
+        onDrop={(event) => {
+          if (!event.dataTransfer.types.includes("Files")) return;
+          event.preventDefault();
+          setDragging(false);
+          addSelected(Array.from(event.dataTransfer.files));
+        }}
         role="combobox"
         aria-label="上下文与命令选择"
         aria-expanded={!!mode}
         aria-haspopup="listbox"
         aria-controls={mode ? id : undefined}
       >
+        {dragging && (
+          <small className="composer-drop-hint">松开以上传文件</small>
+        )}
+        <FileAttachments
+          files={files}
+          scope={attachmentScope}
+          cwd={cwd}
+          tid={threadId}
+          disabled={disabled}
+        />
         {!!images.length && (
           <div className="composer-images" aria-label="待发送图片">
             {images.map((image, index) => (
@@ -593,44 +655,6 @@ export function ComposerInput({
             ))}
           </div>
         )}
-        <details className="composer-add">
-          <summary aria-label="添加上下文">
-            <img src="/figma/plus.svg" alt="" />
-          </summary>
-          <div>
-            <button
-              type="button"
-              disabled={disabled}
-              onClick={(event) => {
-                event.currentTarget.closest("details")?.removeAttribute("open");
-                imagePicker.current?.click();
-              }}
-            >
-              添加图片
-            </button>
-            {[
-              ["skills", "技能 $"],
-              ["apps", "应用 $"],
-              ["commands", "命令 /"],
-            ].map(([key, label]) => (
-              <button
-                type="button"
-                key={key}
-                onClick={(e) => {
-                  setManual(key as "skills" | "apps" | "commands");
-                  setSelected(0);
-                  e.currentTarget.closest("details")?.removeAttribute("open");
-                  input.current?.focus();
-                }}
-              >
-                {label}
-              </button>
-            ))}
-            <button type="button" onClick={() => setRefresh((n) => n + 1)}>
-              刷新目录
-            </button>
-          </div>
-        </details>
         <textarea
           ref={input}
           aria-label={label}
@@ -702,18 +726,94 @@ export function ComposerInput({
             }
           }}
         />
-        {modeControl}
-        {modelSelector && (
-          <div
-            className="composer-model-slot"
-            onFocus={() => {
-              setManual(null);
-              setDismissed(true);
-            }}
-          >
-            {modelSelector}
+        <div className="composer-toolbar">
+          <details className="composer-add">
+            <summary aria-label="添加上下文">
+              <img src="/figma/plus.svg" alt="" />
+            </summary>
+            <div>
+              <button
+                type="button"
+                disabled={disabled}
+                onClick={(event) => {
+                  event.currentTarget
+                    .closest("details")
+                    ?.removeAttribute("open");
+                  imagePicker.current?.click();
+                }}
+              >
+                上传文件
+              </button>
+              {[
+                ["skills", "技能 $"],
+                ["apps", "应用 $"],
+                ["commands", "命令 /"],
+              ].map(([key, label]) => (
+                <button
+                  type="button"
+                  key={key}
+                  onClick={(e) => {
+                    setManual(key as "skills" | "apps" | "commands");
+                    setSelected(0);
+                    e.currentTarget.closest("details")?.removeAttribute("open");
+                    input.current?.focus();
+                  }}
+                >
+                  {label}
+                </button>
+              ))}
+              <button type="button" onClick={() => setRefresh((n) => n + 1)}>
+                刷新目录
+              </button>
+            </div>
+          </details>
+          <div className="composer-toolbar-right">
+            {modeControl}
+            {modelSelector && (
+              <div
+                className="composer-model-slot"
+                onFocus={() => {
+                  setManual(null);
+                  setDismissed(true);
+                }}
+              >
+                {modelSelector}
+              </div>
+            )}
+            <div className="composer-actions">
+              <button
+                type="button"
+                className="primary composer-send"
+                data-action={stopMode ? "stop" : "send"}
+                aria-label={
+                  stopMode
+                    ? "停止当前轮次"
+                    : active
+                      ? "追加指令"
+                      : threadId
+                        ? "开始下一轮"
+                        : "派发任务"
+                }
+                disabled={
+                  stopMode
+                    ? disabled
+                    : disabled ||
+                      submitDisabled ||
+                      readingImages ||
+                      filesPending ||
+                      (!value.trim() && !images.length && !files.length) ||
+                      stale
+                }
+                onClick={stopMode ? onStop : submit}
+              >
+                <img
+                  src={stopMode ? "/figma/stop.svg" : "/figma/arrow.svg"}
+                  alt=""
+                />
+              </button>
+            </div>
           </div>
-        )}
+        </div>
         {stale && (
           <small role="alert">引用已失效或工作区已变化，请重新选择。</small>
         )}
@@ -734,37 +834,6 @@ export function ComposerInput({
             )}
           </div>
         )}
-        <div className="composer-actions">
-          <button
-            type="button"
-            className="primary composer-send"
-            data-action={stopMode ? "stop" : "send"}
-            aria-label={
-              stopMode
-                ? "停止当前轮次"
-                : active
-                  ? "追加指令"
-                  : threadId
-                    ? "开始下一轮"
-                    : "派发任务"
-            }
-            disabled={
-              stopMode
-                ? disabled
-                : disabled ||
-                  submitDisabled ||
-                  readingImages ||
-                  (!value.trim() && !images.length) ||
-                  stale
-            }
-            onClick={stopMode ? onStop : submit}
-          >
-            <img
-              src={stopMode ? "/figma/stop.svg" : "/figma/arrow.svg"}
-              alt=""
-            />
-          </button>
-        </div>
       </div>
     </div>
   );
