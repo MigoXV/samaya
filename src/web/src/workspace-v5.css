@@ -520,6 +520,9 @@
   grid-template-columns: minmax(0, 1fr) 32px;
   gap: 8px;
 }
+.agent-reply-body-only {
+  grid-template-columns: minmax(0, 1fr);
+}
 .agent-reply-body .markdown {
   min-width: 0;
 }
@@ -611,12 +614,6 @@
   padding: 0;
   min-height: 0;
 }
-.task-composer .composer-input textarea {
-  padding: 0;
-  min-height: 24px;
-  max-height: min(168px, 33dvh);
-  line-height: 24px;
-}
 .task-heading .global-pending,
 .task-heading .workspace-exceptions {
   display: inline-flex;
@@ -670,6 +667,10 @@
 .monitor-nav .lucide {
   flex: 0 0 16px;
   color: var(--text-secondary);
+}
+.nav-pending-count {
+  margin-left: auto;
+  font-size: 12px;
 }
 .monitor-nav button[aria-current="page"] .lucide {
   color: var(--text-primary);
@@ -863,12 +864,23 @@
   grid-template-columns: 272px minmax(0, 1fr);
 }
 .monitor-shell .monitor-nav {
-  padding: 24px 12px 16px;
-  gap: 12px;
+  padding: 16px 12px;
+  gap: 4px;
   border: 0;
 }
 .monitor-shell .monitor-brand {
-  padding: 0 12px 12px;
+  height: 48px;
+  flex-shrink: 0;
+  padding: 0 12px;
+}
+.monitor-shell .monitor-brand .nav-collapse {
+  min-height: 32px;
+  width: 32px;
+  padding: 0;
+  margin-left: auto;
+  text-align: center;
+  color: var(--text-secondary);
+  flex-shrink: 0;
 }
 .monitor-shell .monitor-nav button {
   min-height: 36px;
@@ -876,6 +888,7 @@
 }
 .monitor-shell .monitor-nav-items {
   gap: 4px;
+  margin-top: 16px;
 }
 .monitor-shell .monitor-nav button[aria-current="page"] {
   border-color: transparent;
@@ -891,11 +904,22 @@
 .task-is-open > .monitor-nav {
   display: flex;
 }
-.task-is-open.focus-mode {
+.monitor-shell.focus-mode {
   grid-template-columns: minmax(0, 1fr);
 }
-.task-is-open.focus-mode > .monitor-nav {
+.monitor-shell.focus-mode > .monitor-nav {
   display: none;
+}
+@media (min-width: 1100px) {
+  .monitor-shell:not(.focus-mode) .task-heading .task-sidebar-toggle {
+    display: none;
+  }
+  .monitor-shell.focus-mode:not(.task-is-open) .monitor-toolbar {
+    display: flex;
+  }
+  .monitor-shell.focus-mode .mobile-nav-button {
+    display: block;
+  }
 }
 @media (max-width: 1099px) {
   .mobile-nav-button {
@@ -923,31 +947,31 @@
 }
 
 /* Quiet scrollbars share the reading surface, including long output and drafts. */
-.task-detail :is(.detail-scroll, pre, textarea) {
+.task-detail :is(.detail-scroll, pre) {
   scrollbar-width: thin;
   scrollbar-color: color-mix(in srgb, var(--text-secondary) 45%, transparent)
     transparent;
 }
-.task-detail :is(.detail-scroll, pre, textarea):hover {
+.task-detail :is(.detail-scroll, pre):hover {
   scrollbar-color: color-mix(in srgb, var(--text-secondary) 65%, transparent)
     transparent;
 }
-.task-detail :is(.detail-scroll, pre, textarea)::-webkit-scrollbar {
+.task-detail :is(.detail-scroll, pre)::-webkit-scrollbar {
   width: 6px;
   height: 6px;
 }
-.task-detail :is(.detail-scroll, pre, textarea)::-webkit-scrollbar-track {
+.task-detail :is(.detail-scroll, pre)::-webkit-scrollbar-track {
   background: transparent;
 }
-.task-detail :is(.detail-scroll, pre, textarea)::-webkit-scrollbar-thumb {
+.task-detail :is(.detail-scroll, pre)::-webkit-scrollbar-thumb {
   border-radius: 6px;
   background: color-mix(in srgb, var(--text-secondary) 45%, transparent);
 }
-.task-detail :is(.detail-scroll, pre, textarea)::-webkit-scrollbar-thumb:hover {
+.task-detail :is(.detail-scroll, pre)::-webkit-scrollbar-thumb:hover {
   background: color-mix(in srgb, var(--text-secondary) 65%, transparent);
 }
 @media (forced-colors: active) {
-  .task-detail :is(.detail-scroll, pre, textarea) {
+  .task-detail :is(.detail-scroll, pre) {
     scrollbar-color: auto;
   }
 }
@@ -1189,5 +1213,41 @@
 @media (forced-colors: active) {
   .overview-workspace-scroll {
     scrollbar-color: auto;
+  }
+}
+
+/* Global actions and task navigation share one desktop header. */
+@media (min-width: 800px) {
+  .task-heading {
+    height: 48px;
+    min-height: 48px;
+    padding: 8px 24px 8px var(--reading-gutter);
+    gap: 12px;
+  }
+  .task-reading-heading,
+  .task-title-status {
+    display: contents;
+  }
+  .task-reading-heading h1 {
+    margin: 0;
+  }
+  .task-heading > button {
+    flex-shrink: 0;
+  }
+}
+@media (max-width: 799px) {
+  .task-heading {
+    height: auto;
+    min-height: 104px;
+    flex-wrap: wrap;
+  }
+  .task-reading-heading {
+    order: 1;
+    flex: 1 0 100%;
+    min-width: 0;
+    padding: 0 8px;
+  }
+  .task-heading > .task-reading-heading + button {
+    margin-left: auto;
   }
 }

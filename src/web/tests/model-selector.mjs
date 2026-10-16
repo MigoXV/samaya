@@ -187,10 +187,18 @@ try {
   ).toBe("rgba(0, 0, 0, 0)");
   const slider = page.getByRole("slider", { name: "推理强度" });
   await expect(slider).toHaveValue("0");
+  const rangeBox = await slider.boundingBox();
+  const trackBox = await page.locator(".reasoning-slider").boundingBox();
+  expect(rangeBox.height).toBe(24);
+  expect(
+    Math.abs(
+      rangeBox.y + rangeBox.height / 2 - trackBox.y - trackBox.height / 2,
+    ),
+  ).toBeLessThan(1);
   const panel = await page.locator(".reasoning-menu").boundingBox();
-  const composerBox = await page.locator(".composer-input").boundingBox();
+  const toolbarBox = await page.locator(".composer-toolbar").boundingBox();
   expect(panel.width).toBe(260);
-  expect(composerBox.y - panel.y - panel.height).toBe(8);
+  expect(toolbarBox.y - panel.y - panel.height).toBe(8);
   const assets = await page
     .locator(".model-selector img")
     .evaluateAll((nodes) =>
@@ -236,8 +244,10 @@ try {
   await page.keyboard.press("Escape");
 
   await expect(trigger).toContainText("Model A");
-  expect((await page.locator(".composer-input").boundingBox()).height).toBe(58);
-  expect((await input.boundingBox()).height).toBe(24);
+  expect((await page.locator(".composer-input").boundingBox()).height).toBe(
+    118,
+  );
+  expect((await input.boundingBox()).height).toBe(48);
   await input.fill("保留我的草稿");
   await openModels();
   await expect(
@@ -350,7 +360,9 @@ try {
     "auto",
   );
   await input.fill("");
-  expect((await page.locator(".composer-input").boundingBox()).height).toBe(58);
+  expect((await page.locator(".composer-input").boundingBox()).height).toBe(
+    118,
+  );
   await expect(
     page.getByRole("button", { name: "开始下一轮", exact: true }),
   ).toBeDisabled();
@@ -387,14 +399,12 @@ try {
       ),
     ).toBe(true);
     expect((await page.locator(".composer-input").boundingBox()).height).toBe(
-      width <= 360 ? 90 : 58,
+      110,
     );
     const modelBox = await trigger.boundingBox();
     const inputBox = await input.boundingBox();
     expect(inputBox.width).toBeGreaterThan(40);
-    if (width <= 360)
-      expect(inputBox.y + inputBox.height).toBeLessThanOrEqual(modelBox.y);
-    else expect(inputBox.x + inputBox.width).toBeLessThanOrEqual(modelBox.x);
+    expect(inputBox.y + inputBox.height).toBeLessThanOrEqual(modelBox.y);
     expect(modelBox.x + modelBox.width).toBeLessThanOrEqual(width);
 
     await openModels();

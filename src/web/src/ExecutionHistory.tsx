@@ -491,6 +491,30 @@ function TurnHistory({
       needsAuthor = false;
     }
   }
+  // One copy target per answer, bounded by user messages and this native turn.
+  const answerCopies = new Map<string, string>();
+  let answer: Item[] = [];
+  const finishAnswer = () => {
+    const last = answer.at(-1);
+    if (last)
+      answerCopies.set(
+        last.id,
+        answer
+          .map((item) => {
+            const fragment = live[item.id];
+            return fragment?.kind === "agentMessage"
+              ? fragment.text
+              : item.text || "";
+          })
+          .join("\n\n"),
+      );
+    answer = [];
+  };
+  for (const item of merged) {
+    if (item.type === "userMessage") finishAnswer();
+    else if (item.type === "agentMessage") answer.push(item);
+  }
+  finishAnswer();
   const renderItem = (item: Item) => {
     const fragment = live[item.id];
     const observed =
@@ -528,6 +552,7 @@ function TurnHistory({
         <ItemView
           item={observed}
           showAgentAuthor={authorIds.has(item.id)}
+          agentCopyText={answerCopies.get(item.id)}
           progress={
             fragment?.kind === "mcpToolCall" ? fragment.text : undefined
           }
@@ -603,7 +628,7 @@ function TurnHistory({
       )}
       {sections.map((section) =>
         section.tools ? (
-          <ToolSequence key={section.items[0].id} count={section.items.length}>
+          <ToolSequence key={section.items[0].id} items={section.items}>
             {section.items.map(renderItem)}
           </ToolSequence>
         ) : (

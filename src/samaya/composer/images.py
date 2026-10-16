@@ -8,7 +8,7 @@ MAX_IMAGE_BYTES = 5 * 1024 * 1024
 MAX_TOTAL_IMAGE_BYTES = 10 * 1024 * 1024
 
 
-def message_inputs(text: str, images: list) -> list[dict]:
+def message_inputs(text: str, images: list, *, allow_empty: bool = False) -> list[dict]:
     if not isinstance(text, str):
         raise ValueError("无效的消息文本")  # noqa: TRY004 - operation rejection
     if not isinstance(images, list) or len(images) > 5:
@@ -40,6 +40,6 @@ def message_inputs(text: str, images: list) -> list[dict]:
         if total > MAX_TOTAL_IMAGE_BYTES:
             raise ValueError("每条消息的图片总大小不能超过 10 MB")
         inputs.append({"type": "image", "url": url})
-    if not inputs:
+    if not inputs and not allow_empty:
         raise ValueError("消息不能为空")
     return inputs

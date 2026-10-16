@@ -172,7 +172,7 @@ const dimensions = await page
 expect(dimensions.length).toBeGreaterThan(0);
 for (const height of dimensions) expect(height).toBe(28);
 await page
-  .locator(".task-heading")
+  .locator(".monitor-nav")
   .getByRole("button", { name: "收起任务侧栏", exact: true })
   .click();
 await expect(page.locator(".monitor-nav")).toBeHidden();

@@ -24,7 +24,7 @@ app = typer.Typer(help="Samaya · Codex 网页工作台")
 @app.command()
 def serve(
     host: str = typer.Option("0.0.0.0", envvar="SAMAYA_HOST", help="监听地址"),
-    port: int = typer.Option(8000, envvar="SAMAYA_PORT", help="监听端口"),
+    port: int = typer.Option(8765, envvar="SAMAYA_PORT", help="监听端口"),
     ssl_certfile: Annotated[
         Path | None,
         typer.Option(

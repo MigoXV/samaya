@@ -64,6 +64,12 @@ await page.locator('.overview-task[data-task-id="demo-5"]').click();
 const sequences = page.locator(".tool-sequence");
 await expect(sequences).toHaveCount(2);
 await expect(sequences.first()).not.toHaveAttribute("open");
+await expect(sequences.first().locator(".tool-sequence-label")).toHaveText(
+  "已进行 3 次工具调用",
+);
+await expect(sequences.last().locator(".tool-sequence-label")).toHaveText(
+  "正在进行 1 次工具调用",
+);
 await expect(page.locator(".working-status")).toHaveAttribute(
   "title",
   "本轮持续时间",
@@ -129,6 +135,53 @@ for (const theme of ["vallum", "abyssus"]) {
       await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa"]).analyze()
     ).violations.map((v) => v.id),
   ).toEqual([]);
+}
+await page.evaluate(() =>
+  window.__emit(
+    "message",
+    {
+      method: "item/completed",
+      params: {
+        threadId: "demo-5",
+        turnId: "turn-5",
+        item: {
+          id: "mcp",
+          type: "mcpToolCall",
+          server: "figma",
+          tool: "get_metadata",
+          status: "completed",
+        },
+      },
+    },
+    2,
+  ),
+);
+await expect(sequences.last().locator(".tool-sequence-label")).toHaveText(
+  "完成 1 次工具调用",
+);
+for (const theme of ["vallum", "abyssus"]) {
+  await page.evaluate(
+    (value) => window.samayaTheme.setPreference(value),
+    theme,
+  );
+  const icons = await sequences
+    .last()
+    .locator(":scope > summary img")
+    .evaluateAll((nodes) =>
+      nodes
+        .filter((n) => n.getBoundingClientRect().width > 0)
+        .map((n) => ({
+          loaded: n.complete && n.naturalWidth === 12 && n.naturalHeight === 12,
+          width: n.getBoundingClientRect().width,
+          height: n.getBoundingClientRect().height,
+        })),
+    );
+  expect(icons).toHaveLength(2);
+  expect(
+    icons.every(
+      (icon) => icon.loaded && icon.width === 12 && icon.height === 12,
+    ),
+  ).toBe(true);
 }
 await page.getByRole("button", { name: "改动与产物", exact: true }).click();
 await expect(sequences).toHaveCount(0);

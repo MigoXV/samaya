@@ -417,6 +417,13 @@ export function ModelSelector({
               </div>
               {options.length > 0 && (
                 <div className="reasoning-slider">
+                  <div
+                    className="effort-progress"
+                    aria-hidden="true"
+                    style={{
+                      width: `calc(12px + ${(Math.max(0, index) / Math.max(1, options.length - 1)) * 100}% - ${(Math.max(0, index) / Math.max(1, options.length - 1)) * 24}px)`,
+                    }}
+                  />
                   <div className="effort-stops" aria-hidden="true">
                     {options.map((o) => (
                       <span

@@ -88,7 +88,7 @@ for (const theme of ["vallum", "abyssus"]) {
     for (const mode of ["work", "focus"]) {
       if (mode === "focus")
         await page
-          .locator(".task-heading")
+          .locator(".monitor-nav")
           .getByRole("button", { name: "收起任务侧栏", exact: true })
           .click();
       const box = await page.locator(".detail-scroll").boundingBox();
@@ -112,7 +112,7 @@ for (const theme of ["vallum", "abyssus"]) {
     .evaluate((el) => el.scrollTop);
   const sources = await page.evaluate(() => window.__sources.length);
   await page
-    .locator(".task-heading")
+    .locator(".monitor-nav")
     .getByRole("button", { name: "收起任务侧栏", exact: true })
     .click();
   await expect(page.locator(".detail-scroll")).toHaveAttribute(
@@ -169,7 +169,7 @@ for (const theme of ["vallum", "abyssus"]) {
   await page.locator(".detail-scroll").evaluate((el) => (el.scrollTop = 0));
   await page.screenshot({ path: `${out}/work-${theme}.png` });
   await page
-    .locator(".task-heading")
+    .locator(".monitor-nav")
     .getByRole("button", { name: "收起任务侧栏", exact: true })
     .click();
   await page.screenshot({ path: `${out}/focus-${theme}.png` });

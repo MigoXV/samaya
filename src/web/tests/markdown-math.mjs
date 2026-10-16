@@ -77,8 +77,13 @@ try {
     "href",
     "https://example.com",
   );
-  await reply.getByRole("button", { name: "复制这条回复" }).click();
-  expect(await page.evaluate(() => window.__copiedMath)).toBe(text);
+  await expect(reply.getByRole("button", { name: "复制本轮回复" })).toHaveCount(0);
+  const finalReply = page.locator('[data-item-id="math-error"]');
+  await finalReply.hover();
+  await finalReply.getByRole("button", { name: "复制本轮回复" }).click();
+  expect(await page.evaluate(() => window.__copiedMath)).toBe(
+    [text, items[2].text].join("\n\n"),
+  );
   const plan = page.locator('[data-item-id="math-plan"]');
   await plan.locator("summary").click();
   await expect(plan.locator(".katex")).toHaveCount(1);

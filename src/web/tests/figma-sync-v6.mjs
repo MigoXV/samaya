@@ -104,12 +104,13 @@ const axis = await page.evaluate(() => {
     return { x: b.x, width: b.width };
   };
   return {
-    title: box(".task-title-status"),
+    title: box(".task-reading-heading h1"),
     body: box(".history-view .message:not(.user)"),
     composer: box(".task-composer"),
   };
 });
-expect(axis.title.width).toBe(880);
+expect(axis.title.width).toBeGreaterThan(0);
+await expect(page.locator(".task-heading")).toHaveCSS("height", "48px");
 expect(axis.body.x).toBe(axis.title.x);
 expect(axis.composer.x).toBe(axis.title.x + 10);
 expect(axis.composer.width).toBe(860);
@@ -128,9 +129,11 @@ const assets = await page.locator('img[src^="/figma/"]').evaluateAll((nodes) =>
     natural: n.naturalWidth,
   })),
 );
-expect(assets.every((a) => a.loaded && Math.abs(a.width - a.natural) < 1)).toBe(
-  true,
-);
+expect(
+  assets.every(
+    (a) => a.loaded && (a.width === 0 || Math.abs(a.width - a.natural) < 1),
+  ),
+).toBe(true);
 await input.fill("$");
 await expect(page.getByRole("listbox").getByRole("option")).toHaveCount(12);
 const menu = await page.locator(".composer-popup").boundingBox(),

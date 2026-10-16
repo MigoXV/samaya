@@ -71,3 +71,11 @@
   object-fit: contain;
   border-radius: 8px;
 }
+.user-message-files {
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 8px;
+  max-width: min(544px, 88%);
+  margin: 12px 0 12px auto;
+}

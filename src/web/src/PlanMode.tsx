@@ -180,36 +180,23 @@ export function usePlanMode({
           !supported ||
           !settings?.editable
         }
-        title="切换默认/计划模式 · Shift+Tab（输入框内）"
+        title="切换默认/计划模式"
         onClick={() => void toggle()}
       >
         {current === "plan" ? "计划" : current === "default" ? "默认" : "模式"}
-        <span className="plan-shortcut">⇧Tab</span>
-        <span
-          className={
-            loading || saving ? "plan-indicator is-loading" : "plan-indicator"
-          }
-          aria-hidden="true"
-        >
-          <svg
-            width="12"
-            height="12"
-            viewBox={loading || saving ? "0 0 12 12" : "0 0 16 16"}
-            fill="none"
-          >
-            <path
-              d={
-                loading || saving
-                  ? "M10.5 6C10.5 6.89002 10.2361 7.76004 9.74161 8.50007C9.24715 9.24009 8.54434 9.81686 7.72208 10.1575C6.89981 10.4981 5.99501 10.5872 5.12209 10.4135C4.24918 10.2399 3.44736 9.81132 2.81802 9.18198C2.18868 8.55264 1.7601 7.75082 1.58647 6.87791C1.41283 6.00499 1.50195 5.10019 1.84254 4.27792C2.18314 3.45566 2.75991 2.75285 3.49993 2.25839C4.23996 1.76392 5.10998 1.5 6 1.5"
-                  : "M4 6L8 10L12 6"
-              }
-              stroke="currentColor"
-              strokeWidth="1.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </svg>
-        </span>
+        {(loading || saving) && (
+          <span className="plan-indicator is-loading" aria-hidden="true">
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+              <path
+                d="M10.5 6C10.5 6.89002 10.2361 7.76004 9.74161 8.50007C9.24715 9.24009 8.54434 9.81686 7.72208 10.1575C6.89981 10.4981 5.99501 10.5872 5.12209 10.4135C4.24918 10.2399 3.44736 9.81132 2.81802 9.18198C2.18868 8.55264 1.7601 7.75082 1.58647 6.87791C1.41283 6.00499 1.50195 5.10019 1.84254 4.27792C2.18314 3.45566 2.75991 2.75285 3.49993 2.25839C4.23996 1.76392 5.10998 1.5 6 1.5"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          </span>
+        )}
       </button>
       {error && (
         <div className="plan-mode-error" role="alert">
