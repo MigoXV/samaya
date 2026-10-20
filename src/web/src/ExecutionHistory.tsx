@@ -1,4 +1,6 @@
 import { Fragment, useCallback, useEffect, useRef, useState } from "react";
+import { useStatusEntries } from "./inline-status-store";
+import { InlineStatus } from "./InlineStatus";
 import { api } from "./api";
 import { ItemView } from "./components";
 import { ToolSequence } from "./ToolSequence";
@@ -15,11 +17,7 @@ type Summary = {
   notice?: string | null;
   observedAt?: number | null;
 };
-const historyCache = new Map<
-  string,
-  { turns: Turn[]; cursor: string | null; visible: number }
->();
-const itemCache = new Map<string, { items: Item[]; cursor: string | null }>();
+import { historyCache, itemCache } from "./prompt-history";
 function remember<T>(cache: Map<string, T>, key: string, value: T) {
   cache.set(key, value);
   if (cache.size > 24) cache.delete(cache.keys().next().value!);
@@ -213,17 +211,19 @@ export function ExecutionHistory({
           await (retrySource === "older" ? older() : refreshTurns());
         }}
       />
+      {tab === "work" && <InlineStatus tid={tid} turnId={null} />}
       {[...turns.slice(0, visible)].reverse().map((t) => (
-        <TurnHistory
-          key={t.id}
-          tid={tid}
-          turn={t}
-          tab={tab}
-          latest={t.id === turns[0]?.id}
-          onPaging={reportPage}
-          working={working && t.id === turnId}
-          startedAt={t.id === turnId ? turnStartedAt : undefined}
-        />
+        <Fragment key={t.id}>
+          <TurnHistory
+            tid={tid}
+            turn={t}
+            tab={tab}
+            latest={t.id === turns[0]?.id}
+            onPaging={reportPage}
+            working={working && t.id === turnId}
+            startedAt={t.id === turnId ? turnStartedAt : undefined}
+          />
+        </Fragment>
       ))}
       {historyNotice && <p role="status">{historyNotice}</p>}
       {!turns.length && !error && !historyNotice && (
@@ -515,6 +515,10 @@ function TurnHistory({
     else if (item.type === "agentMessage") answer.push(item);
   }
   finishAnswer();
+  const statusEntries = useStatusEntries(tid);
+  const statusAnchors = new Set(
+    statusEntries.filter((e) => e.turnId === turn.id).map((e) => e.itemId),
+  );
   const renderItem = (item: Item) => {
     const fragment = live[item.id];
     const observed =
@@ -566,11 +570,13 @@ function TurnHistory({
     if (item.type === "reasoning") continue;
     const tools =
       tab === "work" &&
+      item.source !== "userShell" &&
       !["userMessage", "agentMessage", "plan", "contextCompaction"].includes(
         item.type,
       );
     const last = sections.at(-1);
-    if (tools && last?.tools) last.items.push(item);
+    if (tools && last?.tools && !statusAnchors.has(last.items.at(-1)!.id))
+      last.items.push(item);
     else sections.push({ tools, items: [item] });
   }
   return (
@@ -587,9 +593,14 @@ function TurnHistory({
         )[turn.status] || turn.status}
         <span className="sr-only">轮次 {turn.id}</span>
       </div>
-      {tab === "work" && latest && loaded && !requirement && !cursor && (
-        <small>当前记录未包含用户要求。</small>
-      )}
+      {tab === "work" &&
+        latest &&
+        loaded &&
+        !requirement &&
+        !cursor &&
+        !merged.some((item) => item.source === "userShell") && (
+          <small>当前记录未包含用户要求。</small>
+        )}
       {!loaded && !error && (
         <p className="history-local-loading">正在载入对话…</p>
       )}
@@ -626,17 +637,29 @@ function TurnHistory({
           )}
         </>
       )}
-      {sections.map((section) =>
-        section.tools ? (
-          <ToolSequence key={section.items[0].id} items={section.items}>
-            {section.items.map(renderItem)}
-          </ToolSequence>
-        ) : (
-          <Fragment key={section.items[0].id}>
-            {section.items.map(renderItem)}
-          </Fragment>
-        ),
-      )}
+      {tab === "work" && <InlineStatus tid={tid} turnId={turn.id} />}
+      {sections.map((section) => (
+        <Fragment key={section.items[0].id}>
+          {section.tools ? (
+            <ToolSequence items={section.items}>
+              {section.items.map(renderItem)}
+            </ToolSequence>
+          ) : (
+            section.items.map(renderItem)
+          )}
+          {tab === "work" &&
+            section.items
+              .filter((item) => statusAnchors.has(item.id))
+              .map((item) => (
+                <InlineStatus
+                  key={item.id}
+                  tid={tid}
+                  turnId={turn.id}
+                  itemId={item.id}
+                />
+              ))}
+        </Fragment>
+      ))}
       {tab === "work" && latest && working && turn.status === "inProgress" && (
         <WorkingStatus
           tid={tid}

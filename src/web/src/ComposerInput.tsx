@@ -17,13 +17,19 @@ import { api } from "./api";
 import { fileScope, queueFiles, useFileDraft } from "./composer-files";
 import { FileAttachments } from "./FileAttachments";
 import { Modal } from "./components";
-import { hasReference, inputTrigger, slashInput } from "./composer-model";
+import {
+  hasReference,
+  inputTrigger,
+  slashInput,
+  shellInput,
+} from "./composer-model";
 import type {
   InputCatalog,
   InputReference,
   SlashCommand,
 } from "./composer-model";
 import "./composer.css";
+import { promptHistory } from "./prompt-history";
 
 type Candidate = {
   key: string;
@@ -87,9 +93,40 @@ export function ComposerInput({
     [literal, setLiteral] = useState(false);
   const input = useRef<HTMLTextAreaElement>(null),
     menu = useRef<HTMLDivElement>(null),
+    addMenu = useRef<HTMLDetailsElement>(null),
     imagePicker = useRef<HTMLInputElement>(null),
     id = useId();
+  const recall = useRef<{
+    scope: string;
+    entries: string[];
+    index: number;
+    draft: string;
+  } | null>(null);
   const identity = threadId || cwd;
+  useEffect(() => {
+    const closeOutside = (event: Event) => {
+      const element = addMenu.current;
+      if (element?.open && !element.contains(event.target as Node))
+        element.open = false;
+    };
+    const escape = (event: KeyboardEvent) => {
+      if (event.key !== "Escape" || !addMenu.current?.open) return;
+      event.preventDefault();
+      addMenu.current.open = false;
+      addMenu.current.querySelector("summary")?.focus();
+    };
+    document.addEventListener("pointerdown", closeOutside, true);
+    document.addEventListener("focusin", closeOutside);
+    document.addEventListener("keydown", escape);
+    return () => {
+      document.removeEventListener("pointerdown", closeOutside, true);
+      document.removeEventListener("focusin", closeOutside);
+      document.removeEventListener("keydown", escape);
+    };
+  }, []);
+  useEffect(() => {
+    if (addMenu.current) addMenu.current.open = false;
+  }, [identity]);
   const attachmentScope = fileScope(cwd, threadId);
   const [files] = useFileDraft(attachmentScope);
   const filesPending = files.some((file) => file.status !== "ready");
@@ -143,7 +180,7 @@ export function ComposerInput({
   async function pasteImages(event: ClipboardEvent<HTMLTextAreaElement>) {
     if (disabled) return;
     const clipboardFiles = Array.from(event.clipboardData.files);
-    if (clipboardFiles.some(file => !file.type.startsWith("image/"))) {
+    if (clipboardFiles.some((file) => !file.type.startsWith("image/"))) {
       event.preventDefault();
       addSelected(clipboardFiles);
       return;
@@ -312,7 +349,9 @@ export function ComposerInput({
       ?.scrollIntoView({ block: "nearest" });
   }, [selected]);
   const trigger =
-    dismissed || (images.length && value.trimStart().startsWith("/"))
+    shellInput(value) !== null ||
+    dismissed ||
+    (images.length && value.trimStart().startsWith("/"))
       ? null
       : inputTrigger(value, caret);
   const mode = manual ? (manual === "commands" ? "/" : "$") : trigger?.mode;
@@ -433,6 +472,7 @@ export function ComposerInput({
     return true;
   }
   function submit() {
+    recall.current = null;
     if (submitDisabled || readingImages || filesPending) return;
     if (disabled || (!value.trim() && !images.length && !files.length) || stale)
       return;
@@ -490,6 +530,11 @@ export function ComposerInput({
     active && !!onStop && !value.trim() && !images.length && !files.length;
   return (
     <div className="composer-shell">
+      {shellInput(value) !== null && (
+        <small className="muted" role="status">
+          Shell 命令 · 当前工作区直接执行
+        </small>
+      )}
       <input
         ref={imagePicker}
         type="file"
@@ -668,6 +713,7 @@ export function ComposerInput({
           rows={1}
           disabled={disabled}
           onChange={(e) => {
+            recall.current = null;
             change(e.target.value);
             setCaret(e.target.selectionStart);
           }}
@@ -690,6 +736,65 @@ export function ComposerInput({
               setDismissed(true);
               onToggleMode();
               return;
+            }
+            if (
+              !mode &&
+              !e.altKey &&
+              !e.ctrlKey &&
+              !e.metaKey &&
+              !e.shiftKey &&
+              ["ArrowUp", "ArrowDown"].includes(e.key)
+            ) {
+              const current = e.currentTarget;
+              let history =
+                recall.current?.scope === identity ? recall.current : null;
+              const atStart =
+                current.selectionStart === 0 && current.selectionEnd === 0;
+              const atEnd =
+                current.selectionStart === value.length &&
+                current.selectionEnd === value.length;
+              if (e.key === "ArrowUp" && (atStart || !value)) {
+                if (!history) {
+                  const entries = promptHistory(cwd, threadId);
+                  history = {
+                    scope: identity,
+                    entries,
+                    index: entries.length,
+                    draft: value,
+                  };
+                }
+                if (history.index > 0) {
+                  e.preventDefault();
+                  history.index--;
+                  recall.current = history;
+                  onChange(history.entries[history.index]);
+                  requestAnimationFrame(() =>
+                    input.current?.setSelectionRange(0, 0),
+                  );
+                  return;
+                }
+              } else if (
+                e.key === "ArrowDown" &&
+                history &&
+                (atEnd || atStart)
+              ) {
+                e.preventDefault();
+                history.index = Math.min(
+                  history.index + 1,
+                  history.entries.length,
+                );
+                onChange(
+                  history.index === history.entries.length
+                    ? history.draft
+                    : history.entries[history.index],
+                );
+                recall.current =
+                  history.index === history.entries.length ? null : history;
+                requestAnimationFrame(() =>
+                  input.current?.setSelectionRange(0, 0),
+                );
+                return;
+              }
             }
             if (mode && e.key === "Escape") {
               e.preventDefault();
@@ -727,7 +832,7 @@ export function ComposerInput({
           }}
         />
         <div className="composer-toolbar">
-          <details className="composer-add">
+          <details className="composer-add" ref={addMenu}>
             <summary aria-label="添加上下文">
               <img src="/figma/plus.svg" alt="" />
             </summary>
@@ -762,7 +867,14 @@ export function ComposerInput({
                   {label}
                 </button>
               ))}
-              <button type="button" onClick={() => setRefresh((n) => n + 1)}>
+              <button
+                type="button"
+                onClick={() => {
+                  if (addMenu.current) addMenu.current.open = false;
+                  setRefresh((n) => n + 1);
+                  input.current?.focus();
+                }}
+              >
                 刷新目录
               </button>
             </div>
@@ -788,11 +900,13 @@ export function ComposerInput({
                 aria-label={
                   stopMode
                     ? "停止当前轮次"
-                    : active
-                      ? "追加指令"
-                      : threadId
-                        ? "开始下一轮"
-                        : "派发任务"
+                    : shellInput(value) !== null
+                      ? "执行 Shell 命令"
+                      : active
+                        ? "追加指令"
+                        : threadId
+                          ? "开始下一轮"
+                          : "派发任务"
                 }
                 disabled={
                   stopMode

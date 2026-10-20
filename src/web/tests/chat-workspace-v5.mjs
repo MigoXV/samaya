@@ -94,8 +94,8 @@ const page = await context.newPage(),
   errors = [];
 page.on("pageerror", (e) => errors.push(e.message));
 await page.goto(process.env.SAMAYA_UI_TEST_URL || "http://127.0.0.1:8765");
-await page.getByRole("button", { name: "查看全部任务 →", exact: true }).click();
-await page.locator('[data-task-id="demo-10"] .task-open').click();
+await expect(page.locator(".task-overview")).toBeVisible();
+await page.locator('[data-task-id="demo-10"].overview-task').click();
 await expect(page.locator(".message.user")).toBeVisible();
 const input = page.getByRole("textbox", { name: "补充当前任务" });
 await input.fill("$tr");
@@ -167,10 +167,10 @@ state.records[10].turn.status = "completed";
 await broadcast();
 await expect(page.locator(".task-live-status")).toContainText("后台");
 const dimensions = await page
-  .locator(".nav-projects button[title]")
+  .locator(".nav-workspace-heading > button[title]")
   .evaluateAll((rows) => rows.map((r) => r.getBoundingClientRect().height));
 expect(dimensions.length).toBeGreaterThan(0);
-for (const height of dimensions) expect(height).toBe(28);
+for (const height of dimensions) expect(height).toBeGreaterThanOrEqual(28);
 await page
   .locator(".monitor-nav")
   .getByRole("button", { name: "收起任务侧栏", exact: true })

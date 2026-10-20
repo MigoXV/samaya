@@ -54,10 +54,8 @@ try {
   );
   const page = await context.newPage();
   await page.goto(process.env.SAMAYA_UI_TEST_URL || "http://127.0.0.1:8765");
-  await page
-    .getByRole("button", { name: "查看全部任务 →", exact: true })
-    .click();
-  await page.locator('[data-task-id="demo-5"] .task-open').click();
+  await expect(page.locator(".task-overview")).toBeVisible();
+  await page.locator('[data-task-id="demo-5"].overview-task').click();
   const replies = page.locator(".agent-reply");
   await expect(replies).toHaveCount(4);
   await expect(page.locator(".agent-reply-author")).toHaveCount(0);

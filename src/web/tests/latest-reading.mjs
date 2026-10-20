@@ -68,8 +68,8 @@ await context.route("**/api/threads/*/turns/*/items?*", async (route) => {
 });
 const page = await context.newPage();
 await page.goto(process.env.SAMAYA_UI_TEST_URL || "http://127.0.0.1:8765");
-await page.getByRole("button", { name: "查看全部任务 →", exact: true }).click();
-await page.locator('[data-task-id="demo-0"] .task-open').click();
+await expect(page.locator(".task-overview")).toBeVisible();
+await page.locator('[data-task-id="demo-0"].overview-task').click();
 await expect(page.locator('[data-item-id="latest-0"]')).toBeVisible();
 expect(earlyLatest).toBe(true);
 const reader = page.locator(".detail-scroll");
@@ -180,9 +180,9 @@ await page
   .getByRole("button", { name: "任务总览", exact: true })
   .click();
 await expect(
-  page.getByRole("button", { name: "返回工作区总览", exact: true }),
+  page.locator(".task-overview"),
 ).toBeVisible();
-await page.locator('[data-task-id="demo-0"] .task-open').click();
+await page.locator('[data-task-id="demo-0"].overview-task').click();
 await expect.poll(distance).toBeLessThan(2);
 await expect(page.locator('[data-turn-id="turn-old"]')).toHaveCount(0);
 console.log(

@@ -20,6 +20,7 @@ import {
 import type { Dispatch, ReactNode, SetStateAction } from "react";
 import { api, operation, pendingOperations, clearOperation } from "./api";
 import { DirectoryPicker, Modal, RequestForm } from "./components";
+import { printStatus } from "./inline-status-store";
 import { ExecutionHistory } from "./ExecutionHistory";
 import { GoalStatus } from "./GoalStatus";
 import { SearchPalette } from "./SearchPalette";
@@ -28,7 +29,6 @@ import { UsageView } from "./UsageView";
 import { ThemeSelect } from "./ThemeSelect";
 import { useMonitor } from "./useMonitor";
 import { TaskOverview } from "./TaskOverview";
-import { useRecentTasks } from "./useRecentTasks";
 import {
   clock,
   execution,
@@ -55,13 +55,16 @@ import {
 } from "./composer-files";
 import type { InputImage } from "./composer-images";
 import { CommandDialog } from "./CommandDialog";
-import { ModelSelector } from "./ModelSelector";
+import { WorkspaceNavigation } from "./WorkspaceNavigation";
+import { ModelSelector, type ModelSettings } from "./ModelSelector";
 import { usePlanMode } from "./PlanMode";
 import {
   NotificationSettings,
   useTaskNotifications,
 } from "./task-notifications";
 import type { InputReference, SlashCommand } from "./composer-model";
+import { shellInput } from "./composer-model";
+import { rememberPrompt } from "./prompt-history";
 import { rowOffsets, visibleRange } from "./rowGeometry";
 
 type View =
@@ -264,6 +267,7 @@ export function MonitorWorkbench({ logout }: { logout: () => void }) {
           ? "settings"
           : "overview",
   );
+  const [workspaceQuery, setWorkspaceQuery] = useState("");
   const [search, setSearch] = useState<string>(
       () => overviewPreferences().search || "",
     ),
@@ -282,14 +286,10 @@ export function MonitorWorkbench({ logout }: { logout: () => void }) {
     [focus, setFocus] = useState(false);
   const [taskTab, setTaskTab] = useState("work");
   const [readerVisit, setReaderVisit] = useState(0);
-  const [allTasks, setAllTasks] = useState(
-    () => !!overviewPreferences().allTasks,
-  );
   const savedOverview = useRef({
     search,
     project,
     filter,
-    allTasks,
     scroll: overviewPreferences().scroll || 0,
   });
   const [opened, setOpened] = useState<string[]>([]);
@@ -449,9 +449,6 @@ export function MonitorWorkbench({ logout }: { logout: () => void }) {
       ),
     [records],
   );
-  const [recentLimit, setRecentLimit] = useState(() =>
-    localStorage.getItem("samaya.recent.limit") === "10" ? 10 : 20,
-  );
   const projects = useMemo(
     () =>
       [...new Set([...records.values()].map((r) => r.thread.cwd))]
@@ -489,7 +486,7 @@ export function MonitorWorkbench({ logout }: { logout: () => void }) {
   }, [records, requests]);
   const waitingCount = [...requestsByRoot.keys()].length,
     unknownCount = unknownRoots.size;
-  const overviewMode = view === "overview" && !workMode && !allTasks;
+  const overviewMode = view === "overview" && !workMode;
   const matching = ordered.filter((r) => {
     const state = execution(r),
       pending =
@@ -497,6 +494,10 @@ export function MonitorWorkbench({ logout }: { logout: () => void }) {
         waitingUnknown(r, EMPTY);
     return (
       (!project || r.thread.cwd === project) &&
+      (!overviewMode ||
+        r.thread.cwd
+          .toLowerCase()
+          .includes(workspaceQuery.trim().toLowerCase())) &&
       (overviewMode ||
         !search ||
         `${threadTitle(r.thread)} ${r.thread.cwd} ${progress(r).text}`
@@ -527,24 +528,12 @@ export function MonitorWorkbench({ logout }: { logout: () => void }) {
             tick - r.confirmedAt * 1000 > 45000)))
     );
   });
-  const recent = useRecentTasks(
-    matching,
-    JSON.stringify([project, search, filter, recentLimit]),
-    recentLimit,
-    !!data?.initialized,
-  );
-  const filtered = (
-    view === "pinned"
-      ? matching.filter((r) => pins.includes(r.thread.id))
-      : allTasks || filter === "running"
-        ? matching
-        : recent.ids
-            .map((id) => records.get(id))
-            .filter((r): r is Observation => !!r)
-  ).sort(
-    (a, b) =>
-      Number(pins.includes(b.thread.id)) - Number(pins.includes(a.thread.id)),
-  );
+  const filtered = matching
+    .filter((r) => view !== "pinned" || pins.includes(r.thread.id))
+    .sort(
+      (a, b) =>
+        Number(pins.includes(b.thread.id)) - Number(pins.includes(a.thread.id)),
+    );
   const outside = requests.filter((p) =>
     view === "attention"
       ? !!project &&
@@ -640,7 +629,7 @@ export function MonitorWorkbench({ logout }: { logout: () => void }) {
   }, []);
   useEffect(() => {
     if (view === "overview")
-      savedOverview.current = { search, project, filter, scroll, allTasks };
+      savedOverview.current = { search, project, filter, scroll };
     sessionStorage.setItem(
       "samaya.monitor.view",
       JSON.stringify({
@@ -649,14 +638,14 @@ export function MonitorWorkbench({ logout }: { logout: () => void }) {
         overview: savedOverview.current,
       }),
     );
-  }, [view, search, project, filter, scroll, selected, allTasks]);
+  }, [view, search, project, filter, scroll, selected]);
   useEffect(() => {
     localStorage.setItem("samaya.pins", JSON.stringify(pins));
   }, [pins]);
   useLayoutEffect(() => {
     if (scrollRef.current)
       scrollRef.current.scrollTop = workMode ? sidebarScroll : scroll;
-  }, [view, data?.initialized, workMode, sidebarScroll, scroll, allTasks]);
+  }, [view, data?.initialized, workMode, sidebarScroll, scroll]);
   const open = useCallback(
     (id: string) => {
       setError("");
@@ -674,7 +663,7 @@ export function MonitorWorkbench({ logout }: { logout: () => void }) {
         setProject(saved.project);
         setFilter(saved.filter);
         setSearch(saved.search);
-        setAllTasks(saved.allTasks);
+
         setScroll(saved.scroll);
       }
       setView("overview");
@@ -717,10 +706,11 @@ export function MonitorWorkbench({ logout }: { logout: () => void }) {
     setNotice("");
     setFeedbackThread("");
     setView(v);
+    if (v === "pinned") setSelected("");
     if (v === "overview") {
       setSelected("");
       const saved = savedOverview.current;
-      setAllTasks(saved.allTasks);
+
       setProject(saved.project);
       setFilter(saved.filter);
       setSearch(saved.search);
@@ -742,7 +732,50 @@ export function MonitorWorkbench({ logout }: { logout: () => void }) {
             : "/",
     );
   };
+  const lastConversation = useRef("");
+  useEffect(() => {
+    if (selected && records.has(selected)) lastConversation.current = selected;
+  }, [selected, records]);
+  useEffect(() => {
+    const navigateWithArrows = (event: KeyboardEvent) => {
+      if (
+        event.defaultPrevented ||
+        event.isComposing ||
+        event.repeat ||
+        event.altKey ||
+        event.ctrlKey ||
+        event.metaKey ||
+        event.shiftKey
+      )
+        return;
+      const target = event.target instanceof Element ? event.target : null;
+      if (
+        target?.closest(
+          'input,textarea,select,button,summary,a,[contenteditable="true"],[role="slider"],[role="listbox"],[role="menu"],[role="tablist"]',
+        ) ||
+        document.querySelector("dialog[open]") ||
+        window.getSelection()?.toString()
+      )
+        return;
+      if (event.key === "ArrowLeft" && workMode && selected) {
+        event.preventDefault();
+        lastConversation.current = selected;
+        navigate("overview");
+      } else if (
+        event.key === "ArrowRight" &&
+        view === "overview" &&
+        !workMode &&
+        records.has(lastConversation.current)
+      ) {
+        event.preventDefault();
+        open(lastConversation.current);
+      }
+    };
+    document.addEventListener("keydown", navigateWithArrows);
+    return () => document.removeEventListener("keydown", navigateWithArrows);
+  });
   const [inFlightScopes, setInFlightScopes] = useState<string[]>([]);
+  const operationError = useRef("");
   async function run(
     action: string,
     body: Record<string, unknown>,
@@ -757,6 +790,7 @@ export function MonitorWorkbench({ logout }: { logout: () => void }) {
       setError("");
       setNotice("");
     }
+    operationError.current = "";
     try {
       const result = await operation(action, body);
       if (action === "interrupt")
@@ -792,6 +826,7 @@ export function MonitorWorkbench({ logout }: { logout: () => void }) {
       }
       return result;
     } catch (e) {
+      operationError.current = String(e);
       if (!options?.localFeedback) {
         setFeedbackThread(String(body.threadId || ""));
         setError(String(e));
@@ -836,7 +871,20 @@ export function MonitorWorkbench({ logout }: { logout: () => void }) {
   const feedbackForCurrentTask =
     !feedbackThread ||
     rootId(feedbackThread, records) === rootId(selected, records);
+  const [draftModel, setDraftModel] = useState<ModelSettings["current"] | null>(
+    null,
+  );
+  const [draftModelPending, setDraftModelPending] = useState(true);
+  const creating = useRef(false);
+  const [creatingNow, setCreatingNow] = useState(false);
+  const [draftScope, setDraftScope] = useState(cwd + "|" + draftWorkspace);
+  if (draftScope !== cwd + "|" + draftWorkspace) {
+    setDraftScope(cwd + "|" + draftWorkspace);
+    setDraftModel(null);
+    setDraftModelPending(true);
+  }
   async function create() {
+    if (creating.current || draftModelPending || !draftModel) return;
     if (
       (!goal.trim() && !newImages.length && !newFiles.length) ||
       newFiles.some((file) => file.status !== "ready") ||
@@ -848,79 +896,109 @@ export function MonitorWorkbench({ logout }: { logout: () => void }) {
       setError("请先点击“浏览目录”确认工作目录。");
       return;
     }
-    const created = await run("create", { cwd, name: newName });
-    if (!created) return;
-    const id = String(created.result?.threadId || "");
-    if (!id) return;
-    recent.include(id);
-    setImageDraft("thread:" + id, newImages);
-    setFileDraft("thread:" + id, newFiles);
-    sessionStorage.setItem("samaya.draft." + id, goal);
-    sessionStorage.setItem(
-      "samaya.references." + id,
-      JSON.stringify(newReferences),
-    );
-    const finish = () => {
-      open(id);
-      setDialog(null);
-      setView("overview");
-    };
-    if (created.result?.warning) {
-      finish();
-      setNotice(String(created.result.warning));
+    const shell = shellInput(goal);
+    if (
+      shell !== null &&
+      (!shell || newImages.length || newFiles.length || newReferences.length)
+    ) {
+      setError(
+        !shell ? "请在 ! 后输入命令" : "Shell 命令不能同时附带图片、文件或引用",
+      );
       return;
     }
-    if (draftWorkspace && draftMode === "plan") {
-      const configured = await run("command", {
-        threadId: id,
-        command: "plan",
-        args: { value: "plan" },
-        expectedTurnId: null,
+    creating.current = true;
+    setCreatingNow(true);
+    try {
+      const created = await run("create", {
+        cwd,
+        name: newName,
+        modelSettings: draftModel,
       });
-      if (
-        !configured ||
-        configured.result?.settingsPending ||
-        configured.result?.mode !== "plan"
-      ) {
-        finish();
-        setNotice(
-          "会话已创建，计划模式尚未确认；消息保留在草稿中，请先核对模式或回执。",
-        );
-        return;
-      }
-    }
-    const sent = await run("send", {
-      threadId: id,
-      text: goal,
-      references: newReferences,
-      images: newImages.map(({ url }) => ({ url })),
-      files: fileReferences(newFiles),
-      expectedCwd: cwd,
-      expectedTurnId: null,
-    });
-    if (!sent) {
+      if (!created) return;
+      const id = String(created.result?.threadId || "");
+      if (!id) return;
+      setImageDraft("thread:" + id, newImages);
+      setFileDraft("thread:" + id, newFiles);
       sessionStorage.setItem("samaya.draft." + id, goal);
       sessionStorage.setItem(
         "samaya.references." + id,
         JSON.stringify(newReferences),
       );
-      setNotice(
-        "任务已创建，但执行提交未确认。目标已保存为该任务的草稿；请核查回执，不要重新创建。",
-      );
-    } else {
-      setGoal("");
-      setNewReferences([]);
-      setNewImages([]);
-      setNewFiles([]);
-      setFileDraft("thread:" + id, []);
-      setImageDraft("thread:" + id, []);
-      setNewName("");
-      sessionStorage.setItem("samaya.draft." + id, "");
-      sessionStorage.setItem("samaya.references." + id, "[]");
-      if (draftWorkspace)
-        sessionStorage.removeItem("samaya.new-draft." + draftWorkspace);
+      const finish = () => {
+        if (draftWorkspace)
+          sessionStorage.removeItem("samaya.new-draft." + draftWorkspace);
+        setGoal("");
+        setNewReferences([]);
+        setNewImages([]);
+        setNewFiles([]);
+        const failure = operationError.current;
+        open(id);
+        if (failure) setError(failure);
+        setDialog(null);
+        setView("overview");
+      };
+      if (created.result?.warning) {
+        finish();
+        setNotice(String(created.result.warning));
+        return;
+      }
+      if (shell === null && draftWorkspace && draftMode === "plan") {
+        const configured = await run("command", {
+          threadId: id,
+          command: "plan",
+          args: { value: "plan" },
+          expectedTurnId: null,
+        });
+        if (
+          !configured ||
+          configured.result?.settingsPending ||
+          configured.result?.mode !== "plan"
+        ) {
+          finish();
+          setNotice(
+            "会话已创建，计划模式尚未确认；消息保留在草稿中，请先核对模式或回执。",
+          );
+          return;
+        }
+      }
+      const sent = await run(shell !== null ? "shell" : "send", {
+        command: shell,
+        threadId: id,
+        text: goal,
+        references: newReferences,
+        images: newImages.map(({ url }) => ({ url })),
+        files: fileReferences(newFiles),
+        expectedCwd: cwd,
+        expectedTurnId: null,
+      });
+      finish();
+      if (!sent) {
+        sessionStorage.setItem("samaya.draft." + id, goal);
+        sessionStorage.setItem(
+          "samaya.references." + id,
+          JSON.stringify(newReferences),
+        );
+        setNotice(
+          "任务已创建，但执行提交未确认。目标已保存为该任务的草稿；请核查回执，不要重新创建。",
+        );
+      } else {
+        rememberPrompt(cwd, goal);
+        setGoal("");
+        setNewReferences([]);
+        setNewImages([]);
+        setNewFiles([]);
+        setFileDraft("thread:" + id, []);
+        setImageDraft("thread:" + id, []);
+        setNewName("");
+        sessionStorage.setItem("samaya.draft." + id, "");
+        sessionStorage.setItem("samaya.references." + id, "[]");
+        if (draftWorkspace)
+          sessionStorage.removeItem("samaya.new-draft." + draftWorkspace);
+      }
+    } finally {
+      creating.current = false;
+      setCreatingNow(false);
     }
-    finish();
   }
   const startWorkspaceDraft = (path: string) => {
     let saved: { text?: string; references?: InputReference[]; mode?: string } =
@@ -980,7 +1058,7 @@ export function MonitorWorkbench({ logout }: { logout: () => void }) {
   const selectOverviewProject = (path: string) => {
     const currentFilter = savedOverview.current.filter;
     navigate("overview");
-    setAllTasks(false);
+
     setFilter(currentFilter);
     setProject(path);
     setScroll(0);
@@ -1083,23 +1161,16 @@ export function MonitorWorkbench({ logout }: { logout: () => void }) {
           count={waitingCount}
           unknown={unknownCount}
         />
-        <div className="nav-projects" aria-label="最近项目">
-          <span className="eyebrow">最近项目</span>
-          {recentProjects.map((p) => (
-            <button key={p} title={p} onClick={() => selectOverviewProject(p)}>
-              <span>{shortProject(p)}</span>
-              <small>{projectStatus(p)}</small>
-            </button>
-          ))}
-          <button
-            onClick={() => {
-              navigate("overview");
-              setProjectMenu(true);
-            }}
-          >
-            查看全部项目
-          </button>
-        </div>
+        <WorkspaceNavigation
+          requests={requests}
+          paths={[...projectVisits, ...projects]}
+          records={records}
+          selected={selected}
+          connected={!!connected}
+          open={open}
+          create={startWorkspaceDraft}
+          status={projectStatus}
+        />
         <div className="nav-bottom">
           {!workMode && receiptEntry}
           {!workMode && !dialog && !requestTask && (error || notice) && (
@@ -1168,7 +1239,7 @@ export function MonitorWorkbench({ logout }: { logout: () => void }) {
               className="exception-button"
               onClick={() => {
                 navigate("overview");
-                setAllTasks(true);
+
                 setFilter("failed");
                 setProject("");
                 setScroll(0);
@@ -1216,6 +1287,14 @@ export function MonitorWorkbench({ logout }: { logout: () => void }) {
           <TaskOverview
             controls={
               <OverviewScope
+                workspaceQuery={workspaceQuery}
+                setWorkspaceQuery={(value) => {
+                  setWorkspaceQuery(value);
+                  if (value.trim()) {
+                    setProject("");
+                    setFilter("all");
+                  }
+                }}
                 project={project}
                 projects={projects}
                 recent={recentProjects}
@@ -1242,10 +1321,6 @@ export function MonitorWorkbench({ logout }: { logout: () => void }) {
             summary={sidebarSummary}
             activityClass={activityClass}
             open={open}
-            all={() => {
-              setAllTasks(true);
-              setSearch("");
-            }}
           />
         )}
         {!overviewMode &&
@@ -1309,42 +1384,13 @@ export function MonitorWorkbench({ logout }: { logout: () => void }) {
                         </select>
                       </label>
                     )}
-                    {view === "overview" && !allTasks && (
-                      <label>
-                        <span className="sr-only">最近任务数量</span>
-                        <select
-                          aria-label="最近任务数量"
-                          value={recentLimit}
-                          onChange={(e) => {
-                            const n = Number(e.target.value);
-                            setRecentLimit(n);
-                            localStorage.setItem(
-                              "samaya.recent.limit",
-                              String(n),
-                            );
-                            setScroll(0);
-                          }}
-                        >
-                          <option value={20}>最近 20 个任务</option>
-                          <option value={10}>最近 10 个任务</option>
-                        </select>
-                      </label>
-                    )}
                     <div className="recent-scope">
-                      {view === "overview" && allTasks && (
-                        <button
-                          className="quiet"
-                          onClick={() => setAllTasks(false)}
-                        >
-                          返回工作区总览
-                        </button>
-                      )}
                       <span>
                         {view === "attention"
                           ? `${requests.length} 项未解决请求`
                           : view === "pinned"
                             ? `${filtered.length} 个置顶任务`
-                            : `${allTasks ? "全部" : "最近"} ${filtered.length} 个主任务`}
+                            : `${filtered.length} 个主任务`}
                       </span>
                       {outside > 0 && (
                         <button
@@ -1355,33 +1401,6 @@ export function MonitorWorkbench({ logout }: { logout: () => void }) {
                         >
                           范围外 {outside} 项请求 · 查看请求
                         </button>
-                      )}
-                      {view === "overview" &&
-                        filter !== "running" &&
-                        ordered.some(
-                          (r) =>
-                            !filtered.some(
-                              (f) => f.thread.id === r.thread.id,
-                            ) &&
-                            (execution(r) === "执行中" ||
-                              r.terminals.length ||
-                              childMap
-                                .get(r.thread.id)
-                                ?.some((c) => execution(c) === "执行中")),
-                        ) && (
-                          <button
-                            onClick={() => {
-                              setSearch("");
-                              setProject("");
-                              setAllTasks(true);
-                              setFilter("running");
-                            }}
-                          >
-                            查看全部活动任务
-                          </button>
-                        )}
-                      {view === "overview" && recent.changed && (
-                        <button onClick={recent.update}>更新最近任务</button>
                       )}
                     </div>
                   </div>
@@ -1668,7 +1687,7 @@ export function MonitorWorkbench({ logout }: { logout: () => void }) {
                       onClick={() => {
                         navigate("overview");
                         closeDetail();
-                        setAllTasks(true);
+
                         setFilter("issues");
                         setProject("");
                       }}
@@ -1705,7 +1724,20 @@ export function MonitorWorkbench({ logout }: { logout: () => void }) {
                       onImages={setNewImages}
                       mode={draftMode}
                       onMode={setDraftMode}
-                      disabled={!connected || !!busy}
+                      disabled={!connected || !!busy || creatingNow}
+                      modelSelector={
+                        <ModelSelector
+                          key={draftWorkspace}
+                          cwd={draftWorkspace}
+                          disabled={!connected || creatingNow}
+                          busy={!!busy}
+                          run={run}
+                          inspectReceipts={() => setDialog("receipts")}
+                          onDraftChange={setDraftModel}
+                          onPendingChange={setDraftModelPending}
+                        />
+                      }
+                      modelPending={draftModelPending}
                       submit={() => void create()}
                       tab={taskTab}
                       feedback={operationFeedback}
@@ -2096,7 +2128,11 @@ export function MonitorWorkbench({ logout }: { logout: () => void }) {
           recent={opened}
           close={() => setSearchOpen(false)}
           open={open}
-          project={selectOverviewProject}
+          project={(path) => {
+            selectOverviewProject(path);
+            setFilter("all");
+            setWorkspaceQuery("");
+          }}
           file={(id) => {
             open(id);
             setTaskTab("result");
@@ -2215,6 +2251,19 @@ export function MonitorWorkbench({ logout }: { logout: () => void }) {
             />
             <div className="task-composer">
               <ComposerInput
+                modelSelector={
+                  <ModelSelector
+                    key={cwd}
+                    cwd={confirmedCwd === cwd ? cwd : ""}
+                    disabled={!connected || creatingNow || confirmedCwd !== cwd}
+                    busy={!!busy}
+                    run={run}
+                    inspectReceipts={() => setDialog("receipts")}
+                    onDraftChange={setDraftModel}
+                    onPendingChange={setDraftModelPending}
+                  />
+                }
+                submitDisabled={draftModelPending || creatingNow}
                 label="工作要求"
                 value={goal}
                 onChange={setGoal}
@@ -2240,8 +2289,8 @@ export function MonitorWorkbench({ logout }: { logout: () => void }) {
                 />
               </label>
               <p>
-                模型沿用 Codex
-                默认配置。工作目录写入沙箱，审批按请求交由你处理。
+                新会话默认读取当前工作目录的 Codex
+                配置，可在输入框中调整。工作目录写入沙箱，审批按请求交由你处理。
               </p>
             </details>
           </form>
@@ -2463,6 +2512,7 @@ function TaskComposer({
     item: SlashCommand;
     args: string;
   } | null>(null);
+  const [modelPending, setModelPending] = useState(true);
   const [localError, setLocalError] = useState("");
   const [goalRefresh, setGoalRefresh] = useState(0);
   const active = record.turn?.status === "inProgress";
@@ -2486,8 +2536,20 @@ function TaskComposer({
   }, [id, draft, references]);
   const submit = async () => {
     if (files.some((file) => file.status !== "ready")) return;
+    const shell = shellInput(draft);
+    if (
+      shell !== null &&
+      (!shell || images.length || files.length || references.length)
+    ) {
+      setLocalError(
+        !shell ? "请在 ! 后输入命令" : "Shell 命令不能同时附带图片、文件或引用",
+      );
+      return;
+    }
+    setLocalError("");
     const submitted = draft;
-    const r = await run(active ? "steer" : "send", {
+    const r = await run(shell !== null ? "shell" : active ? "steer" : "send", {
+      command: shell,
       threadId: id,
       text: draft,
       references,
@@ -2497,6 +2559,7 @@ function TaskComposer({
       expectedTurnId: record.turn?.id || null,
     });
     if (r) {
+      rememberPrompt(record.thread.cwd, submitted);
       setFiles((current) => current.filter((file) => !files.includes(file)));
       setDraft((current) => (current === submitted ? "" : current));
       setReferences((current) =>
@@ -2509,6 +2572,11 @@ function TaskComposer({
   };
   function invoke(item: SlashCommand, args: string) {
     const name = item.alias || item.name;
+    if (name === "status") {
+      void printStatus(id, record.turn?.id || null);
+      if (draft.trim().startsWith("/status")) setDraft("");
+      return;
+    }
     if (name === "init") {
       setDraft(
         "检查当前项目，生成或完善根目录 AGENTS.md，保留已有有效约定。" +
@@ -2575,6 +2643,7 @@ function TaskComposer({
           <ModelSelector
             key={id}
             tid={id}
+            onPendingChange={setModelPending}
             model={record.thread.model}
             reasoningEffort={record.thread.reasoningEffort}
             serviceTier={record.thread.serviceTier}
@@ -2589,7 +2658,7 @@ function TaskComposer({
             inspectReceipts={inspectReceipts}
           />
         }
-        submitDisabled={mode.pending}
+        submitDisabled={mode.pending || modelPending}
         modeControl={mode.control}
         onToggleMode={() => void mode.toggle()}
         active={active}
@@ -2973,6 +3042,8 @@ function WorkspaceDraft({
   submit,
   tab,
   feedback,
+  modelSelector,
+  modelPending,
 }: {
   cwd: string;
   value: string;
@@ -2987,6 +3058,8 @@ function WorkspaceDraft({
   submit: () => void;
   tab: string;
   feedback: ReactNode;
+  modelSelector: ReactNode;
+  modelPending: boolean;
 }) {
   const [commandError, setCommandError] = useState("");
   const plan = usePlanMode({
@@ -3024,7 +3097,8 @@ function WorkspaceDraft({
             onImages={onImages}
             cwd={cwd}
             disabled={disabled}
-            submitDisabled={plan.pending}
+            modelSelector={modelSelector}
+            submitDisabled={plan.pending || modelPending}
             placeholder={`在 ${shortProject(cwd)} 中发送消息…`}
             modeControl={plan.control}
             onToggleMode={() => void plan.toggle()}

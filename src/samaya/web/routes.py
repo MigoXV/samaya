@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field
 from samaya.composer.commands import registry
 from samaya.composer.files import UploadTooLarge, save_upload
 from samaya.composer.images import MAX_TOTAL_IMAGE_BYTES
+from samaya.composer.models import draft_settings
 from samaya.config import Settings
 from samaya.runtime import Runtime
 
@@ -54,6 +55,10 @@ def register_routes(application: FastAPI, config: Settings) -> None:
     @application.get("/api/threads/{tid}/model-settings")
     async def model_settings(tid: str):
         return await service().commands.model_settings(tid, refresh=True)
+
+    @application.get("/api/model-settings")
+    async def workspace_model_settings(cwd: str):
+        return await draft_settings(service().connection, str(config.directory(cwd)))
 
     @application.get("/api/collaboration-modes")
     async def collaboration_modes():

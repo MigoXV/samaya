@@ -130,10 +130,8 @@ try {
   const errors = [];
   page.on("pageerror", (e) => errors.push(e.message));
   await page.goto(process.env.SAMAYA_UI_TEST_URL || "http://127.0.0.1:8765");
-  await page
-    .getByRole("button", { name: "查看全部任务 →", exact: true })
-    .click();
-  await page.locator('[data-task-id="demo-6"] .task-open').click();
+  await expect(page.locator(".task-overview")).toBeVisible();
+  await page.locator('[data-task-id="demo-6"].overview-task').click();
   const input = page.getByLabel("补充当前任务", { exact: true });
   const trigger = page.locator(".model-trigger");
   await expect(trigger.locator(".model-spinner")).toBeVisible();
@@ -433,6 +431,7 @@ try {
   expect(state.records.find((r) => r.thread.id === "demo-6").turn.status).toBe(
     "inProgress",
   );
+  await expect(trigger).toHaveAttribute("aria-busy", "false");
   pendingRead = true;
   failCatalog = true;
   await expect(page.locator(".fast-toggle").first()).toBeEnabled();

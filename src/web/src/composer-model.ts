@@ -58,3 +58,8 @@ export function slashInput(text: string) {
   const m = /^\s*\/([\w:-]+)(?:\s+([\s\S]*))?$/.exec(text);
   return m ? { name: m[1], args: m[2] || "" } : null;
 }
+
+/** A leading ! follows the native CLI shell shortcut. */
+export function shellInput(text: string): string | null {
+  return text.startsWith("!") ? text.slice(1).trim() : null;
+}

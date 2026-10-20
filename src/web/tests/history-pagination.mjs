@@ -31,10 +31,8 @@ async function setup(width = 1440) {
 }
 async function open(page) {
   await page.goto(url);
-  await page
-    .getByRole("button", { name: "查看全部任务 →", exact: true })
-    .click();
-  await page.locator('[data-task-id="demo-0"] .task-open').click();
+  await expect(page.locator(".task-overview")).toBeVisible();
+  await page.locator('[data-task-id="demo-0"].overview-task').click();
 }
 // Tool-only and empty pages must advance through the same turn before admitting older turns.
 {
@@ -248,7 +246,7 @@ async function open(page) {
   await open(page);
   await expect.poll(() => requested).toBe(true);
   await returnToOverview(page);
-  await page.locator('[data-task-id="demo-3"] .task-open').click();
+  await page.locator('[data-task-id="demo-3"].overview-task').click();
   release();
   await expect(page.locator('[data-turn-id="turn-3"]')).toHaveCount(1);
   await expect(page.locator('[data-item-id="late-other-task"]')).toHaveCount(0);

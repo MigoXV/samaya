@@ -111,10 +111,8 @@ try {
   await page.emulateMedia({ colorScheme: "dark" });
   await expect(root).toHaveAttribute("data-theme", "abyssus");
 
-  await page
-    .getByRole("button", { name: "查看全部任务 →", exact: true })
-    .click();
-  await page.locator('[data-task-id="demo-5"] .task-open').click();
+  await expect(page.locator(".task-overview")).toBeVisible();
+  await page.locator('[data-task-id="demo-5"].overview-task').click();
   const input = page.getByRole("textbox", {
     name: "补充当前任务",
     exact: true,
@@ -240,7 +238,7 @@ try {
     page.getByRole("button", { name: "放大查看图片 1", exact: true }),
   ).toBeFocused();
   await returnToOverview(page);
-  await page.locator('[data-task-id="demo-5"] .task-open').click();
+  await page.locator('[data-task-id="demo-5"].overview-task').click();
   await expect(thumbnails).toHaveCount(1);
   fail = true;
   await input.press("Enter");
@@ -425,7 +423,7 @@ try {
       .click();
 
   await returnToOverview(page);
-  await page.locator('[data-task-id="demo-6"] .task-open').click();
+  await page.locator('[data-task-id="demo-6"].overview-task').click();
   await pasteImage();
   await expect(thumbnails).toHaveCount(1);
   await input.press("Enter");
@@ -439,9 +437,7 @@ try {
   await expect(primary).toHaveAttribute("data-action", "stop");
 
   await returnToOverview(page);
-  await page
-    .getByRole("button", { name: "返回工作区总览", exact: true })
-    .click();
+  await expect(page.locator(".task-overview")).toBeVisible();
   const workspace = page.locator('[data-workspace="/demo/Laya"]');
   if (!(await workspace.locator(".workspace-create").isVisible()))
     await workspace.locator(".workspace-toggle").click();

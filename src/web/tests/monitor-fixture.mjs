@@ -269,8 +269,23 @@ export async function install(context, state) {
       };
     else if (p.endsWith("/model-settings"))
       body = {
-        models: [],
-        current: { model: null, reasoningEffort: null, serviceTier: "default" },
+        models: [
+          {
+            model: "fixture-model",
+            displayName: "Fixture model",
+            effortOptions: ["low", "medium", "high"].map((value) => ({
+              value,
+              label: value,
+            })),
+            defaultEffort: "medium",
+            serviceTiers: [{ id: "priority", name: "Fast" }],
+          },
+        ],
+        current: {
+          model: "fixture-model",
+          reasoningEffort: "medium",
+          serviceTier: "default",
+        },
         expectedTurnId: null,
         active: false,
         editable: true,
@@ -435,9 +450,41 @@ export async function returnToOverview(page) {
   const overview = page.getByRole("button", { name: "任务总览", exact: true });
   if (!(await overview.isVisible()))
     await page
-      .getByRole("button", { name: "展开任务侧栏", exact: true })
+      .getByRole("button", { name: /^(导航|展开任务侧栏)$/ })
       .click();
   await overview.click();
-  const all = page.getByRole("button", { name: "查看全部任务 →", exact: true });
-  if (await all.isVisible()) await all.click();
+}
+
+// Row-level monitoring still exists in pinned tasks; the old all-tasks page was removed.
+export async function openPinnedTasks(page) {
+  await page.addInitScript(() => {
+    const pins = sessionStorage.getItem("samaya.test.pins");
+    if (pins) localStorage.setItem("samaya.pins", pins);
+  });
+  await page.evaluate(async () => {
+    const snapshot = await (await fetch("/api/monitor")).json();
+    sessionStorage.setItem(
+      "samaya.test.pins",
+      JSON.stringify(
+        snapshot.records
+          .filter((r) => !r.thread.parentThreadId)
+          .map((r) => r.thread.id),
+      ),
+    );
+  });
+  await page.reload();
+  const button = page
+    .locator(".monitor-nav")
+    .getByRole("button", { name: "置顶任务", exact: true });
+  if (!(await button.isVisible()))
+    await page
+      .getByRole("button", { name: /^(导航|展开任务侧栏)$/ })
+      .click();
+  await button.click();
+}
+export async function returnToPinnedTasks(page) {
+  await returnToOverview(page);
+  const button = page.locator(".monitor-nav").getByRole("button", { name: "置顶任务", exact: true });
+  if (!(await button.isVisible())) await page.getByRole("button", { name: /^(导航|展开任务侧栏)$/ }).click();
+  await button.click();
 }

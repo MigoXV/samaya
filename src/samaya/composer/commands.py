@@ -1,8 +1,10 @@
 """Versioned command registry. No arbitrary RPC or shell supplied by the browser."""
 
 import asyncio
+import time
 
 from samaya.composer.catalog import InputCatalog
+from samaya.composer.models import model_options
 from samaya.sessions.models import active_turn
 
 # Native UI commands are handled by the existing workbench; the rest by this service.
@@ -133,23 +135,7 @@ class CommandService:
         configured = await self.queries.settings(tid, refresh=refresh)
         rows = await self.pages("model/list")
         current_model = configured.get("model") or thread.get("model")
-        models = [
-            {
-                "model": m["model"],
-                "displayName": m.get("displayName") or m["model"],
-                "isDefault": bool(m.get("isDefault")),
-                "effortOptions": choices(
-                    m.get("supportedReasoningEfforts") or [],
-                    "reasoningEffort",
-                    "description",
-                ),
-                "defaultEffort": m.get("defaultReasoningEffort"),
-                "serviceTiers": m.get("serviceTiers") or [],
-                "defaultServiceTier": m.get("defaultServiceTier"),
-            }
-            for m in rows
-            if not m.get("hidden") or m["model"] == current_model
-        ]
+        models = model_options(rows, current_model)
         selected = next((m for m in models if m["model"] == current_model), {})
         current = {
             "model": current_model,
@@ -304,9 +290,22 @@ class CommandService:
         elif command in ("status", "usage", "ps", "hooks", "plugins", "diff"):
             result["readOnly"] = True
             if command == "status":
+                settings = await self.queries.settings(tid, refresh=True)
+                try:
+                    limits = await rpc("account/rateLimits/read", {})
+                    limits_error = None
+                except Exception as exc:  # noqa: BLE001 - status remains useful without quota service
+                    limits, limits_error = None, str(exc)
                 result["data"] = {
-                    "thread": thread,
-                    "rateLimits": await rpc("account/rateLimits/read", {}),
+                    "threadId": tid,
+                    "cwd": cwd,
+                    "model": settings.get("model") or thread.get("model"),
+                    "reasoningEffort": settings.get("reasoningEffort"),
+                    "serviceTier": settings.get("serviceTier"),
+                    "tokenUsage": self.actions.store.token_usage(tid),
+                    "rateLimits": limits,
+                    "rateLimitsError": limits_error,
+                    "observedAt": time.time(),
                 }
             elif command == "usage":
                 result["data"] = await rpc("account/rateLimits/read", {})

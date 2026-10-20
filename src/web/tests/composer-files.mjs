@@ -87,10 +87,8 @@ try {
   const errors = [];
   page.on("pageerror", (e) => errors.push(e.message));
   await page.goto(process.env.SAMAYA_UI_TEST_URL || "http://127.0.0.1:8786");
-  await page
-    .getByRole("button", { name: "查看全部任务 →", exact: true })
-    .click();
-  await page.locator('[data-task-id="demo-6"] .task-open').click();
+  await expect(page.locator(".task-overview")).toBeVisible();
+  await page.locator('[data-task-id="demo-6"].overview-task').click();
   await expect(page.locator(".user-message-files")).toContainText(fileName);
   await expect(
     page.locator('[data-item-id="uploaded-user"]'),
@@ -102,6 +100,28 @@ try {
     name: "补充当前任务",
     exact: true,
   });
+  const addMenu = page.locator(".composer-add");
+  const addTrigger = addMenu.locator("summary");
+  await addTrigger.click();
+  await expect(addMenu).toHaveAttribute("open", "");
+  await input.click();
+  await expect(addMenu).not.toHaveAttribute("open");
+  await addTrigger.click();
+  await page.mouse.click(5, 5);
+  await expect(addMenu).not.toHaveAttribute("open");
+  await addTrigger.click();
+  await page.keyboard.press("Tab");
+  await expect(addMenu).toHaveAttribute("open", "");
+  await page.keyboard.press("Escape");
+  await expect(addMenu).not.toHaveAttribute("open");
+  await expect(addTrigger).toBeFocused();
+  await addTrigger.click();
+  await input.focus();
+  await expect(addMenu).not.toHaveAttribute("open");
+  await addTrigger.click();
+  await addMenu.getByRole("button", { name: "刷新目录" }).click();
+  await expect(addMenu).not.toHaveAttribute("open");
+  await expect(input).toBeFocused();
   const picker = page.locator('input[type="file"]');
   const cards = page.locator(".composer-files .composer-file");
   const send = page.locator(".composer-send");
@@ -136,10 +156,10 @@ try {
   await expect(cards.nth(1)).toHaveAttribute("data-status", "uploading");
   await expect(send).toBeDisabled();
   await returnToOverview(page);
-  await page.locator('[data-task-id="demo-5"] .task-open').click();
+  await page.locator('[data-task-id="demo-5"].overview-task').click();
   await expect(cards).toHaveCount(0);
   await returnToOverview(page);
-  await page.locator('[data-task-id="demo-6"] .task-open').click();
+  await page.locator('[data-task-id="demo-6"].overview-task').click();
   await expect(cards).toHaveCount(2);
   holdUpload = false;
   await expect.poll(() => typeof releaseUpload).toBe("function");
@@ -230,9 +250,7 @@ try {
     .click();
   await expect(cards).toHaveCount(0);
   await returnToOverview(page);
-  await page
-    .getByRole("button", { name: "返回工作区总览", exact: true })
-    .click();
+  await expect(page.locator(".task-overview")).toBeVisible();
   const group = page.locator('[data-workspace="/demo/Laya"]');
   if (!(await group.locator(".workspace-create").isVisible()))
     await group.locator(".workspace-toggle").click();

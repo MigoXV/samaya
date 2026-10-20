@@ -1,7 +1,8 @@
+import { openPinnedTasks } from "./monitor-fixture.mjs";
 import { chromium, expect } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
 import { mkdirSync, writeFileSync } from "node:fs";
-import { fixture, install, returnToOverview } from "./monitor-fixture.mjs";
+import { fixture, install, returnToPinnedTasks as returnToOverview } from "./monitor-fixture.mjs";
 const browser = await chromium.launch({ args: ["--no-sandbox"] });
 const context = await browser.newContext({
     viewport: { width: 1440, height: 900 },
@@ -14,7 +15,7 @@ page.on("pageerror", (e) => errors.push(e.message));
 const out = "../../.samaya/workflow-v3";
 mkdirSync(out, { recursive: true });
 await page.goto(process.env.SAMAYA_UI_TEST_URL || "http://127.0.0.1:5175");
-await page.getByRole("button", { name: "查看全部任务 →", exact: true }).click();
+await openPinnedTasks(page);
 await page.getByRole("list", { name: "任务列表" }).waitFor();
 await expect(page.locator(".task-row")).toHaveCount(16);
 await expect(
@@ -88,9 +89,7 @@ await returnToOverview(page);
 // Cross-tab resolution of the same request disables the old form.
 const other = await context.newPage();
 await other.goto(process.env.SAMAYA_UI_TEST_URL || "http://127.0.0.1:5175");
-await other
-  .getByRole("button", { name: "查看全部任务 →", exact: true })
-  .click();
+await openPinnedTasks(other);
 await other.getByRole("list", { name: "任务列表" }).waitFor();
 await page
   .locator('[data-task-id="demo-2"]')
@@ -137,10 +136,7 @@ for (const width of [390, 320]) {
 // Restore while keeping the current state: no submission may be replayed.
 const before = calls.length;
 await page.reload();
-await expect(
-  page.getByRole("button", { name: "返回工作区总览", exact: true }),
-).toBeVisible();
-await page.getByRole("list", { name: "任务列表" }).waitFor();
+await expect(page.locator(".task-overview")).toBeVisible();
 expect(calls.length).toBe(before);
 const result = {
   demo: true,

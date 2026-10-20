@@ -435,7 +435,9 @@ export function RequestForm({
 function CommandRecord({ item }: { item: Item }) {
   const key = "samaya.tool." + item.id;
   const [open, setOpen] = useState(
-    () => sessionStorage.getItem(key) === "open",
+    () =>
+      sessionStorage.getItem(key) === "open" ||
+      (item.source === "userShell" && sessionStorage.getItem(key) !== "closed"),
   );
   return (
     <details

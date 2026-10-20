@@ -22,10 +22,8 @@ try {
       catalogPaths.push(u.searchParams.get("cwd"));
   });
   await page.goto(process.env.SAMAYA_UI_TEST_URL || "https://127.0.0.1:8765");
-  await page
-    .getByRole("button", { name: "查看全部任务 →", exact: true })
-    .click();
-  await page.getByRole("button", { name: "新建任务", exact: true }).click();
+  await expect(page.locator(".task-overview")).toBeVisible();
+  await page.getByRole("button", { name: "＋ 新任务", exact: true }).click();
   const directory = page.getByLabel("服务器目录");
   await directory.fill("/missing");
   await page.getByRole("button", { name: "浏览目录", exact: true }).click();

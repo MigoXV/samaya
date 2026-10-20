@@ -64,14 +64,14 @@ await page.route("**/api/threads/*/turns/*/items*", (route) =>
   }),
 );
 await page.goto(process.env.SAMAYA_UI_TEST_URL || "http://127.0.0.1:5175");
-await page.getByRole("button", { name: "查看全部任务 →", exact: true }).click();
-expect(await page.locator(".task-row").count()).toBeGreaterThan(20);
+await expect(page.locator(".task-overview")).toBeVisible();
+expect(await page.locator(".overview-workspace").count()).toBe(3);
 for (const theme of ["vallum", "abyssus"]) {
   await page.evaluate(
     (value) => window.samayaTheme.setPreference(value),
     theme,
   );
-  await page.locator('[data-task-id="demo-0"] .task-open').click();
+  await page.locator('[data-task-id="demo-0"].overview-task').click();
   await page.locator(".message.user").waitFor();
   await expect(page.locator(".recent-requirement")).toHaveCount(0);
   await expect(page.locator(".command-record")).not.toHaveAttribute("open");
