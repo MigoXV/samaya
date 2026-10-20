@@ -48,8 +48,8 @@ await context.route("**/api/threads/*/turns/*/items*", (route) =>
 const page = await context.newPage();
 page.setDefaultTimeout(10000);
 await page.goto(process.env.SAMAYA_UI_TEST_URL || "http://127.0.0.1:8765");
-await page.getByRole("button", { name: "查看全部任务 →", exact: true }).click();
-await page.locator('[data-task-id="demo-0"] .task-open').click();
+await expect(page.locator(".task-overview")).toBeVisible();
+await page.locator('[data-task-id="demo-0"].overview-task').click();
 await expect(page.locator(".command-record")).toHaveCount(5);
 const sequence = page.locator(".tool-sequence");
 await expect(sequence).toHaveCount(1);

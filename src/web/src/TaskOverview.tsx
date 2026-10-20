@@ -8,6 +8,7 @@ import {
   waitingUnknown,
 } from "./monitor";
 import type { Observation } from "./monitor";
+import { workspaceActivity } from "./workspace-activity";
 import type { Pending } from "./types";
 
 function groupPreferences() {
@@ -26,7 +27,6 @@ export function TaskOverview({
   summary,
   activityClass,
   open,
-  all,
   controls,
   visibleIds,
   create,
@@ -39,12 +39,12 @@ export function TaskOverview({
   summary: (r: Observation) => string;
   activityClass: (r: Observation) => string;
   open: (id: string) => void;
-  all: () => void;
   controls: ReactNode;
   visibleIds: Set<string>;
   create: (cwd: string) => void;
   connected: boolean;
 }) {
+  const activity = workspaceActivity(records, connected, requests);
   const allRoots = [...records.values()].filter(
     (r) => !r.thread.parentThreadId || !records.has(r.thread.parentThreadId),
   );
@@ -139,14 +139,6 @@ export function TaskOverview({
       </span>
     </button>
   );
-  const footer = (
-    <footer>
-      <button className="quiet" onClick={all}>
-        查看全部任务 →
-      </button>
-      <small>完整任务与历史记录按需查看</small>
-    </footer>
-  );
   return (
     <section className="task-overview" aria-label="任务总览">
       <header>
@@ -156,7 +148,6 @@ export function TaskOverview({
       {!initialized ? (
         <>
           <p role="status">正在读取任务…</p>
-          {footer}
         </>
       ) : (
         <>
@@ -196,7 +187,7 @@ export function TaskOverview({
                 ).length;
                 return (
                   <section
-                    className="overview-workspace"
+                    className={`overview-workspace ${(activity.get(cwd)?.running.size || 0) > 0 ? "workspace-running" : ""}`}
                     key={cwd}
                     data-workspace={cwd}
                     aria-label={`${name} 工作区`}
@@ -236,6 +227,10 @@ export function TaskOverview({
                           </span>
                           <small className="workspace-metadata">
                             {tasks.length} 个任务
+                            {!!activity.get(cwd)?.running.size &&
+                              ` · 运行中 ${activity.get(cwd)!.running.size}`}
+                            {!!activity.get(cwd)?.uncertain.size &&
+                              " · 状态待确认"}
                             {pendingCount > 0 && ` · 待处理 ${pendingCount}`} ·
                             最近活动{" "}
                             {updatedAt
@@ -300,7 +295,6 @@ export function TaskOverview({
                   当前范围没有任务，可新建任务或调整筛选。
                 </p>
               )}
-              {footer}
             </div>
           </section>
         </>

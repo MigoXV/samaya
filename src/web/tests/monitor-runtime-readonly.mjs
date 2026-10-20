@@ -1,3 +1,4 @@
+import { openPinnedTasks } from "./monitor-fixture.mjs";
 import { chromium, expect } from "@playwright/test";
 import { writeFileSync } from "node:fs";
 const b = await chromium.launch({ args: ["--no-sandbox"] }),
@@ -9,7 +10,7 @@ p.on("request", (r) => {
 const errors = [];
 p.on("pageerror", (e) => errors.push(e.message));
 await p.goto(process.env.SAMAYA_RUNTIME_TEST_URL || "http://127.0.0.1:8772");
-await p.getByRole("button", { name: "查看全部任务 →", exact: true }).click();
+await openPinnedTasks(p);
 await p.getByRole("list", { name: "任务列表" }).waitFor();
 const data = await p.evaluate(() =>
   fetch("/api/monitor").then((r) => r.json()),

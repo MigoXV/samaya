@@ -20,8 +20,8 @@
     "test:composer": "node tests/chat-workspace-v5.mjs && node tests/composer-images.mjs && pnpm run test:files",
     "test:files": "node tests/composer-files.mjs",
     "test:figma": "node tests/figma-sync-v6.mjs && node tests/model-selector.mjs && node tests/decision-search.mjs && node tests/usage-settings.mjs",
-    "test:workspace-features": "node tests/workspace-features.mjs && node tests/notification-settings.mjs && node tests/home-workspace.mjs && node --test tests/notification-worker.test.mjs",
-    "test:scope": "node tests/overview-scope-v7.mjs && node tests/workspace-overview.mjs && node tests/overview-retention.mjs"
+    "test:workspace-features": "node tests/shell-commands.mjs && node tests/prompt-navigation.mjs && node tests/session-controls.mjs && node tests/workspace-features.mjs && node tests/notification-settings.mjs && node tests/home-workspace.mjs && node --test tests/notification-worker.test.mjs",
+    "test:scope": "node tests/workspace-search.mjs && node tests/overview-scope-v7.mjs && node tests/workspace-overview.mjs && node tests/overview-retention.mjs"
   },
   "dependencies": {
     "katex": "^0.16.47",

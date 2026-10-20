@@ -35,6 +35,9 @@ const effortLabels: Record<string, string> = {
 };
 export function ModelSelector({
   tid,
+  cwd,
+  onDraftChange,
+  onPendingChange,
   model,
   reasoningEffort,
   serviceTier,
@@ -43,7 +46,10 @@ export function ModelSelector({
   run,
   inspectReceipts,
 }: {
-  tid: string;
+  tid?: string;
+  cwd?: string;
+  onDraftChange?: (value: ModelSettings["current"]) => void;
+  onPendingChange?: (value: boolean) => void;
   model?: string | null;
   reasoningEffort?: string | null;
   serviceTier?: string | null;
@@ -74,15 +80,45 @@ export function ModelSelector({
   const draftEffort = useRef<string | null>(null);
   const sequence = useRef(0);
   const id = useId();
+  const readInFlight = useRef(false);
+  const confirmed = useRef<ModelSettings["current"] | null>(null);
+  const loadContext = useRef("");
+  const draftChoice = useRef<ModelSettings["current"] | null>(null);
+  const draftChanged = useRef(onDraftChange);
   useEffect(() => {
-    if (disabled) return;
+    draftChanged.current = onDraftChange;
+  }, [onDraftChange]);
+  useEffect(() => {
+    draftChoice.current = null;
+  }, [cwd]);
+  useEffect(() => {
+    const context = JSON.stringify([tid, cwd, disabled, open, retry]);
+    const known = confirmed.current;
+    const unchanged = context === loadContext.current;
+    loadContext.current = context;
+    if (disabled || (!tid && !cwd)) return;
+    // A settings receipt already confirms these values; avoid a second read
+    // disabling the slider between consecutive keyboard adjustments.
+    if (
+      tid &&
+      unchanged &&
+      !readInFlight.current &&
+      known &&
+      (!model || model === known.model) &&
+      (!reasoningEffort || reasoningEffort === known.reasoningEffort) &&
+      (!serviceTier || serviceTier === known.serviceTier)
+    )
+      return;
     const controller = new AbortController();
     const request = ++sequence.current;
     const load = async () => {
+      readInFlight.current = true;
       setLoading(true);
       try {
         const result = await api<ModelSettings>(
-          `/threads/${encodeURIComponent(tid)}/model-settings`,
+          tid
+            ? `/threads/${encodeURIComponent(tid)}/model-settings`
+            : `/model-settings?cwd=${encodeURIComponent(cwd!)}`,
           { signal: controller.signal },
         );
         if (
@@ -90,7 +126,10 @@ export function ModelSelector({
           request === sequence.current &&
           !pending.current
         ) {
+          if (!tid && draftChoice.current) result.current = draftChoice.current;
+          confirmed.current = result.current;
           setSettings(result);
+          if (!tid) draftChanged.current?.(result.current);
           setAwaitingSync(false);
           setError("");
           setPreview(null);
@@ -101,13 +140,15 @@ export function ModelSelector({
         if (!controller.signal.aborted && request === sequence.current)
           setError(String(e));
       } finally {
-        if (!controller.signal.aborted && request === sequence.current)
+        if (!controller.signal.aborted && request === sequence.current) {
+          readInFlight.current = false;
           setLoading(false);
+        }
       }
     };
     void load();
     return () => controller.abort();
-  }, [tid, model, reasoningEffort, serviceTier, disabled, open, retry]);
+  }, [tid, cwd, model, reasoningEffort, serviceTier, disabled, open, retry]);
   useEffect(() => {
     if (!open) return;
     const close = () => {
@@ -158,6 +199,11 @@ export function ModelSelector({
     !!error ||
     !settings ||
     !settings.editable;
+  useEffect(() => {
+    onPendingChange?.(
+      loading || saving || awaitingSync || !!error || !settings,
+    );
+  }, [loading, saving, awaitingSync, error, settings, onPendingChange]);
   const canToggleFast = !locked && !!fastTier;
   const updating = !disabled && (loading || saving);
   const fastReason = disabled
@@ -217,6 +263,24 @@ export function ModelSelector({
       setPreview(null);
       return;
     }
+    if (!tid) {
+      const next = { ...settings.current };
+      if (command === "model") {
+        const target = settings.models.find((m) => m.model === value)!;
+        next.model = value;
+        if (!target.effortOptions.some((o) => o.value === next.reasoningEffort))
+          next.reasoningEffort = target.defaultEffort;
+        if (!target.serviceTiers.some((t) => t.id === next.serviceTier))
+          next.serviceTier = "default";
+      } else if (command === "reasoning") next.reasoningEffort = value;
+      else next.serviceTier = value;
+      draftChoice.current = next;
+      setSettings({ ...settings, current: next });
+      draftChanged.current?.(next);
+      setPreview(null);
+      if (command === "model") focusReasoningView();
+      return;
+    }
     pending.current = true;
     ++sequence.current;
     setLoading(false);
@@ -234,7 +298,9 @@ export function ModelSelector({
       });
       if (!receipt) throw new Error("操作未确认，请查看操作回执。");
       if (receipt.result?.modelSettings) {
-        setSettings(receipt.result.modelSettings as ModelSettings);
+        const result = receipt.result.modelSettings as ModelSettings;
+        confirmed.current = result.current;
+        setSettings(result);
       } else {
         setAwaitingSync(true);
         setOpen(true);
@@ -253,6 +319,30 @@ export function ModelSelector({
       draftEffort.current = null;
     }
   }
+  useEffect(() => {
+    const scope = root.current?.closest(".task-composer");
+    if (!scope) return;
+    const keydown = (event: Event) => {
+      const e = event as KeyboardEvent;
+      if (
+        !e.altKey ||
+        e.ctrlKey ||
+        e.metaKey ||
+        e.shiftKey ||
+        e.isComposing ||
+        e.repeat ||
+        !["Comma", "Period"].includes(e.code)
+      )
+        return;
+      e.preventDefault();
+      if (locked || index < 0) return;
+      const next = index + (e.code === "Comma" ? -1 : 1);
+      if (next >= 0 && next < options.length)
+        void choose("reasoning", options[next].value);
+    };
+    scope.addEventListener("keydown", keydown);
+    return () => scope.removeEventListener("keydown", keydown);
+  });
   function commit() {
     const value = draftEffort.current;
     draftEffort.current = null;

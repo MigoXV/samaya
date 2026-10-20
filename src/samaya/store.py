@@ -33,6 +33,7 @@ class Store:
         CREATE TABLE IF NOT EXISTS operations(id TEXT PRIMARY KEY, fingerprint TEXT, state TEXT, result TEXT, created REAL);
         CREATE TABLE IF NOT EXISTS events(id INTEGER PRIMARY KEY AUTOINCREMENT, payload TEXT, created REAL);
         CREATE TABLE IF NOT EXISTS watched(id TEXT PRIMARY KEY);
+        CREATE TABLE IF NOT EXISTS token_usage(thread_id TEXT PRIMARY KEY, payload TEXT, observed REAL);
         """)
         self.db.execute("UPDATE operations SET state='uncertain' WHERE state='pending'")
         self.db.commit()
@@ -81,7 +82,20 @@ class Store:
             else None
         )
 
+    def token_usage(self, thread_id: str) -> dict | None:
+        row = self.db.execute(
+            "SELECT payload,observed FROM token_usage WHERE thread_id=?", (thread_id,)
+        ).fetchone()
+        return {"usage": json.loads(row[0]), "observedAt": row[1]} if row else None
+
     def event(self, payload: dict) -> int:
+        if payload.get("method") == "thread/tokenUsage/updated":
+            params = payload.get("params", {})
+            if params.get("threadId") and isinstance(params.get("tokenUsage"), dict):
+                self.db.execute(
+                    "INSERT OR REPLACE INTO token_usage VALUES(?,?,?)",
+                    (params["threadId"], json.dumps(params["tokenUsage"]), time.time()),
+                )
         cursor = self.db.execute(
             "INSERT INTO events(payload,created) VALUES(?,?)",
             (json.dumps(payload), time.time()),

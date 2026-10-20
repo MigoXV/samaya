@@ -1,5 +1,6 @@
+import { openPinnedTasks } from "./monitor-fixture.mjs";
 import { chromium, expect } from "@playwright/test";
-import { fixture, install, returnToOverview } from "./monitor-fixture.mjs";
+import { fixture, install, returnToPinnedTasks as returnToOverview } from "./monitor-fixture.mjs";
 import { writeFileSync, mkdirSync } from "node:fs";
 const browser = await chromium.launch({ args: ["--no-sandbox"] });
 const cases = [];
@@ -13,9 +14,7 @@ async function scenario(name, alter, check) {
   const controls = await install(context, state),
     page = await context.newPage();
   await page.goto(url);
-  await page
-    .getByRole("button", { name: "查看全部任务 →", exact: true })
-    .click();
+  await openPinnedTasks(page);
   await check(page, state, controls, context);
   cases.push(name);
   await context.unrouteAll({ behavior: "wait" });

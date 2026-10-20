@@ -1,6 +1,7 @@
 """Durable operation identities, per-thread serialization and HTTP-independent work."""
 
 import asyncio
+import logging
 from collections import defaultdict
 from collections.abc import Awaitable, Callable
 
@@ -9,6 +10,8 @@ from openai_codex.errors import JsonRpcError
 from samaya.composer.files import file_ids
 from samaya.composer.images import message_inputs
 from samaya.store import Store
+
+logger = logging.getLogger(__name__)
 
 
 class Operations:
@@ -31,6 +34,7 @@ class Operations:
     def validate_action(action: str, body: dict) -> None:
         required = {
             "command": ["threadId", "command"],
+            "shell": ["threadId", "command", "expectedCwd"],
             "create": ["cwd"],
             "send": ["threadId"],
             "steer": ["threadId", "expectedTurnId"],
@@ -47,6 +51,10 @@ class Operations:
         for field in required[action]:
             if not isinstance(body.get(field), str) or not body[field].strip():
                 raise ValueError(f"缺少有效参数：{field}")
+        if action == "shell" and any(
+            body.get(key) for key in ("images", "files", "references")
+        ):
+            raise ValueError("Shell 命令不能同时附带图片、文件或引用")
         if action == "respond" and not isinstance(body.get("response"), dict):
             raise ValueError("无效的输入响应")
         if action in ("send", "steer"):
@@ -81,6 +89,13 @@ class Operations:
             receipt = self.store.finish(
                 key, "failed" if definite else "uncertain", {"message": str(exc)[:1500]}
             )
+        logger.info(
+            "operation action=%s id=%s thread=%s state=%s",
+            action,
+            key,
+            body.get("threadId") or (receipt.get("result") or {}).get("threadId", "-"),
+            receipt["state"],
+        )
         await self.publish(
             {
                 "method": "samaya/operation",

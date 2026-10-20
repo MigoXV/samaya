@@ -1084,11 +1084,13 @@
   padding: 0 10px 0 2px;
 }
 .overview-workspace + .overview-workspace {
-  margin-top: 28px;
+  margin-top: 24px;
 }
 .overview-workspace > header {
   gap: 16px;
-  min-height: 48px;
+  min-height: 64px;
+  padding: 8px 12px;
+  border-radius: var(--av-radius-md);
 }
 .overview-workspace h3 {
   margin: 0;
@@ -1109,7 +1111,7 @@
   gap: 16px;
   padding: 0;
   border: 0;
-  border-radius: 0;
+  border-radius: var(--av-radius-md);
   background: transparent;
   text-align: left;
 }

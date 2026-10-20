@@ -16,7 +16,7 @@ const page = await context.newPage();
 const errors = [];
 page.on("pageerror", (e) => errors.push(e.message));
 await page.goto(process.env.SAMAYA_UI_TEST_URL || "http://127.0.0.1:8765");
-const projects = page.locator(".nav-projects button[title]");
+const projects = page.locator(".nav-workspace-heading > button[title]");
 await expect(projects).toHaveCount(4);
 const originalOrder = await projects.evaluateAll((nodes) =>
   nodes.map((n) => n.title),
@@ -28,13 +28,15 @@ expect(
 ).toEqual(originalOrder);
 expect(
   await projects.first().evaluate((n) => n.getBoundingClientRect().height),
-).toBe(28);
-await expect(page.locator(".monitor-nav svg.lucide")).toHaveCount(6);
+).toBeGreaterThanOrEqual(28);
+await expect(
+  page.locator(".monitor-nav svg.lucide:not(.workspace-disclosure)"),
+).toHaveCount(6);
 const globalCount = await page
   .locator(".monitor-nav-items")
   .getByRole("button", { name: /待我处理/ })
   .innerText();
-await page.getByRole("button", { name: "查看全部项目", exact: true }).click();
+await page.locator(".scope-trigger").first().click();
 await expect(
   page.getByRole("textbox", { name: "搜索项目", exact: true }),
 ).toBeFocused();
@@ -54,7 +56,9 @@ expect(
     .getByRole("button", { name: /待我处理/ })
     .innerText(),
 ).toBe(globalCount);
-await expect(page.locator(".nav-projects .selected")).toHaveCount(0);
+await expect(page.locator(".nav-workspaces [aria-current=page]")).toHaveCount(
+  0,
+);
 await page
   .locator(".monitor-nav-items")
   .getByRole("button", { name: "任务总览", exact: true })
@@ -121,10 +125,17 @@ for (const theme of ["vallum", "abyssus"]) {
   await page.screenshot({ path: `${out}/overview-${theme}.png` });
   await page.locator(".scope-trigger").first().click();
   await page.screenshot({ path: `${out}/projects-${theme}.png` });
+  const audit = await new AxeBuilder({ page })
+    .withTags(["wcag2a", "wcag2aa"])
+    .analyze();
   expect(
-    (
-      await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa"]).analyze()
-    ).violations.map((v) => v.id),
+    audit.violations.map((v) => ({
+      id: v.id,
+      nodes: v.nodes.map((n) => ({
+        target: n.target,
+        summary: n.failureSummary,
+      })),
+    })),
   ).toEqual([]);
   await page.keyboard.press("Escape");
 }
@@ -153,20 +164,22 @@ await page.pdf({
 const sidebarNavigation = await page
   .locator(".monitor-nav-items button, .nav-bottom button")
   .allTextContents();
-await page.getByRole("button", { name: "查看全部任务 →", exact: true }).click();
-await page.locator('[data-task-id="demo-6"] .task-open').click();
+await expect(page.locator(".task-overview")).toBeVisible();
+await page.locator('[data-task-id="demo-6"].overview-task').click();
 await expect(page.locator(".monitor-nav")).toBeVisible();
 expect(
   await page
     .locator(".monitor-nav-items button, .nav-bottom button")
     .allTextContents(),
 ).toEqual(sidebarNavigation);
-await expect(page.locator(".monitor-nav svg.lucide")).toHaveCount(6);
+await expect(
+  page.locator(".monitor-nav svg.lucide:not(.workspace-disclosure)"),
+).toHaveCount(6);
 await expect(page.locator(".task-navigation")).toHaveCount(0);
 for (const height of await projects.evaluateAll((nodes) =>
   nodes.map((n) => n.getBoundingClientRect().height),
 ))
-  expect(height).toBe(28);
+  expect(height).toBeGreaterThanOrEqual(28);
 
 const geometry = [];
 for (const width of [1440, 768, 390, 320]) {

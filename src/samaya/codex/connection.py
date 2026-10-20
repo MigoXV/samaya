@@ -6,6 +6,7 @@ import asyncio
 import logging
 import uuid
 from collections.abc import Awaitable, Callable
+from importlib.metadata import version
 
 from samaya.config import Settings
 
@@ -55,7 +56,7 @@ class Connection:
             "connection": self.state,
             "error": self.error,
             "generation": self.generation,
-            "sdkVersion": "0.160.0",
+            "sdkVersion": version("openai-codex"),
             "runtime": self.metadata,
             "socket": self.config.socket,
             "roots": [str(p) for p in self.config.roots],

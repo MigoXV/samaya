@@ -64,32 +64,16 @@ await expect(page.locator(".scope-trigger").nth(1)).toContainText("运行中");
 await samaya.locator(".overview-task").first().click();
 await nav("任务总览").click();
 await expect(page.locator(".scope-trigger").nth(1)).toContainText("运行中");
-await page.getByRole("button", { name: "查看全部任务 →", exact: true }).click();
-await page
-  .getByRole("searchbox", { name: "搜索任务与进展", exact: true })
-  .fill("验证");
-await nav("设置与连接").click();
-await nav("任务总览").click();
-await expect(page.locator(".task-overview")).toHaveCount(0);
 await expect(
-  page.getByRole("searchbox", { name: "搜索任务与进展", exact: true }),
-).toHaveValue("验证");
-await expect(page.getByRole("combobox", { name: "执行情况筛选" })).toHaveValue(
-  "running",
-);
+  page.getByRole("button", { name: "查看全部任务 →", exact: true }),
+).toHaveCount(0);
 await page.reload();
-await expect(
-  page.getByRole("searchbox", { name: "搜索任务与进展", exact: true }),
-).toHaveValue("验证");
-await expect(page.getByRole("combobox", { name: "执行情况筛选" })).toHaveValue(
-  "running",
-);
-expect(calls).toHaveLength(0);
-await page.getByRole("button", { name: "返回工作区总览", exact: true }).click();
+await expect(page.locator(".task-overview")).toBeVisible();
 await expect(page.locator(".scope-trigger").first()).toContainText("Samaya");
 await expect(page.locator(".scope-trigger").nth(1)).toContainText("运行中");
+expect(calls).toHaveLength(0);
 expect(errors).toEqual([]);
 await browser.close();
 console.log(
-  "Overview retention: filters, project, all tasks, search, workspace expansion/collapse, scroll, task navigation, live updates and reload passed.",
+  "Overview retention: filters, project, removed all-tasks view, workspace expansion/collapse, scroll, task navigation, live updates and reload passed.",
 );

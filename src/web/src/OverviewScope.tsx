@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { Search, ChevronDown } from "lucide-react";
 import { shortProject } from "./project-navigation";
 
 const overviewStates = [
@@ -10,6 +11,8 @@ const overviewStates = [
 ] as const;
 
 export function OverviewScope({
+  workspaceQuery,
+  setWorkspaceQuery,
   project,
   projects,
   recent,
@@ -22,6 +25,8 @@ export function OverviewScope({
   create,
   connected,
 }: {
+  workspaceQuery: string;
+  setWorkspaceQuery: (value: string) => void;
   project: string;
   projects: string[];
   recent: string[];
@@ -86,6 +91,16 @@ export function OverviewScope({
   );
   return (
     <div className="overview-scope" ref={ref}>
+      <label className="workspace-search">
+        <Search size={16} aria-hidden="true" />
+        <input
+          type="search"
+          aria-label="搜索工作区"
+          placeholder="搜索工作区名称或路径…"
+          value={workspaceQuery}
+          onChange={(event) => setWorkspaceQuery(event.target.value)}
+        />
+      </label>
       <div className="scope-control">
         <button
           className="quiet scope-trigger"
@@ -99,7 +114,7 @@ export function OverviewScope({
           }}
         >
           {project ? shortProject(project) : "所有项目"}{" "}
-          <span aria-hidden="true">⌄</span>
+          <ChevronDown size={14} aria-hidden="true" />
         </button>
         {openProjects && (
           <div
@@ -152,7 +167,7 @@ export function OverviewScope({
         >
           {overviewStates.find(([value]) => value === filter)?.[1] ||
             "全部状态"}{" "}
-          <span aria-hidden="true">⌄</span>
+          <ChevronDown size={14} aria-hidden="true" />
         </button>
         {openStatus && (
           <div

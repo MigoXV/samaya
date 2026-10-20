@@ -1,3 +1,4 @@
+import { openPinnedTasks } from "./monitor-fixture.mjs";
 import { chromium, expect } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
 import { fixture, install } from "./monitor-fixture.mjs";
@@ -100,9 +101,7 @@ try {
     expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
   }
   await page.screenshot({ path: `${out}/overview.png` });
-  await page
-    .getByRole("button", { name: "查看全部任务 →", exact: true })
-    .click();
+  await openPinnedTasks(page);
   const listRow = page.locator('.task-row[data-task-id="demo-0"]');
   await expect(listRow).toHaveClass(/task-attention-live/);
   expect((await listRow.evaluate(pseudo)).border).toBe("4px");

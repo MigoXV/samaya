@@ -110,3 +110,197 @@
   padding: 4px 6px;
   font-size: 13px;
 }
+
+/* Workspace identity stays visible while its conversations are collapsed. */
+.nav-workspaces {
+  scrollbar-gutter: stable;
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  flex: 1;
+  padding-top: 16px;
+}
+.nav-workspaces .eyebrow {
+  display: block;
+  padding: 6px 10px;
+}
+.nav-workspace-heading {
+  display: flex;
+  align-items: center;
+  border-radius: 6px;
+}
+.nav-workspace-heading > button:first-child {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  flex: 1;
+}
+.nav-workspace-heading .workspace-disclosure {
+  flex: 0 0 16px;
+  width: 16px;
+  height: 16px;
+  color: var(--text-secondary);
+}
+.nav-workspace-heading > button[aria-expanded="true"] .workspace-disclosure {
+  transform: rotate(90deg);
+}
+.nav-workspace-heading > button:first-child > span:nth-child(2) {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.nav-workspace-heading small {
+  margin-left: auto;
+  white-space: nowrap;
+  font-size: 11px;
+}
+.nav-workspace-heading .nav-workspace-create {
+  flex: 0 0 28px;
+  width: 28px;
+  padding: 4px;
+  justify-content: center;
+}
+.nav-workspace-threads {
+  padding: 0 0 6px 21px;
+}
+.nav-workspace-threads > button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  padding: 7px 9px;
+}
+.nav-conversation-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.nav-conversation-status {
+  flex-shrink: 0;
+  margin-left: auto;
+  color: var(--text-secondary);
+  font-size: 11px;
+}
+.monitor-nav .nav-workspace-threads > .conversation-running {
+  background: var(--selected);
+  color: var(--text-primary);
+  border-color: transparent;
+}
+.monitor-nav .nav-workspace-threads > .conversation-running:hover {
+  background: color-mix(in srgb, var(--selected) 80%, var(--hover));
+}
+.nav-workspace-threads > small {
+  padding: 8px;
+}
+.nav-workspace-threads > button[aria-current="page"] {
+  background: var(--selected);
+  color: var(--text-primary);
+}
+.workspace-running > header,
+.workspace-running > .nav-workspace-heading {
+  background: var(--selected);
+}
+.nav-workspace-heading {
+  transition: background var(--av-transition);
+}
+.nav-workspace-heading:hover {
+  background: var(--hover);
+}
+.workspace-running > .nav-workspace-heading:hover {
+  background: color-mix(in srgb, var(--selected) 80%, var(--hover));
+}
+.monitor-shell .nav-workspaces button:hover {
+  border-color: transparent;
+}
+.monitor-shell .nav-workspace-heading > button:hover {
+  background: transparent;
+}
+.inline-status {
+  margin: 18px 0;
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-subtle);
+  color: var(--text-secondary);
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+.inline-status header {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+}
+.inline-status p {
+  margin: 7px 0;
+  line-height: 1.6;
+}
+.inline-status small {
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+.workspace-running > header :is(small, button, .workspace-create-label),
+.workspace-running > .nav-workspace-heading small {
+  color: var(--text-primary);
+}
+
+.overview-scope .workspace-search {
+  display: flex;
+  flex-direction: row;
+  margin: 0;
+  align-items: center;
+  gap: 8px;
+  flex: 1 1 240px;
+  min-width: 180px;
+  max-width: 360px;
+  height: 40px;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--text-secondary);
+}
+.overview-scope .workspace-search:focus-within {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+.overview-scope .workspace-search input {
+  width: 100%;
+  min-width: 0;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  outline: none;
+  box-shadow: none;
+  background: transparent;
+}
+.overview-scope .scope-trigger {
+  height: 40px;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  font-size: 14px;
+}
+.overview-scope .scope-trigger:hover {
+  background: var(--hover);
+}
+.overview-scope .scope-trigger svg {
+  flex-shrink: 0;
+}
+@media (max-width: 700px) {
+  .overview-scope {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .overview-scope .workspace-search {
+    flex-basis: 100%;
+    max-width: none;
+  }
+}

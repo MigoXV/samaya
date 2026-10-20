@@ -1,6 +1,7 @@
+import { openPinnedTasks } from "./monitor-fixture.mjs";
 import { chromium } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
-import { fixture, install, returnToOverview } from "./monitor-fixture.mjs";
+import { fixture, install, returnToPinnedTasks as returnToOverview } from "./monitor-fixture.mjs";
 import { writeFileSync } from "node:fs";
 import assert from "node:assert/strict";
 const b = await chromium.launch({ args: ["--no-sandbox"] }),
@@ -8,7 +9,7 @@ const b = await chromium.launch({ args: ["--no-sandbox"] }),
 await install(c, fixture());
 const p = await c.newPage();
 await p.goto(process.env.SAMAYA_UI_TEST_URL || "http://127.0.0.1:5175");
-await p.getByRole("button", { name: "查看全部任务 →", exact: true }).click();
+await openPinnedTasks(p);
 await p.getByRole("list").waitFor();
 const results = [];
 for (const theme of ["vallum", "abyssus"]) {
@@ -44,8 +45,8 @@ for (const theme of ["vallum", "abyssus"]) {
         ".monitor-brand",
         ".task-live-status",
         ".task-reading-heading h1",
-        ".history-view .eyebrow",
-        ".history-view .tool summary",
+        ".history-view .turn-divider",
+        ".history-view .tool-sequence summary",
         ".message.user .prose",
         ".model-effort",
       ].map((sel) => {

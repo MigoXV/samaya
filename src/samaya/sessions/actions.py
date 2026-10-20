@@ -6,6 +6,7 @@ import logging
 from openai_codex.errors import CodexError
 
 from samaya.codex.connection import Connection
+from samaya.composer.models import draft_settings, validate_selection
 from samaya.config import Settings
 from samaya.store import Store
 
@@ -36,6 +37,16 @@ class SessionActions:
         tid = b.get("threadId", "")
         if action == "create":
             cwd = str(self.config.directory(b["cwd"]))
+            selection = {}
+            if b.get("modelSettings") is not None:
+                choice = validate_selection(
+                    await draft_settings(self.connection, cwd), b["modelSettings"]
+                )
+                selection = {
+                    "model": choice["model"],
+                    "serviceTier": choice["serviceTier"],
+                    "config": {"model_reasoning_effort": choice["reasoningEffort"]},
+                }
             started = await self.connection.rpc(
                 "thread/start",
                 {
@@ -46,6 +57,7 @@ class SessionActions:
                     "historyMode": "paginated",
                     "threadSource": "user",
                     "ephemeral": False,
+                    **selection,
                 },
             )
             thread = started["thread"]
@@ -74,6 +86,20 @@ class SessionActions:
                     "warning": "会话已创建，但附加设置未全部确认。请先核查会话，不要重复创建。",
                 }
             return {"threadId": created_id}
+        if action == "shell":
+            await self.queries.join(tid)
+            thread = (await self.queries.read(tid, include_turns=False))["thread"]
+            cwd = str(self.config.directory(thread["cwd"]))
+            if cwd != b["expectedCwd"]:
+                raise ValueError("工作目录已变化，请刷新后再执行命令")
+            if thread.get("canAcceptDirectInput") is False:
+                raise ValueError("此子智能体不接受直接输入，请返回主会话")
+            self.store.watch(tid)
+            result = await self.connection.rpc(
+                "thread/shellCommand", {"threadId": tid, "command": b["command"]}
+            )
+            self.queries.fresh_threads.discard((self.connection.connection_id, tid))
+            return result
         if action == "send":
             await self.queries.join(tid)
             thread = await self.queries.idle(tid)

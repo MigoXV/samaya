@@ -93,9 +93,9 @@ await page.evaluate(
   (value) => window.samayaTheme.setPreference(value),
   "vallum",
 );
-await page.getByRole("button", { name: "查看全部任务 →", exact: true }).click();
+await expect(page.locator(".task-overview")).toBeVisible();
 await expect(page.locator('[data-task-id="demo-30"]')).toContainText("后台");
-await page.locator('[data-task-id="demo-6"] .task-open').click();
+await page.locator('[data-task-id="demo-6"].overview-task').click();
 await expect(page.locator(".message.user")).toBeVisible();
 await expect(page.locator(".task-live-status")).toContainText("后台运行 1");
 const axis = await page.evaluate(() => {

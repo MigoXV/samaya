@@ -20,10 +20,8 @@ try {
   const calls = await install(context, state);
   const page = await context.newPage();
   await page.goto(process.env.SAMAYA_UI_TEST_URL || "http://127.0.0.1:8765");
-  await page
-    .getByRole("button", { name: "查看全部任务 →", exact: true })
-    .click();
-  await page.locator('[data-task-id="demo-0"] .task-open').click();
+  await expect(page.locator(".task-overview")).toBeVisible();
+  await page.locator('[data-task-id="demo-0"].overview-task').click();
   const decision = page
     .locator(".inline-decision")
     .filter({ hasText: "希望采用哪种去重方案？" });

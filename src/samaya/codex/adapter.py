@@ -1,6 +1,6 @@
 """Version-pinned SDK compatibility boundary. No protocol requests in routes.
 
-0.160.0 lacks a public external-daemon transport, raw request API and async
+0.163.0 lacks a public external-daemon transport, raw request API and async
 approval hook on AsyncCodex. Only this module accesses its private client.
 """
 
