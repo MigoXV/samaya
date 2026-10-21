@@ -24,7 +24,9 @@ async def run(socket: str) -> None:
         sys.stdout.write(json.dumps(message, ensure_ascii=False) + "\n")
         sys.stdout.flush()
 
-    async with unix_connect(socket, max_size=32 * 1024 * 1024) as ws:
+    # The trusted local daemon can return large histories and inline images.
+    # A response-size cutoff disconnects every in-flight request on this bridge.
+    async with unix_connect(socket, max_size=None, max_queue=4) as ws:
 
         async def upstream() -> None:
             while line := await reader.readline():

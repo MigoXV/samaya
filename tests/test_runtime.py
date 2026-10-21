@@ -121,3 +121,22 @@ async def test_reconnect_preserves_observation_but_invalidates_old_decisions(
     assert runtime.connection.runner.done()
     assert all(task.done() for task in runtime.monitor.tasks)
     assert not runtime.operations.tasks
+
+
+async def test_transport_closed_is_service_unavailable_without_retry(tmp_path):
+    import pytest
+    from openai_codex.errors import TransportClosedError
+
+    from samaya.codex.connection import Connection
+
+    connection = Connection(
+        Settings(data_dir=tmp_path), AsyncMock(), AsyncMock(), lambda: None
+    )
+    connection.state = "connected"
+    adapter = SimpleNamespace(
+        request=AsyncMock(side_effect=TransportClosedError("private transport trace"))
+    )
+    connection.adapter = adapter
+    with pytest.raises(ConnectionError, match="Codex 连接已断开；请等待恢复"):
+        await connection.rpc("thread/fork", {"threadId": "test"})
+    adapter.request.assert_awaited_once_with("thread/fork", {"threadId": "test"})
