@@ -933,6 +933,16 @@ dialog::backdrop {
   color: var(--accent-strong);
   text-decoration: underline;
 }
+.file-link {
+  overflow-wrap: anywhere;
+}
+.file-download-notice {
+  display: block;
+  margin-top: 4px;
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 18px;
+}
 .markdown code {
   background: var(--surface-subtle);
   padding: 2px 4px;

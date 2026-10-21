@@ -351,7 +351,7 @@ export function ComposerInput({
   const trigger =
     shellInput(value) !== null ||
     dismissed ||
-    (images.length && value.trimStart().startsWith("/"))
+    (images.length && value.startsWith("/"))
       ? null
       : inputTrigger(value, caret);
   const mode = manual ? (manual === "commands" ? "/" : "$") : trigger?.mode;

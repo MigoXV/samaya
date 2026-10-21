@@ -555,6 +555,7 @@ function TurnHistory({
         )}
         <ItemView
           item={observed}
+          threadId={tid}
           showAgentAuthor={authorIds.has(item.id)}
           agentCopyText={answerCopies.get(item.id)}
           progress={

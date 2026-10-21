@@ -2,7 +2,11 @@ import { openPinnedTasks } from "./monitor-fixture.mjs";
 import { chromium, expect } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
 import { mkdirSync, writeFileSync } from "node:fs";
-import { fixture, install, returnToPinnedTasks as returnToOverview } from "./monitor-fixture.mjs";
+import {
+  fixture,
+  install,
+  returnToPinnedTasks as returnToOverview,
+} from "./monitor-fixture.mjs";
 const browser = await chromium.launch({ args: ["--no-sandbox"] });
 const context = await browser.newContext({
     viewport: { width: 1440, height: 900 },
@@ -56,10 +60,9 @@ await expect
   .poll(() => calls.filter((c) => c.action === "steer").length)
   .toBe(1);
 await page.getByRole("button", { name: "停止当前轮次", exact: true }).click();
-await page
-  .getByRole("dialog")
-  .getByRole("button", { name: "停止本轮", exact: true })
-  .click();
+await expect
+  .poll(() => calls.filter((c) => c.action === "interrupt").length)
+  .toBe(1);
 await expect(page.getByRole("dialog")).toHaveCount(0);
 await expect(
   page.getByRole("button", { name: "停止当前轮次", exact: true }),

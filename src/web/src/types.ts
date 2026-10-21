@@ -53,6 +53,9 @@ export type Pending = {
     cwd?: string;
     reason?: string;
     permissions?: Record<string, unknown>;
+    availableDecisions?: (string | Record<string, unknown>)[] | null;
+    networkApprovalContext?: Record<string, unknown> | null;
+    grantRoot?: string | null;
     questions?: {
       id: string;
       header: string;

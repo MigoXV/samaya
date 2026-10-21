@@ -105,3 +105,18 @@
 .decision-request {
   max-width: 560px;
 }
+
+.approval-options {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 8px;
+}
+.approval-options > div {
+  min-width: 0;
+  max-width: 100%;
+}
+.approval-options pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
