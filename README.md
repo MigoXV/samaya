@@ -154,6 +154,8 @@ tests/                 不调用真实模型的风险测试
 scripts/               明确运行才调用真实 Codex 的验收脚本
 ```
 
+连接桥接通过本机 Unix socket 接收常驻服务消息，允许超过 32 MiB 的历史和内联图片响应；接收队列限制为 4 帧，避免积压。传输中断统一返回 503，等待原有重连流程恢复，不自动重放提交操作。
+
 业务服务共享同一个连接，`runtime.py` 只装配服务、分发事件和管理生命周期。HTTP 路由分别调用会话、监控和操作服务；状态投影不访问网络或数据库。内部依赖及重构验证见 [Python 包职责说明](docs/python-architecture.md)。
 
 固定 `openai-codex==0.163.0`，SDK 依赖的 CLI runtime 包也是 0.163.0；实际使用现有 daemon 0.163.0，**不是** SDK 默认启动的独立执行实例。SDK 公开 `launch_args_override` 启动 Samaya 桥接；桥接只负责传输，关闭它不会关闭 daemon。少量 SDK 高层缺口通过官方协议补齐，集中在集成模块；内部 `_client` 访问仅在 adapter.py，升级必须重新验证。

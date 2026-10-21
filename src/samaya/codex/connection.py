@@ -8,6 +8,8 @@ import uuid
 from collections.abc import Awaitable, Callable
 from importlib.metadata import version
 
+from openai_codex.errors import TransportClosedError
+
 from samaya.config import Settings
 
 from .adapter import Adapter
@@ -115,4 +117,7 @@ class Connection:
         return self.adapter
 
     async def rpc(self, method: str, params: dict | None = None) -> dict:
-        return await asyncio.wait_for(self.connected().request(method, params), 60)
+        try:
+            return await asyncio.wait_for(self.connected().request(method, params), 60)
+        except TransportClosedError as exc:
+            raise ConnectionError("Codex 连接已断开；请等待恢复") from exc

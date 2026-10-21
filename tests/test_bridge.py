@@ -71,3 +71,34 @@ async def test_sdk_bridge_never_auto_accepts_server_request(tmp_path, method, re
             assert responses == [{"id": 7, "result": result}]
         finally:
             await adapter.close()
+
+
+@pytest.mark.asyncio
+async def test_bridge_accepts_large_history_and_keeps_connection(tmp_path):
+    payload = "x" * (65 * 1024 * 1024)
+
+    async def daemon(ws):
+        try:
+            async for raw in ws:
+                message = json.loads(raw)
+                if "id" not in message:
+                    continue
+                result = (
+                    {"text": payload}
+                    if message.get("method") == "thread/read"
+                    else {"userAgent": "codex/0.160.0"}
+                )
+                await ws.send(json.dumps({"id": message["id"], "result": result}))
+        except ConnectionClosed:
+            pass
+
+    socket = str(tmp_path / "large.sock")
+    async with unix_serve(daemon, socket):
+        adapter = Adapter(socket)
+        try:
+            await adapter.start()
+            result = await asyncio.wait_for(adapter.request("thread/read", {}), 30)
+            assert result["text"] == payload
+            assert await adapter.request("ping", {}) == {"userAgent": "codex/0.160.0"}
+        finally:
+            await adapter.close()
