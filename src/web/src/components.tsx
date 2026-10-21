@@ -148,10 +148,12 @@ export function DirectoryPicker({
 }
 function AgentReply({
   item,
+  threadId,
   showAuthor,
   copyText,
 }: {
   item: Item;
+  threadId?: string;
   showAuthor: boolean;
   copyText?: string;
 }) {
@@ -167,7 +169,7 @@ function AgentReply({
       <div
         className={`agent-reply-body${copyText === undefined ? " agent-reply-body-only" : ""}`}
       >
-        <MarkdownContent text={item.text || ""} />
+        <MarkdownContent text={item.text || ""} threadId={threadId} />
         {copyText !== undefined && (
           <div className="response-actions">
             <button
@@ -203,11 +205,13 @@ function AgentReply({
 
 export function ItemView({
   item,
+  threadId,
   progress,
   showAgentAuthor = true,
   agentCopyText,
 }: {
   item: Item;
+  threadId?: string;
   progress?: string;
   showAgentAuthor?: boolean;
   agentCopyText?: string;
@@ -219,6 +223,7 @@ export function ItemView({
     return (
       <AgentReply
         item={item}
+        threadId={threadId}
         showAuthor={showAgentAuthor}
         copyText={agentCopyText}
       />
@@ -241,7 +246,7 @@ export function ItemView({
     return (
       <details className="tool">
         <summary>执行计划</summary>
-        <MarkdownContent text={item.text || ""} />
+        <MarkdownContent text={item.text || ""} threadId={threadId} />
       </details>
     );
   if (/collab|agent/i.test(item.type))
@@ -290,6 +295,22 @@ export function RequestForm({
     return <McpRequest request={request} busy={busy} respond={respond} />;
   const questions = request.params.questions;
   const permissions = request.method === "item/permissions/requestApproval";
+  const decisions = request.params.availableDecisions ?? ["accept", "decline"];
+  const decisionLabel = (decision: string | Record<string, unknown>) => {
+    if (typeof decision === "string")
+      return (
+        {
+          accept: "允许本次",
+          acceptForSession: "允许本会话",
+          decline: "拒绝",
+          cancel: "取消本次操作",
+        } as Record<string, string>
+      )[decision];
+    if ("acceptWithExecpolicyAmendment" in decision)
+      return "允许并记住此命令规则";
+    if ("applyNetworkPolicyAmendment" in decision) return "应用此网络授权规则";
+    return undefined;
+  };
   const supported =
     permissions ||
     [
@@ -315,6 +336,14 @@ export function RequestForm({
       {!questions && <h3>等待审批</h3>}
       {request.params.reason && <p>{request.params.reason}</p>}
       {request.params.command && <pre>{request.params.command}</pre>}
+      {request.params.networkApprovalContext && (
+        <pre>
+          {JSON.stringify(request.params.networkApprovalContext, null, 2)}
+        </pre>
+      )}
+      {request.params.grantRoot && (
+        <p>文件授权范围：{request.params.grantRoot}</p>
+      )}
       {request.params.cwd && <p className="muted">{request.params.cwd}</p>}
       {questions ? (
         <form
@@ -394,33 +423,57 @@ export function RequestForm({
               <pre>{JSON.stringify(request.params.permissions, null, 2)}</pre>
             </details>
           )}
-          <div className="actions">
-            <button
-              className="primary"
-              disabled={busy}
-              onClick={() =>
-                respond(
-                  permissions
-                    ? { permissions: request.params.permissions, scope: "turn" }
-                    : { decision: "accept" },
-                )
-              }
-            >
-              允许本次
-            </button>
-            <button
-              disabled={busy}
-              onClick={() =>
-                respond(
-                  permissions
-                    ? { permissions: {}, scope: "turn" }
-                    : { decision: "decline" },
-                )
-              }
-            >
-              拒绝
-            </button>
-          </div>
+          {permissions ? (
+            <div className="actions">
+              <button
+                className="primary"
+                disabled={busy}
+                onClick={() =>
+                  respond({
+                    permissions: request.params.permissions,
+                    scope: "turn",
+                  })
+                }
+              >
+                允许本次
+              </button>
+              <button
+                disabled={busy}
+                onClick={() => respond({ permissions: {}, scope: "turn" })}
+              >
+                拒绝
+              </button>
+            </div>
+          ) : (
+            <div className="approval-options">
+              {decisions.map((decision, index) => {
+                const label = decisionLabel(decision);
+                if (!label) return null;
+                return (
+                  <div key={index}>
+                    {typeof decision !== "string" && (
+                      <details>
+                        <summary>查看授权规则</summary>
+                        <pre>{JSON.stringify(decision, null, 2)}</pre>
+                      </details>
+                    )}
+                    <button
+                      className={decision === "accept" ? "primary" : undefined}
+                      disabled={busy}
+                      onClick={() => respond({ decision })}
+                    >
+                      {label}
+                    </button>
+                  </div>
+                );
+              })}
+              {!decisions.some(decisionLabel) && (
+                <p role="status">
+                  服务端没有提供当前可用的授权选项，请核对请求状态。
+                </p>
+              )}
+            </div>
+          )}
         </>
       ) : (
         <p>

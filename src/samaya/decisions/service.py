@@ -59,8 +59,15 @@ class Decisions:
             "item/commandExecution/requestApproval",
             "item/fileChange/requestApproval",
         ):
-            if result.get("decision") not in ("accept", "decline", "cancel"):
-                raise ValueError("不支持的审批决定")
+            offered = request["params"].get("availableDecisions")
+            allowed = (
+                offered
+                if isinstance(offered, list)
+                else ["accept", "decline", "cancel"]
+            )
+            if result.get("decision") not in allowed:
+                raise ValueError("该决定不在当前请求允许的授权选项中")
+            result = {"decision": result["decision"]}
         elif method == "item/tool/requestUserInput":
             questions = request["params"]["questions"]
             if any(q["id"] not in result.get("answers", {}) for q in questions):

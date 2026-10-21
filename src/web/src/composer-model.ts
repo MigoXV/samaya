@@ -36,7 +36,7 @@ export function inputTrigger(text: string, caret: number) {
     (left.split("\n").at(-1)!.match(/`/g) || []).length % 2
   )
     return null;
-  const slash = /^\s*\/([\w:-]*)$/.exec(left);
+  const slash = /^\/([\w:-]*)$/.exec(left);
   if (slash)
     return {
       mode: "/" as const,
@@ -55,7 +55,7 @@ export function inputTrigger(text: string, caret: number) {
     : null;
 }
 export function slashInput(text: string) {
-  const m = /^\s*\/([\w:-]+)(?:\s+([\s\S]*))?$/.exec(text);
+  const m = /^\/([\w:-]+)(?:\s+([\s\S]*))?$/.exec(text);
   return m ? { name: m[1], args: m[2] || "" } : null;
 }
 

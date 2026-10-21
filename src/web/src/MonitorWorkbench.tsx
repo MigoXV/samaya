@@ -344,7 +344,7 @@ export function MonitorWorkbench({ logout }: { logout: () => void }) {
     {},
   );
   const [dialog, setDialog] = useState<
-      "create" | "workspace" | "context" | "stop" | "receipts" | "agents" | null
+      "create" | "workspace" | "context" | "receipts" | "agents" | null
     >(null),
     [requestTask, setRequestTask] = useState<string | null>(null),
     [requestKey, setRequestKey] = useState<string | null>(null);
@@ -1890,51 +1890,44 @@ export function MonitorWorkbench({ logout }: { logout: () => void }) {
                           (
                             requestsByRoot.get(rootId(selected, records)) ||
                             EMPTY
-                          )
-                            .filter(
-                              (p) =>
-                                p.method === "item/tool/requestUserInput" &&
-                                p.params.questions?.length,
-                            )
-                            .map((p) => (
-                              <div key={p.key} className="inline-decision">
-                                {p.params.threadId !== selected && (
-                                  <p className="muted">
-                                    {records.has(p.params.threadId)
-                                      ? threadTitle(
-                                          records.get(p.params.threadId)!
-                                            .thread,
-                                        )
-                                      : "子任务"}
-                                  </p>
-                                )}
-                                {p.responseState && (
-                                  <p role="status">
-                                    {p.responseState === "uncertain"
-                                      ? "答复结果待确认；请核对回执。"
-                                      : "答复已发送；等待服务端确认。"}
-                                  </p>
-                                )}
-                                <RequestForm
-                                  request={p}
-                                  attentionActive={activityClass(
-                                    selectedRecord,
-                                  ).includes("task-attention-live")}
-                                  busy={
-                                    !connected ||
-                                    busy === p.key ||
-                                    !!p.responseState
-                                  }
-                                  respond={(response) =>
-                                    void run("respond", {
-                                      threadId: p.params.threadId,
-                                      requestKey: p.key,
-                                      response,
-                                    })
-                                  }
-                                />
-                              </div>
-                            ))}
+                          ).map((p) => (
+                            <div key={p.key} className="inline-decision">
+                              {p.params.threadId !== selected && (
+                                <p className="muted">
+                                  {records.has(p.params.threadId)
+                                    ? threadTitle(
+                                        records.get(p.params.threadId)!.thread,
+                                      )
+                                    : "子任务"}
+                                </p>
+                              )}
+                              {p.responseState && (
+                                <p role="status">
+                                  {p.responseState === "uncertain"
+                                    ? "答复结果待确认；请核对回执。"
+                                    : "答复已发送；等待服务端确认。"}
+                                </p>
+                              )}
+                              <RequestForm
+                                request={p}
+                                attentionActive={activityClass(
+                                  selectedRecord,
+                                ).includes("task-attention-live")}
+                                busy={
+                                  !connected ||
+                                  busy === p.key ||
+                                  !!p.responseState
+                                }
+                                respond={(response) =>
+                                  void run("respond", {
+                                    threadId: p.params.threadId,
+                                    requestKey: p.key,
+                                    response,
+                                  })
+                                }
+                              />
+                            </div>
+                          ))}
                       </ReadingSurface>
                       <div className="detail-footer">
                         <TaskComposer
@@ -1963,7 +1956,18 @@ export function MonitorWorkbench({ logout }: { logout: () => void }) {
                               ? operationFeedback
                               : null
                           }
-                          stop={() => setDialog("stop")}
+                          stop={() => {
+                            if (
+                              !connected ||
+                              !selectedRecord.turn ||
+                              selectedRecord.turn.status !== "inProgress"
+                            )
+                              return;
+                            void run("interrupt", {
+                              threadId: selectedRecord.thread.id,
+                              turnId: selectedRecord.turn.id,
+                            });
+                          }}
                           open={open}
                           navigateCommand={(name) => {
                             if (name === "new") {
@@ -2329,32 +2333,6 @@ export function MonitorWorkbench({ logout }: { logout: () => void }) {
           {operationFeedback}
         </Modal>
       )}
-      {dialog === "stop" && selectedRecord && (
-        <Modal title="停止当前执行轮次" close={() => setDialog(null)}>
-          <p>{threadTitle(selectedRecord.thread)}</p>
-          <p>
-            只中断此任务本轮，不回滚文件，不会停止其他会话。后台命令须分别终止。
-          </p>
-          <code>{selectedRecord.turn?.id}</code>
-          <button
-            className="primary"
-            disabled={!!busy || !connected}
-            onClick={async () => {
-              if (
-                await run("interrupt", {
-                  threadId: selected,
-                  turnId: selectedRecord.turn?.id,
-                })
-              )
-                setDialog(null);
-            }}
-          >
-            停止本轮
-          </button>
-          <button onClick={() => setDialog(null)}>取消</button>
-          {operationFeedback}
-        </Modal>
-      )}
       {dialog === "receipts" && (
         <Modal title="核查操作回执" close={() => setDialog(null)}>
           {feedbackThread && !feedbackForCurrentTask && (
@@ -2572,9 +2550,33 @@ function TaskComposer({
   };
   function invoke(item: SlashCommand, args: string) {
     const name = item.alias || item.name;
+    if (name === "fork" && item.enabled) {
+      setLocalError("");
+      void run("command", {
+        threadId: id,
+        command: "fork",
+        args: {},
+        expectedTurnId: record.turn?.id || null,
+      }).then((result) => {
+        if (!result) return;
+        if (draft.startsWith("/")) {
+          if (sessionStorage.getItem("samaya.draft." + id) === draft) {
+            sessionStorage.setItem("samaya.draft." + id, "");
+            sessionStorage.setItem("samaya.references." + id, "[]");
+          }
+          setDraft((current) => (current === draft ? "" : current));
+          setReferences((current) =>
+            current.filter((r) => !references.includes(r)),
+          );
+        }
+        if (typeof result.result?.threadId === "string")
+          open(result.result.threadId);
+      });
+      return;
+    }
     if (name === "status") {
       void printStatus(id, record.turn?.id || null);
-      if (draft.trim().startsWith("/status")) setDraft("");
+      if (draft.startsWith("/status")) setDraft("");
       return;
     }
     if (name === "init") {
@@ -2685,7 +2687,7 @@ function TaskComposer({
             setGoalRefresh((n) => n + 1);
             if ((command.item.alias || command.item.name) === "plan")
               window.dispatchEvent(new Event("focus"));
-            if (draft.trim().startsWith("/")) {
+            if (draft.startsWith("/")) {
               setDraft((current) => (current === draft ? "" : current));
               setReferences((current) =>
                 current.filter((r) => !references.includes(r)),

@@ -5,6 +5,7 @@ import time
 
 from fastapi import FastAPI, HTTPException, Query, Request
 from pydantic import BaseModel, Field
+from starlette.concurrency import run_in_threadpool
 
 from samaya.composer.commands import registry
 from samaya.composer.files import UploadTooLarge, save_upload
@@ -12,6 +13,8 @@ from samaya.composer.images import MAX_TOTAL_IMAGE_BYTES
 from samaya.composer.models import draft_settings
 from samaya.config import Settings
 from samaya.runtime import Runtime
+
+from .downloads import download_response
 
 
 class Operation(BaseModel):
@@ -23,6 +26,11 @@ class Operation(BaseModel):
 def register_routes(application: FastAPI, config: Settings) -> None:
     def service() -> Runtime:
         return application.state.runtime
+
+    @application.api_route("/api/threads/{tid}/files/download", methods=["GET", "HEAD"])
+    async def download(tid: str, path: str = Query(min_length=1, max_length=8192)):
+        directory = config.directory(await service().catalog.directory(tid, None))
+        return await run_in_threadpool(download_response, directory, path)
 
     @application.post("/api/uploads")
     async def upload(
