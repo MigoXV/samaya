@@ -123,6 +123,49 @@ async def test_model_switch_is_one_compatible_patch(native, target, effort, tier
     )
 
 
+@pytest.mark.parametrize(
+    "command,value,key",
+    [
+        ("model", "b", "model"),
+        ("reasoning", "medium", "reasoningEffort"),
+        ("fast", "default", "serviceTier"),
+    ],
+)
+@pytest.mark.parametrize("previous_turn", [None, "turn"])
+@pytest.mark.parametrize("status", ["inProgress", "completed"])
+async def test_next_turn_settings_survive_new_turn(
+    native, command, value, key, previous_turn, status
+):
+    cmd, _, con, _, _ = native
+    initial = await cmd.model_settings("t")
+    old_rpc = con.rpc.side_effect
+
+    async def rpc(method, params):
+        if method == "thread/turns/list":
+            return {"data": [{"id": "new-turn", "status": status}]}
+        return await old_rpc(method, params)
+
+    con.rpc.side_effect = rpc
+    result = await cmd.execute(
+        {
+            "threadId": "t",
+            "command": command,
+            "args": {"value": value},
+            "expectedTurnId": previous_turn,
+            "expectedModel": initial["current"]["model"],
+        }
+    )
+    assert result["modelSettings"]["current"][key] == value
+    assert result["modelSettings"]["expectedTurnId"] == "new-turn"
+    writes = [
+        c for c in con.rpc.call_args_list if c.args[0] == "thread/settings/update"
+    ]
+    assert len(writes) == 1
+    assert not any(
+        c.args[0] in ("turn/start", "turn/interrupt") for c in con.rpc.call_args_list
+    )
+
+
 async def test_fast_context_reads_current_and_off_means_standard(native):
     cmd, _, con, _, models = native
     models[0]["defaultServiceTier"] = "priority"
@@ -153,7 +196,7 @@ async def test_changed_model_or_capability_rejects_without_write(native):
                 "threadId": "t",
                 "command": "reasoning",
                 "args": {"value": "medium"},
-                "expectedTurnId": "turn",
+                "expectedTurnId": "old-turn",
                 "expectedModel": "b",
             }
         )
@@ -163,7 +206,7 @@ async def test_changed_model_or_capability_rejects_without_write(native):
                 "threadId": "t",
                 "command": "reasoning",
                 "args": {"value": "xhigh"},
-                "expectedTurnId": "turn",
+                "expectedTurnId": "old-turn",
             }
         )
     assert not any(

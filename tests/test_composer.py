@@ -217,11 +217,12 @@ async def test_permission_choices_validated_at_execution(services, args):
     )
 
 
-async def test_stale_turn_rejected(services):
+@pytest.mark.parametrize("command", ["compact", "fork", "side", "review", "rename"])
+async def test_stale_turn_rejected(services, command):
     _, cmd, con, _, _ = services
     with pytest.raises(ValueError):
         await cmd.execute(
-            {"threadId": "t", "command": "compact", "expectedTurnId": "old"}
+            {"threadId": "t", "command": command, "expectedTurnId": "old"}
         )
     con.rpc.assert_not_called()
 

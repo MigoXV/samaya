@@ -430,9 +430,14 @@ try {
     page.getByRole("button", { name: "停止当前轮次", exact: true }),
   ).toBeVisible();
   await openModels();
+  // A new turn arriving while the menu is open must not reload or block it.
+  const readsBeforeNewTurn = catalogReads;
+  state.records.find((r) => r.thread.id === "demo-6").turn.id = "next-turn";
+  await broadcast();
   await page.getByRole("menuitemradio", { name: /Model A/ }).click();
   await expect(trigger).toContainText("Model A");
   expect(selections.at(-1).body.expectedTurnId).toBe("turn-6");
+  expect(catalogReads).toBe(readsBeforeNewTurn);
   expect(state.records.find((r) => r.thread.id === "demo-6").turn.status).toBe(
     "inProgress",
   );
