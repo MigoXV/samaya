@@ -140,9 +140,20 @@ try {
   await expect(status).toContainText("1.2B");
   await expect(status.locator("header")).not.toContainText("本地快照");
   await expect(
-    status.getByRole("progressbar", { name: "上下文已用", exact: true }),
-  ).toHaveAttribute("aria-valuenow", "12.5");
+    status.getByRole("progressbar", { name: "上下文剩余", exact: true }),
+  ).toHaveAttribute("aria-valuenow", "87.5");
   await expect(status.locator('[data-tone="success"]')).toHaveCount(2);
+  const contextBar = status.getByRole("progressbar", {
+    name: "上下文剩余",
+    exact: true,
+  });
+  expect(await contextBar.locator("span").evaluate((n) => n.style.width)).toBe(
+    "87.5%",
+  );
+  const sides = status.locator(".status-meter-label").first().locator("span");
+  await expect(sides.first()).toHaveText("剩余 87%");
+  await expect(sides.last()).toHaveText("已用 13%");
+
   for (const [value, tone] of [
     [70, "warning"],
     [90, "danger"],

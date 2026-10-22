@@ -41,24 +41,31 @@ function StatusMeter({
             : "充足";
   return (
     <div className="status-meter" data-tone={tone}>
-      <div className="status-meter-title"><span>{label}</span><small>{state}</small></div>
+      <div className="status-meter-title">
+        <span>{label}</span>
+        <small>{state}</small>
+      </div>
       <div className="status-meter-label">
-        {value === null ? <span>用量未提供</span> : <>
-          <span>剩余 {100 - Math.round(value)}%</span>
-          <span>已用 {Math.round(value)}%</span>
-        </>}
+        {value === null ? (
+          <span>用量未提供</span>
+        ) : (
+          <>
+            <span>剩余 {100 - Math.round(value)}%</span>
+            <span>已用 {Math.round(value)}%</span>
+          </>
+        )}
       </div>
       {value !== null && (
         <div
           className="status-meter-track"
           role="progressbar"
-          aria-label={label + "已用"}
+          aria-label={label + "剩余"}
           aria-valuemin={0}
           aria-valuemax={100}
-          aria-valuenow={value}
-          aria-valuetext={`已用 ${Math.round(value)}%，${state}`}
+          aria-valuenow={100 - value}
+          aria-valuetext={`剩余 ${100 - Math.round(value)}%，已用 ${Math.round(value)}%，${state}`}
         >
-          <span style={{ width: `${value}%` }} />
+          <span style={{ width: `${100 - value}%` }} />
         </div>
       )}
       <small>{caption}</small>
