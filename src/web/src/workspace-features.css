@@ -223,28 +223,26 @@
   background: transparent;
 }
 .inline-status {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
   margin: 18px 0;
-  padding: 14px 16px;
+  padding: 16px;
   border: 1px solid var(--border);
   border-radius: 8px;
   background: var(--surface-subtle);
-  color: var(--text-secondary);
+  color: var(--text-primary);
   font-size: 13px;
   overflow-wrap: anywhere;
 }
 .inline-status header {
   display: flex;
   justify-content: space-between;
+  flex-wrap: wrap;
   gap: 16px;
 }
-.inline-status p {
-  margin: 7px 0;
-  line-height: 1.6;
-}
-.inline-status small {
-  font-size: 11px;
-  color: var(--text-secondary);
-}
+.inline-status p { margin: 0; line-height: 1.6; }
+.inline-status small { font-size: 11px; color: var(--text-primary); line-height: 18px; }
 .workspace-running > header :is(small, button, .workspace-create-label),
 .workspace-running > .nav-workspace-heading small {
   color: var(--text-primary);
@@ -304,3 +302,12 @@
     max-width: none;
   }
 }
+
+.status-meter { width: 100%; max-width: 440px; display: flex; flex-direction: column; gap: 6px; margin: 0; }
+.inline-status > div:has(.status-meter) { display: flex; flex-direction: column; gap: 12px; }
+.status-meter-title { display: flex; justify-content: space-between; gap: 12px; }
+.status-meter-label { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 4px 12px; line-height: 21px; font-variant-numeric: tabular-nums; }
+.status-meter-track { height: 4px; background: var(--border); border-radius: 4px; overflow: hidden; }
+.status-meter-track > span { display: block; height: 100%; border-radius: inherit; background: var(--av-success); }
+.status-meter[data-tone="warning"] .status-meter-track > span { background: var(--av-warning); }
+.status-meter[data-tone="danger"] .status-meter-track > span { background: var(--av-danger); }

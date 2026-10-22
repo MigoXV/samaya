@@ -49,6 +49,8 @@ def native(tmp_path):
     async def rpc(method, params):
         if method == "thread/read":
             return {"thread": dict(thread)}
+        if method == "thread/turns/list":
+            return {"data": thread["turns"][-1:]}
         if method == "thread/resume":
             return dict(values)
         if method == "model/list":

@@ -39,7 +39,8 @@ try {
               total: {
                 totalTokens: 2500,
                 inputTokens: 2000,
-                cachedInputTokens: 1000,
+                cachedInputTokens: 2500000,
+                reasoningOutputTokens: 1200000000,
                 outputTokens: 500,
               },
               last: { totalTokens: 500 },
@@ -132,13 +133,66 @@ try {
   await known.fill("/status");
   await known.press("Enter");
   const status = page.getByRole("status", { name: "会话状态与用量" });
-  await expect(status).toContainText("2,500");
-  await expect(status).toContainText("剩余 88%");
+  await expect(status).toContainText("2.5K");
+  await expect(status).toContainText("剩余 87%");
   await expect(status).toContainText("剩余 80%");
+  await expect(status).toContainText("2.5M");
+  await expect(status).toContainText("1.2B");
+  await expect(status.locator("header")).not.toContainText("本地快照");
+  await expect(
+    status.getByRole("progressbar", { name: "上下文已用", exact: true }),
+  ).toHaveAttribute("aria-valuenow", "12.5");
+  await expect(status.locator('[data-tone="success"]')).toHaveCount(2);
+  for (const [value, tone] of [
+    [70, "warning"],
+    [90, "danger"],
+    [100, "danger"],
+    [null, "unknown"],
+  ]) {
+    await page.evaluate(
+      ({ value }) => {
+        const tid = new URL(location.href).searchParams.get("thread");
+        const key = "samaya.status." + tid;
+        const entries = JSON.parse(sessionStorage.getItem(key));
+        entries.at(-1).data.rateLimits.rateLimits.primary.usedPercent = value;
+        sessionStorage.setItem(key, JSON.stringify(entries));
+        window.dispatchEvent(new CustomEvent("samaya:status", { detail: tid }));
+      },
+      { value },
+    );
+    await expect(status.locator(`[data-tone="${tone}"]`)).toHaveCount(1);
+    if (value === null) {
+      await expect(status.getByRole("progressbar")).toHaveCount(1);
+      await expect(status).toContainText("用量未提供");
+    }
+  }
+  await page.evaluate(() => {
+    const tid = new URL(location.href).searchParams.get("thread");
+    const key = "samaya.status." + tid;
+    const entries = JSON.parse(sessionStorage.getItem(key));
+    const limits = entries.at(-1).data.rateLimits.rateLimits;
+    limits.primary.usedPercent = 76;
+    limits.secondary = { usedPercent: 94, windowDurationMins: 10080 };
+    sessionStorage.setItem(key, JSON.stringify(entries));
+    window.dispatchEvent(new CustomEvent("samaya:status", { detail: tid }));
+  });
+  for (const theme of ["abyssus", "vallum"]) {
+    await page.evaluate(
+      (theme) => (document.documentElement.dataset.theme = theme),
+      theme,
+    );
+    await page.setViewportSize({ width: 390, height: 844 });
+    await status.scrollIntoViewIfNeeded();
+    expect(await status.evaluate((n) => n.scrollWidth <= n.clientWidth)).toBe(
+      true,
+    );
+    await status.screenshot({ path: `../../.samaya/status-${theme}.png` });
+  }
+  await page.setViewportSize({ width: 1440, height: 900 });
   await expect(page.getByRole("dialog")).toHaveCount(0);
   expect(calls).toHaveLength(before);
   await page.reload();
-  await expect(status).toContainText("2,500");
+  await expect(status).toContainText("2.5K");
   const nav = page.locator(".nav-workspaces");
   const laya = nav.locator('[data-sidebar-workspace="/demo/Laya"]');
   await expect(laya.locator(".nav-workspace-threads")).toBeVisible();

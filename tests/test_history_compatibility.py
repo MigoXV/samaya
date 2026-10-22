@@ -273,3 +273,38 @@ async def test_full_history_rejection_uses_supported_paginated_history(queries):
     assert result["thread"]["turns"][0]["id"] == "turn"
     assert not queries.unavailable_history
     await queries.require_history("cli")
+
+
+@pytest.mark.asyncio
+async def test_control_read_uses_only_latest_summary_and_never_full_history(queries):
+    async def rpc(method, params):
+        if method == "thread/read":
+            assert params["includeTurns"] is False
+            return {"thread": {"id": "t", "cwd": "/tmp", "status": {"type": "active"}}}
+        assert method == "thread/turns/list"
+        assert params == {
+            "threadId": "t",
+            "cursor": None,
+            "limit": 1,
+            "sortDirection": "desc",
+            "itemsView": "summary",
+        }
+        return {"data": [{"id": "latest", "status": "inProgress"}]}
+
+    queries.connection.rpc.side_effect = rpc
+    result = await queries.read("t", latest_only=True)
+    assert result["thread"]["turns"] == [{"id": "latest", "status": "inProgress"}]
+    assert queries.connection.rpc.await_count == 2
+
+
+@pytest.mark.asyncio
+async def test_control_read_does_not_hide_native_failures(queries):
+    async def rpc(method, params):
+        if method == "thread/read":
+            return {"thread": {"id": "t", "status": {"type": "idle"}}}
+        raise ConnectionError("offline")
+
+    queries.connection.rpc.side_effect = rpc
+    with pytest.raises(ConnectionError, match="offline"):
+        await queries.read("t", latest_only=True)
+    assert queries.connection.rpc.await_count == 2

@@ -131,7 +131,7 @@ class CommandService:
                 return data
 
     async def model_settings(self, tid, refresh=False, thread=None):
-        thread = thread or (await self.queries.read(tid))["thread"]
+        thread = thread or (await self.queries.read(tid, latest_only=True))["thread"]
         configured = await self.queries.settings(tid, refresh=refresh)
         rows = await self.pages("model/list")
         current_model = configured.get("model") or thread.get("model")
@@ -157,7 +157,7 @@ class CommandService:
         command = ALIASES.get(command, command)
         if command not in NATIVE:
             raise ValueError(UNAVAILABLE.get(command, "此命令没有原生操作"))
-        thread = (await self.queries.read(tid))["thread"]
+        thread = (await self.queries.read(tid, latest_only=True))["thread"]
         if thread.get("historyAvailable") is False:
             return {
                 "command": command,
