@@ -393,7 +393,12 @@ class CommandService:
             raise ValueError(context["historyNotice"])
         if context["readOnly"]:
             raise ValueError("只读命令不需要执行")
-        if b.get("expectedTurnId") != context["expectedTurnId"]:
+        # These settings affect subsequent turns, so a new turn doesn't stale
+        # the selection. Keep model/capability checks below for real conflicts.
+        if (
+            cmd not in ("model", "reasoning", "fast")
+            and b.get("expectedTurnId") != context["expectedTurnId"]
+        ):
             raise ValueError("轮次已变化，请重新打开命令")
         settings = context.get("modelSettings")
         if (
