@@ -21,38 +21,25 @@ function StatusMeter({
     typeof percent === "number" && Number.isFinite(percent)
       ? Math.max(0, Math.min(100, percent))
       : null;
+  const remaining = value === null ? null : 100 - value;
   const tone =
-    value === null
+    remaining === null
       ? "unknown"
-      : value >= 90
+      : remaining < 25
         ? "danger"
-        : value >= 70
+        : remaining <= 50
           ? "warning"
           : "success";
-  const state =
-    value === null
-      ? "未提供"
-      : value >= 100
-        ? "已达上限"
-        : value >= 90
-          ? "接近上限"
-          : value >= 70
-            ? "偏高"
-            : "充足";
   return (
     <div className="status-meter" data-tone={tone}>
       <div className="status-meter-title">
         <span>{label}</span>
-        <small>{state}</small>
       </div>
       <div className="status-meter-label">
         {value === null ? (
           <span>用量未提供</span>
         ) : (
-          <>
-            <span>剩余 {100 - Math.round(value)}%</span>
-            <span>已用 {Math.round(value)}%</span>
-          </>
+          <span>剩余 {Math.round(remaining!)}%</span>
         )}
       </div>
       {value !== null && (
@@ -63,7 +50,7 @@ function StatusMeter({
           aria-valuemin={0}
           aria-valuemax={100}
           aria-valuenow={100 - value}
-          aria-valuetext={`剩余 ${100 - Math.round(value)}%，已用 ${Math.round(value)}%，${state}`}
+          aria-valuetext={`剩余 ${Math.round(remaining!)}%`}
         >
           <span style={{ width: `${100 - value}%` }} />
         </div>

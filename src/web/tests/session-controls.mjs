@@ -134,7 +134,7 @@ try {
   await known.press("Enter");
   const status = page.getByRole("status", { name: "会话状态与用量" });
   await expect(status).toContainText("2.5K");
-  await expect(status).toContainText("剩余 87%");
+  await expect(status).toContainText("剩余 88%");
   await expect(status).toContainText("剩余 80%");
   await expect(status).toContainText("2.5M");
   await expect(status).toContainText("1.2B");
@@ -151,11 +151,17 @@ try {
     "87.5%",
   );
   const sides = status.locator(".status-meter-label").first().locator("span");
-  await expect(sides.first()).toHaveText("剩余 87%");
-  await expect(sides.last()).toHaveText("已用 13%");
+  await expect(sides.first()).toHaveText("剩余 88%");
+  await expect(sides).toHaveCount(1);
+  await expect(status).not.toContainText("已用");
+  await expect(status).not.toContainText("充足");
 
   for (const [value, tone] of [
-    [70, "warning"],
+    [49, "success"],
+    [50, "warning"],
+    [75, "warning"],
+    [75.1, "danger"],
+    [87, "danger"],
     [90, "danger"],
     [100, "danger"],
     [null, "unknown"],
@@ -171,7 +177,10 @@ try {
       },
       { value },
     );
-    await expect(status.locator(`[data-tone="${tone}"]`)).toHaveCount(1);
+    await expect(status.locator(".status-meter").nth(1)).toHaveAttribute(
+      "data-tone",
+      tone,
+    );
     if (value === null) {
       await expect(status.getByRole("progressbar")).toHaveCount(1);
       await expect(status).toContainText("用量未提供");
