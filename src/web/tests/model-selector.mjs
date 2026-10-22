@@ -60,7 +60,9 @@ try {
       editable: true,
     };
   }
+  let catalogReads = 0;
   await context.route("**/model-settings", async (route) => {
+    catalogReads++;
     if (holdCatalog)
       await new Promise((resolve) => {
         releaseCatalog = resolve;
@@ -179,12 +181,14 @@ try {
   expect(
     await trigger.evaluate((el) => getComputedStyle(el).backgroundColor),
   ).toBe("rgba(0, 0, 0, 0)");
+  const beforeMenuOpen = catalogReads;
   await trigger.click();
   expect(
     await trigger.evaluate((el) => getComputedStyle(el).backgroundColor),
   ).toBe("rgba(0, 0, 0, 0)");
   const slider = page.getByRole("slider", { name: "推理强度" });
   await expect(slider).toHaveValue("0");
+  expect(catalogReads).toBe(beforeMenuOpen);
   const rangeBox = await slider.boundingBox();
   const trackBox = await page.locator(".reasoning-slider").boundingBox();
   expect(rangeBox.height).toBe(24);
@@ -339,6 +343,7 @@ try {
   await page.keyboard.press("Escape");
   failCatalog = true;
   await fastEntry.click();
+  await page.getByRole("button", { name: "重新读取", exact: true }).click();
   await expect(page.locator(".model-menu")).toContainText("模型目录暂不可用");
   const beforeReadFailure = selections.length;
   await page.locator(".panel-fast").click();

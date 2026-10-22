@@ -291,7 +291,11 @@ class SessionQueries:
                 raise
 
     async def read(
-        self, tid: str, subscribe: bool = False, include_turns: bool = True
+        self,
+        tid: str,
+        subscribe: bool = False,
+        include_turns: bool = True,
+        latest_only: bool = False,
     ) -> dict:
         summary = await self.connection.rpc(
             "thread/read", {"threadId": tid, "includeTurns": False}
@@ -325,6 +329,29 @@ class SessionQueries:
                 ],
             )
             return summary
+        if latest_only and key not in self.legacy_turns:
+            try:
+                page = await self.connection.rpc(
+                    "thread/turns/list",
+                    {
+                        "threadId": tid,
+                        "cursor": None,
+                        "limit": 1,
+                        "sortDirection": "desc",
+                        "itemsView": "summary",
+                    },
+                )
+                summary["thread"] = self.with_settings(normalize(summary["thread"]))
+                summary["thread"]["turns"] = page["data"]
+                if page.get("historyAvailable") is False:
+                    summary["thread"].update(
+                        historyAvailable=False, historyNotice=HISTORY_UNAVAILABLE
+                    )
+                return summary
+            except JsonRpcError as exc:
+                if "-32601" not in str(exc):
+                    raise
+                self.legacy_turns.add(key)
         if subscribe:
             try:
                 await self.join(tid)

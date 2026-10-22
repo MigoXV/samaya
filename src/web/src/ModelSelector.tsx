@@ -92,7 +92,7 @@ export function ModelSelector({
     draftChoice.current = null;
   }, [cwd]);
   useEffect(() => {
-    const context = JSON.stringify([tid, cwd, disabled, open, retry]);
+    const context = JSON.stringify([tid, cwd, disabled, retry]);
     const known = confirmed.current;
     const unchanged = context === loadContext.current;
     loadContext.current = context;
@@ -148,7 +148,7 @@ export function ModelSelector({
     };
     void load();
     return () => controller.abort();
-  }, [tid, cwd, model, reasoningEffort, serviceTier, disabled, open, retry]);
+  }, [tid, cwd, model, reasoningEffort, serviceTier, disabled, retry]);
   useEffect(() => {
     if (!open) return;
     const close = () => {
