@@ -244,7 +244,7 @@ export function ItemView({
     );
   if (item.type === "plan")
     return (
-      <details className="tool">
+      <details className="tool execution-plan" open>
         <summary>执行计划</summary>
         <MarkdownContent text={item.text || ""} threadId={threadId} />
       </details>

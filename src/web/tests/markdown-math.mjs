@@ -85,8 +85,12 @@ try {
     [text, items[2].text].join("\n\n"),
   );
   const plan = page.locator('[data-item-id="math-plan"]');
+  await expect(plan.locator("details")).toHaveAttribute("open");
+  await expect(plan.locator(".katex")).toBeVisible();
   await plan.locator("summary").click();
-  await expect(plan.locator(".katex")).toHaveCount(1);
+  await expect(plan.locator("details")).not.toHaveAttribute("open");
+  await plan.locator("summary").click();
+  await expect(plan.locator(".katex")).toBeVisible();
   await expect(
     page.locator('[data-item-id="math-error"] .katex-error'),
   ).toHaveCount(1);

@@ -178,3 +178,9 @@ Figma 同步状态：[侧栏重命名·白垣](https://www.figma.com/design/TZOG
 批量操作集中在列表上方的固定操作行。归档与恢复先静默核对范围再执行；删除在原位变为“确定删除 N 个”，可展开检查后代及其它目录的影响范围，不另弹窗口。确认期间锁定筛选和选择，取消不执行操作。范围读取最多并行四项，写操作逐项执行；结果收成一行摘要，失败原因可展开，失败条目保留。失败或结果待确认不会自动重发。列表具有独立滚动区和稳定的滚动条占位，避免长记录把确认按钮推到页底。归档成功的条目立即退出侧栏与任务总览；部分失败只移除已核实成功的范围，恢复归档后重新核对显示。执行中或仍有后台命令的会话继续由服务端拒绝清理。
 
 Figma 独立 Page：[18 · 工作区管理](https://www.figma.com/design/TZOGfIsv1ESAQckxwg4lpa?node-id=328-15550)；现行桌面稿：[白垣](https://www.figma.com/design/TZOGfIsv1ESAQckxwg4lpa?node-id=328-15551)、[苍渊](https://www.figma.com/design/TZOGfIsv1ESAQckxwg4lpa?node-id=328-15749)；[手机稿](https://www.figma.com/design/TZOGfIsv1ESAQckxwg4lpa?node-id=332-13511)。图标已从现行稿导出到 `public/figma/workspace-management`，按主题使用语义颜色。浏览器回归入口：`pnpm --dir src/web run test:composer` 中的 `workspace-management.mjs`。
+
+## 执行计划展示
+
+原生 `plan` 条目默认展开，直接显示 Markdown 正文；用户仍可手动收起。计划不归入工具日志折叠组，在“对话”和“改动与产物”两页都可阅读。
+
+计划正文直接消费原生 `item/plan/delta`，按 thread、turn、item 身份及 SSE 序号合并，约每 250ms 更新 Markdown，不等待轮次完成。重连核对保留当前已观察到的计划片段；`item/completed` 原位替换为完整计划，迟到增量及旧分页响应不能追加或覆盖已完成内容。若未收到条目完成事件，轮次结束后的完整历史读取会替换临时计划。用户手动收起的选择在增量更新期间保留。回归入口：`tests/plan-output.mjs`。
