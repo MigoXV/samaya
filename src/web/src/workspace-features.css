@@ -164,7 +164,8 @@
 .nav-workspace-threads {
   padding: 0 0 6px 21px;
 }
-.nav-workspace-threads > button {
+.nav-workspace-threads .nav-conversation,
+.nav-workspace-threads > .nav-show-more {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -188,18 +189,18 @@
   color: var(--text-secondary);
   font-size: 11px;
 }
-.monitor-nav .nav-workspace-threads > .conversation-running {
+.monitor-nav .nav-conversation-row.conversation-running {
   background: var(--selected);
   color: var(--text-primary);
   border-color: transparent;
 }
-.monitor-nav .nav-workspace-threads > .conversation-running:hover {
+.monitor-nav .nav-conversation-row.conversation-running:hover {
   background: color-mix(in srgb, var(--selected) 80%, var(--hover));
 }
 .nav-workspace-threads > small {
   padding: 8px;
 }
-.nav-workspace-threads > button[aria-current="page"] {
+.nav-conversation-row:has([aria-current="page"]) {
   background: var(--selected);
   color: var(--text-primary);
 }
@@ -311,3 +312,57 @@
 .status-meter-track > span { display: block; height: 100%; border-radius: inherit; background: var(--av-success); }
 .status-meter[data-tone="warning"] .status-meter-track > span { background: var(--av-warning); }
 .status-meter[data-tone="danger"] .status-meter-track > span { background: var(--av-danger); }
+
+.nav-conversation-row { display: flex; align-items: center; border-radius: 8px; min-width: 0; }
+.nav-conversation-row:hover { background: var(--hover); }
+.monitor-nav .nav-conversation-row .nav-conversation { flex: 1; min-width: 0; background: transparent; }
+.monitor-nav .nav-conversation-row .nav-conversation-more { display: flex; align-items: center; justify-content: center; flex: 0 0 28px; padding: 0; min-width: 28px; min-height: 28px; height: 28px; margin-right: 3px; background: transparent; opacity: 0; }
+.nav-conversation-row:is(:hover, :focus-within) .nav-conversation-more,
+.nav-conversation-row .nav-conversation-more[aria-expanded="true"],
+.nav-conversation-row:has([aria-current="page"]) .nav-conversation-more { opacity: 1; }
+.conversation-menu { position: fixed; z-index: 150; width: 208px; max-width: calc(100vw - 16px); max-height: calc(100dvh - 16px); overflow: auto; padding: 6px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); color: var(--text-primary); }
+.conversation-menu [role="menuitem"] { display: flex; align-items: center; gap: 10px; padding: 4px 12px; width: 100%; min-height: 32px; line-height: 24px; text-align: left; border: 0; background: transparent; border-radius: 6px; color: var(--text-primary); }
+.conversation-menu [role="menuitem"]:hover { background: var(--hover); }
+.conversation-menu .conversation-menu-delete svg { color: var(--av-danger); }
+@media (hover: none), (max-width: 760px) { .monitor-nav .nav-conversation-row .nav-conversation-more { opacity: 1; } }
+.conversation-menu-note {
+  display: block;
+  padding: 4px 12px;
+  font-size: 11px;
+  line-height: 18px;
+  color: var(--text-primary);
+  overflow-wrap: anywhere;
+}
+.nav-conversation-edit {
+  flex: 1;
+  min-width: 0;
+  padding: 3px 4px;
+}
+.nav-conversation-edit input {
+  width: 100%;
+  min-width: 0;
+  min-height: 28px;
+  padding: 3px 5px;
+  font-size: 12px;
+  line-height: 20px;
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--text-primary);
+}
+.nav-conversation-edit small {
+  display: block;
+  font-size: 11px;
+  line-height: 18px;
+  overflow-wrap: anywhere;
+}
+.nav-workspace-heading .nav-workspace-manage { display: flex; flex: 0 0 28px; width: 28px; height: 28px; padding: 4px; align-items: center; justify-content: center; opacity: 0; }
+.nav-workspace-heading:is(:hover, :focus-within) .nav-workspace-manage { opacity: 1; }
+.workspace-management-path { overflow-wrap: anywhere; color: var(--text-secondary); }
+.records-confirmation { margin-top: 24px; padding-top: 16px; border-top: 1px solid var(--border); }
+.records-confirmation h3 { font-size: 16px; margin: 0 0 12px; }
+.records-confirmation section { margin: 8px 0; }
+@media (hover: none), (max-width: 760px) { .monitor-nav .nav-workspace-heading .nav-workspace-manage { opacity: 1; } }
+.workspace-management .actions { align-items: center; gap: 12px; }
+.workspace-management .actions label { display: inline-flex; flex-direction: row; align-items: center; gap: 8px; }
+.workspace-management input[type="checkbox"] { width: 16px; height: 16px; min-height: 0; padding: 0; margin: 0; accent-color: var(--text-primary); }

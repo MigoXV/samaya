@@ -66,6 +66,64 @@ try {
   await input.focus();
   await input.press("ArrowUp");
   await expect(input).toHaveValue("新的提示词");
+  await c.route("**/api/input-catalog?*", (route) =>
+    route.fulfill({
+      json: {
+        cwd: "/demo/Samaya",
+        references: [],
+        prompts: [],
+        errors: [],
+        commands: [
+          {
+            name: "status",
+            description: "状态",
+            kind: "native",
+            enabled: true,
+          },
+        ],
+      },
+    }),
+  );
+  await c.route("**/command-context?command=status", (route) =>
+    route.fulfill({ json: { data: { cwd: "/demo/Samaya" } } }),
+  );
+  await p.reload();
+  await input.fill("/sta");
+  await p.getByRole("option", { name: /\/status/ }).click();
+  await expect(input).toHaveValue("");
+  await input.press("ArrowUp");
+  await expect(input).toHaveValue("/status");
+  await input.press("ArrowDown");
+  await expect(input).toHaveValue("");
+  await input.fill("/未执行的命令");
+  await input.evaluate((n) => n.blur());
+  await p.keyboard.press("ArrowLeft");
+  await expect(p.locator(".task-overview")).toBeVisible();
+  await p.keyboard.press("ArrowRight");
+  await expect(input).toHaveValue("");
+  await input.press("ArrowUp");
+  await expect(input).toHaveValue("/status");
+  const sidebar = p.locator(".nav-workspaces");
+  await sidebar
+    .getByRole("button", { name: "在 Samaya 工作区新建会话", exact: true })
+    .click();
+  const draft = p.getByRole("textbox", { name: "新会话工作要求", exact: true });
+  await draft.fill("/尚未执行");
+  await sidebar
+    .getByRole("button", { name: "在 Laya 工作区新建会话", exact: true })
+    .click();
+  await sidebar
+    .getByRole("button", { name: "在 Samaya 工作区新建会话", exact: true })
+    .click();
+  await expect(draft).toHaveValue("");
+  await draft.fill("普通草稿仍要保留");
+  await sidebar
+    .getByRole("button", { name: "在 Laya 工作区新建会话", exact: true })
+    .click();
+  await sidebar
+    .getByRole("button", { name: "在 Samaya 工作区新建会话", exact: true })
+    .click();
+  await expect(draft).toHaveValue("普通草稿仍要保留");
   console.log(
     "Prompt recall: native history, successful sends, reload, older/newer, draft restoration, multiline caret and left/right navigation passed.",
   );

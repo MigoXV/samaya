@@ -15,6 +15,7 @@ type Context = {
   }[];
   data: unknown;
   readOnly: boolean;
+  available?: boolean;
   expectedTurnId: string | null;
   active: boolean;
 };
@@ -25,6 +26,7 @@ export function CommandDialog({
   close,
   run,
   done,
+  onRead,
 }: {
   command: SlashCommand;
   args: string;
@@ -32,6 +34,7 @@ export function CommandDialog({
   close: () => void;
   run: (a: string, b: Record<string, unknown>) => Promise<Receipt | null>;
   done: (r: Receipt) => void;
+  onRead: () => void;
 }) {
   const name = command.alias || command.name;
   const [context, setContext] = useState<Context | null>(null),
@@ -40,6 +43,9 @@ export function CommandDialog({
     [busy, setBusy] = useState(false),
     [result, setResult] = useState<Record<string, unknown> | null>(null),
     [preview, setPreview] = useState<Preview | null>(null);
+  useEffect(() => {
+    if (context?.readOnly && context.available !== false) onRead();
+  }, [context, onRead]);
   useEffect(() => {
     let alive = true;
     if (!command.enabled) return;
@@ -101,6 +107,8 @@ export function CommandDialog({
         setResult(r.result || {});
         done(r);
       } else setError("操作未确认，请查看工作区提示或操作回执。");
+    } catch (e) {
+      setError(String(e));
     } finally {
       setBusy(false);
     }

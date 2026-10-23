@@ -50,6 +50,7 @@ const commands = [
   { name: "rename", description: "重命名任务", kind: "native", enabled: true },
   { name: "skills", description: "浏览技能", kind: "ui", enabled: true },
   { name: "apps", description: "浏览应用", kind: "ui", enabled: true },
+  { name: "usage", description: "查看用量", kind: "native", enabled: true },
   {
     name: "cloud",
     description: "当前未连接云执行接口",
@@ -84,7 +85,7 @@ await context.route("**/command-context?*", (route) => {
             ]
           : [],
       data: { goal: null },
-      readOnly: false,
+      readOnly: c === "usage",
       active: false,
       expectedTurnId: "turn-10",
     },
@@ -118,24 +119,39 @@ await expect(input).toHaveValue("$sample-app ");
 await page.locator(".composer-references summary").click();
 await page.getByRole("button", { name: "移除 示例应用" }).click();
 await expect(page.locator(".composer-references")).toHaveCount(0);
-await input.fill("/skills");
+await input.fill("/ski");
 await input.press("Enter");
 await expect(page.getByRole("listbox", { name: "技能与应用" })).toBeVisible();
 await expect(page.getByRole("listbox").getByRole("option")).toHaveCount(1);
 await input.press("Escape");
-await input.fill("/rename");
+await expect(input).toHaveValue("");
+await input.fill("/ren");
 await input.press("Enter");
-await expect(page.getByRole("dialog")).toBeVisible();
+const renameInput = page.getByRole("textbox", {
+  name: "会话新名称",
+  exact: true,
+});
+await expect(renameInput).toBeVisible();
+await expect(page.getByRole("dialog")).toHaveCount(0);
 expect(calls).toHaveLength(1);
-await page.getByLabel("新名称").fill("新的任务名");
-await page.getByRole("button", { name: "确认执行" }).click();
+await renameInput.fill("新的任务名");
+await renameInput.press("Enter");
 await expect.poll(() => calls.length).toBe(2);
 expect(calls[1].body.command).toBe("rename");
 expect(calls[1].body.args.value).toBe("新的任务名");
-await expect(
-  page.getByText("请求已确认；执行进展以任务记录为准。"),
-).toBeVisible();
+await expect(input).toHaveValue("");
+await input.fill("/us");
+await input.press("Enter");
+await expect(page.getByRole("dialog").locator(".command-result")).toContainText(
+  "goal",
+);
 await page.getByRole("dialog").press("Escape");
+await expect(input).toHaveValue("");
+await input.fill("/ren");
+await input.press("Enter");
+await expect(renameInput).toBeVisible();
+await renameInput.press("Escape");
+await expect(input).toHaveValue("");
 await input.fill("/unknown");
 await input.press("Enter");
 await expect(

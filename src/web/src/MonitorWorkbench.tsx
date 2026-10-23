@@ -6,6 +6,7 @@ import {
   History,
   Settings as SettingsIcon,
 } from "lucide-react";
+import { WorkspaceManagement } from "./WorkspaceManagement";
 import { OverviewScope } from "./OverviewScope";
 import { shortProject } from "./project-navigation";
 import {
@@ -87,9 +88,12 @@ const workspaceFromUrl = () =>
   new URL(location.href).searchParams.get("workspace") || "";
 const readWorkspaceDraft = (cwd: string) => {
   try {
-    return JSON.parse(
+    const saved = JSON.parse(
       sessionStorage.getItem("samaya.new-draft." + cwd) || "{}",
     );
+    return saved.text?.startsWith("/")
+      ? { ...saved, text: "", references: [] }
+      : saved;
   } catch {
     return {};
   }
@@ -284,8 +288,17 @@ export function MonitorWorkbench({ logout }: { logout: () => void }) {
         "",
     ),
     [focus, setFocus] = useState(false);
+  const [managedWorkspace, setManagedWorkspace] = useState(() =>
+    location.pathname.startsWith("/sessions")
+      ? new URL(location.href).searchParams.get("cwd") || ""
+      : "",
+  );
   const [taskTab, setTaskTab] = useState("work");
   const [readerVisit, setReaderVisit] = useState(0);
+  const [sidebarCommand, setSidebarCommand] = useState<{
+    id: string;
+    action: "archive";
+  } | null>(null);
   const savedOverview = useRef({
     search,
     project,
@@ -701,6 +714,7 @@ export function MonitorWorkbench({ logout }: { logout: () => void }) {
     [],
   );
   const navigate = (v: View) => {
+    setManagedWorkspace("");
     setDraftWorkspace("");
     setError("");
     setNotice("");
@@ -801,15 +815,11 @@ export function MonitorWorkbench({ logout }: { logout: () => void }) {
       if (!options?.localFeedback) {
         setFeedbackThread(String(body.threadId || ""));
         setNotice(
-          action === "respond"
-            ? result.result?.sent
-              ? "答复已发送，等待 Codex 确认；是否继续执行以新的活动为准。"
-              : "答复已确认；是否继续执行以新的活动为准。"
-            : action === "interrupt"
-              ? "停止请求已提交；等待轮次中断确认。"
-              : action === "terminate"
-                ? "终止请求已提交；请根据后台命令列表核对结果。"
-                : "",
+          action === "interrupt"
+            ? "停止请求已提交；等待轮次中断确认。"
+            : action === "terminate"
+              ? "终止请求已提交；请根据后台命令列表核对结果。"
+              : "",
         );
       }
       if (options?.localFeedback) {
@@ -1004,9 +1014,7 @@ export function MonitorWorkbench({ logout }: { logout: () => void }) {
     let saved: { text?: string; references?: InputReference[]; mode?: string } =
       {};
     try {
-      saved = JSON.parse(
-        sessionStorage.getItem("samaya.new-draft." + path) || "{}",
-      );
+      saved = readWorkspaceDraft(path);
     } catch {
       /* Start an empty draft when local preferences are unreadable. */
     }
@@ -1040,6 +1048,24 @@ export function MonitorWorkbench({ logout }: { logout: () => void }) {
         }),
       );
   }, [draftWorkspace, goal, newReferences, draftMode]);
+  useEffect(
+    () => () => {
+      if (!draftWorkspace) return;
+      const key = "samaya.new-draft." + draftWorkspace;
+      try {
+        const saved = JSON.parse(sessionStorage.getItem(key) || "{}");
+        if (saved.text?.startsWith("/")) {
+          sessionStorage.setItem(
+            key,
+            JSON.stringify({ ...saved, text: "", references: [] }),
+          );
+        }
+      } catch {
+        /* An invalid draft is ignored when this workspace is opened again. */
+      }
+    },
+    [draftWorkspace],
+  );
   useEffect(() => {
     document.title =
       workMode && draftWorkspace
@@ -1094,7 +1120,7 @@ export function MonitorWorkbench({ logout }: { logout: () => void }) {
     : EMPTY;
   return (
     <div
-      className={`monitor-shell ${focus ? "focus-mode" : ""} ${workMode ? "task-is-open" : ""} ${taskNav ? "task-nav-open" : ""} ${overviewMode ? "overview-mode" : ""} ${["settings", "usage"].includes(view) ? "settings-mode" : ""} `}
+      className={`monitor-shell ${focus ? "focus-mode" : ""} ${workMode ? "task-is-open" : ""} ${taskNav ? "task-nav-open" : ""} ${overviewMode || (view === "records" && managedWorkspace) ? "overview-mode" : ""} ${view === "records" && managedWorkspace ? "workspace-management-mode" : ""} ${["settings", "usage"].includes(view) ? "settings-mode" : ""} `}
     >
       <a className="skip-link" href="#monitor-main">
         跳到任务总览
@@ -1170,6 +1196,41 @@ export function MonitorWorkbench({ logout }: { logout: () => void }) {
           open={open}
           create={startWorkspaceDraft}
           status={projectStatus}
+          onAction={(id, action) => {
+            setTaskNav(false);
+            setSidebarCommand({ id, action });
+          }}
+          manage={(cwd) => {
+            navigate("records");
+            setManagedWorkspace(cwd);
+            history.replaceState(
+              null,
+              "",
+              "/sessions?cwd=" + encodeURIComponent(cwd),
+            );
+          }}
+          onRename={async (id, value) =>
+            !!(await run(
+              "command",
+              {
+                threadId: id,
+                command: "rename",
+                args: { value },
+                expectedTurnId: records.get(id)?.turn?.id || null,
+              },
+              { localFeedback: true, throwOnError: true },
+            ))
+          }
+          onDelete={async (id, digest) => {
+            const result = await run(
+              "delete",
+              { threadId: id, digest },
+              { localFeedback: true, throwOnError: true },
+            );
+            if (!result) return false;
+            if (selected === id) closeDetail();
+            return true;
+          }}
         />
         <div className="nav-bottom">
           {!workMode && receiptEntry}
@@ -1199,6 +1260,28 @@ export function MonitorWorkbench({ logout }: { logout: () => void }) {
           <small role="status">{connectionLabel}</small>
         </div>
       </aside>
+      {sidebarCommand && (
+        <CommandDialog
+          key={sidebarCommand.id + sidebarCommand.action}
+          command={{
+            name: sidebarCommand.action,
+            description: "归档会话",
+            kind: "native",
+            enabled: true,
+          }}
+          args=""
+          tid={sidebarCommand.id}
+          run={(action, body) =>
+            run(action, body, { localFeedback: true, throwOnError: true })
+          }
+          onRead={() => {}}
+          close={() => setSidebarCommand(null)}
+          done={() => {
+            if (selected === sidebarCommand.id) closeDetail();
+            setSidebarCommand(null);
+          }}
+        />
+      )}
       <main
         id="monitor-main"
         className="monitor-main"
@@ -1220,7 +1303,9 @@ export function MonitorWorkbench({ logout }: { logout: () => void }) {
                 overview: "全部任务",
                 pinned: "置顶任务",
                 attention: "待我处理",
-                records: "记录管理",
+                records: managedWorkspace
+                  ? `${shortProject(managedWorkspace)} · 工作区管理`
+                  : "记录管理",
                 settings: "设置与连接",
                 usage: "使用情况",
                 changes: "最近变化",
@@ -1994,15 +2079,33 @@ export function MonitorWorkbench({ logout }: { logout: () => void }) {
               )}
             </div>
           )}
-        {view === "records" && (
-          <Records
-            connected={!!connected}
-            open={(id) => {
-              navigate("overview");
-              open(id);
-            }}
-          />
-        )}
+        {view === "records" &&
+          (managedWorkspace ? (
+            <WorkspaceManagement
+              key={managedWorkspace}
+              cwd={managedWorkspace}
+              connected={!!connected}
+              records={records}
+              back={() => navigate("overview")}
+              create={() => {
+                navigate("overview");
+                startWorkspaceDraft(managedWorkspace);
+              }}
+              open={(id) => {
+                navigate("overview");
+                open(id);
+              }}
+            />
+          ) : (
+            <Records
+              cwd=""
+              connected={!!connected}
+              open={(id) => {
+                navigate("overview");
+                open(id);
+              }}
+            />
+          ))}
         {view === "settings" && (
           <SettingsView logout={logout} usage={() => navigate("usage")} />
         )}
@@ -2474,9 +2577,10 @@ function TaskComposer({
   const id = record.thread.id;
   const [images, setImages] = useImageDraft("thread:" + id);
   const [files, setFiles] = useFileDraft("thread:" + id);
-  const [draft, setDraft] = useState(
-    () => sessionStorage.getItem("samaya.draft." + id) || "",
-  );
+  const [draft, setDraft] = useState(() => {
+    const saved = sessionStorage.getItem("samaya.draft." + id) || "";
+    return saved.startsWith("/") ? "" : saved;
+  });
   const [references, setReferences] = useState<InputReference[]>(() => {
     try {
       return JSON.parse(
@@ -2489,7 +2593,9 @@ function TaskComposer({
   const [command, setCommand] = useState<{
     item: SlashCommand;
     args: string;
+    finish: () => void;
   } | null>(null);
+  const [rename, setRename] = useState<{ value: string } | null>(null);
   const [modelPending, setModelPending] = useState(true);
   const [localError, setLocalError] = useState("");
   const [goalRefresh, setGoalRefresh] = useState(0);
@@ -2512,6 +2618,38 @@ function TaskComposer({
       JSON.stringify(references),
     );
   }, [id, draft, references]);
+  useEffect(
+    () => () => {
+      if (sessionStorage.getItem("samaya.draft." + id)?.startsWith("/")) {
+        sessionStorage.setItem("samaya.draft." + id, "");
+        sessionStorage.setItem("samaya.references." + id, "[]");
+      }
+    },
+    [id],
+  );
+  const cancelRename = () => {
+    setRename(null);
+    setLocalError("");
+  };
+  const saveRename = async () => {
+    if (!rename || busy) return;
+    const value = rename.value.trim();
+    if (!value || value.length > 200) {
+      setLocalError("名称需为 1–200 字");
+      return;
+    }
+    setLocalError("");
+    const result = await run("command", {
+      threadId: id,
+      command: "rename",
+      args: { value },
+      expectedTurnId: record.turn?.id || null,
+    });
+    if (result) {
+      rememberPrompt(record.thread.cwd, "/rename " + value);
+      setRename(null);
+    }
+  };
   const submit = async () => {
     if (files.some((file) => file.status !== "ready")) return;
     const shell = shellInput(draft);
@@ -2548,8 +2686,35 @@ function TaskComposer({
       );
     }
   };
+  function consumeCommandDraft(source = draft, refs = references) {
+    if (
+      !source.startsWith("/") ||
+      sessionStorage.getItem("samaya.draft." + id) !== source
+    )
+      return;
+    sessionStorage.setItem("samaya.draft." + id, "");
+    sessionStorage.setItem("samaya.references." + id, "[]");
+    setDraft((current) => (current === source ? "" : current));
+    setReferences((current) => current.filter((r) => !refs.includes(r)));
+  }
   function invoke(item: SlashCommand, args: string) {
     const name = item.alias || item.name;
+    let finished = false;
+    const finish = () => {
+      if (finished) return;
+      finished = true;
+      rememberPrompt(
+        record.thread.cwd,
+        "/" + item.name + (args ? " " + args : ""),
+      );
+      consumeCommandDraft();
+    };
+    if (name === "rename" && item.enabled) {
+      consumeCommandDraft();
+      setLocalError("");
+      setRename({ value: args || record.thread.name || "" });
+      return;
+    }
     if (name === "fork" && item.enabled) {
       setLocalError("");
       void run("command", {
@@ -2559,27 +2724,20 @@ function TaskComposer({
         expectedTurnId: record.turn?.id || null,
       }).then((result) => {
         if (!result) return;
-        if (draft.startsWith("/")) {
-          if (sessionStorage.getItem("samaya.draft." + id) === draft) {
-            sessionStorage.setItem("samaya.draft." + id, "");
-            sessionStorage.setItem("samaya.references." + id, "[]");
-          }
-          setDraft((current) => (current === draft ? "" : current));
-          setReferences((current) =>
-            current.filter((r) => !references.includes(r)),
-          );
-        }
+        finish();
         if (typeof result.result?.threadId === "string")
           open(result.result.threadId);
       });
       return;
     }
     if (name === "status") {
-      void printStatus(id, record.turn?.id || null);
-      if (draft.startsWith("/status")) setDraft("");
+      void printStatus(id, record.turn?.id || null).then((success) => {
+        if (success) finish();
+      });
       return;
     }
     if (name === "init") {
+      finish();
       setDraft(
         "检查当前项目，生成或完善根目录 AGENTS.md，保留已有有效约定。" +
           (args ? "\n" + args : ""),
@@ -2593,6 +2751,7 @@ function TaskComposer({
       if (message?.text)
         void navigator.clipboard
           .writeText(message.text)
+          .then(finish)
           .catch(() => setLocalError("复制失败，请手动选择回复。"));
       else setLocalError("当前汇总没有完整回复，请在正文复制。");
       return;
@@ -2608,10 +2767,11 @@ function TaskComposer({
         "subagents",
       ].includes(name)
     ) {
+      finish();
       navigateCommand(name);
       return;
     }
-    setCommand({ item, args });
+    setCommand({ item, args, finish });
   }
   return (
     <div className="task-composer">
@@ -2633,38 +2793,66 @@ function TaskComposer({
       {localError && <small role="alert">{localError}</small>}
       {!command && feedback}
       <ComposerInput
-        value={draft}
-        onChange={setDraft}
-        references={references}
+        value={rename ? rename.value : draft}
+        onChange={rename ? (value) => setRename({ value }) : setDraft}
+        references={rename ? [] : references}
         onReferences={setReferences}
-        images={images}
+        images={rename ? [] : images}
         onImages={setImages}
         cwd={record.thread.cwd}
         threadId={id}
         modelSelector={
-          <ModelSelector
-            key={id}
-            tid={id}
-            onPendingChange={setModelPending}
-            model={record.thread.model}
-            reasoningEffort={record.thread.reasoningEffort}
-            serviceTier={record.thread.serviceTier}
-            busy={busy}
-            disabled={
-              !connected ||
-              record.thread.canAcceptDirectInput === false ||
-              record.thread.historyAvailable === false ||
-              !!record.error
-            }
-            run={runSettings}
-            inspectReceipts={inspectReceipts}
-          />
+          !rename && (
+            <ModelSelector
+              key={id}
+              tid={id}
+              onPendingChange={setModelPending}
+              model={record.thread.model}
+              reasoningEffort={record.thread.reasoningEffort}
+              serviceTier={record.thread.serviceTier}
+              busy={busy}
+              disabled={
+                !connected ||
+                record.thread.canAcceptDirectInput === false ||
+                record.thread.historyAvailable === false ||
+                !!record.error
+              }
+              run={runSettings}
+              inspectReceipts={inspectReceipts}
+            />
+          )
         }
-        submitDisabled={mode.pending || modelPending}
-        modeControl={mode.control}
-        onToggleMode={() => void mode.toggle()}
-        active={active}
-        placeholder={!connected || record.error ? "等待连接恢复…" : undefined}
+        submitDisabled={!rename && (mode.pending || modelPending)}
+        modeControl={
+          rename ? (
+            <>
+              <span>重命名会话</span>
+              <button
+                type="button"
+                className="quiet"
+                disabled={busy}
+                onClick={cancelRename}
+              >
+                取消
+              </button>
+            </>
+          ) : (
+            mode.control
+          )
+        }
+        onToggleMode={rename ? undefined : () => void mode.toggle()}
+        active={!rename && active}
+        textOnly={!!rename}
+        onCancel={cancelRename}
+        submitLabel={rename ? "保存名称" : undefined}
+        label={rename ? "会话新名称" : "补充当前任务"}
+        placeholder={
+          rename
+            ? "输入会话名称…"
+            : !connected || record.error
+              ? "等待连接恢复…"
+              : undefined
+        }
         disabled={
           !connected ||
           (busy && !mode.pending) ||
@@ -2672,7 +2860,7 @@ function TaskComposer({
           record.thread.historyAvailable === false ||
           !!record.error
         }
-        onSubmit={() => void submit()}
+        onSubmit={() => void (rename ? saveRename() : submit())}
         onStop={stop}
         onCommand={invoke}
       />
@@ -2683,16 +2871,12 @@ function TaskComposer({
           tid={id}
           close={() => setCommand(null)}
           run={run}
+          onRead={command.finish}
           done={(r) => {
             setGoalRefresh((n) => n + 1);
             if ((command.item.alias || command.item.name) === "plan")
               window.dispatchEvent(new Event("focus"));
-            if (draft.startsWith("/")) {
-              setDraft((current) => (current === draft ? "" : current));
-              setReferences((current) =>
-                current.filter((r) => !references.includes(r)),
-              );
-            }
+            command.finish();
             if (
               typeof r.result?.threadId === "string" &&
               r.result.threadId !== id
@@ -2784,9 +2968,11 @@ function SettingsView({
 function Records({
   connected,
   open,
+  cwd,
 }: {
   connected: boolean;
   open: (id: string) => void;
+  cwd: string;
 }) {
   const [now] = useState(() => Date.now());
   const [rows, setRows] = useState<Thread[]>([]),
@@ -2802,20 +2988,26 @@ function Records({
     [action, setAction] = useState("archive"),
     [results, setResults] = useState<string[]>([]),
     [busy, setBusy] = useState(false);
+  const loadVersion = useRef(0);
   const load = useCallback(
     async (more?: string) => {
+      const version = ++loadVersion.current;
       try {
         const r = await api<{ data: Thread[]; nextCursor: string | null }>(
-          `/threads?archived=${archived}${more ? "&cursor=" + encodeURIComponent(more) : ""}`,
+          `/threads?archived=${archived}${cwd ? "&cwd=" + encodeURIComponent(cwd) : ""}${more ? "&cursor=" + encodeURIComponent(more) : ""}`,
         );
-        setRows((old) => (more ? [...old, ...r.data] : r.data));
+        if (version !== loadVersion.current) return;
+        const data = cwd
+          ? r.data.filter((t) => t.cwd === cwd && !t.parentThreadId)
+          : r.data;
+        setRows((old) => (more ? [...old, ...data] : data));
         setCursor(r.nextCursor);
         setError("");
       } catch (e) {
-        setError(String(e));
+        if (version === loadVersion.current) setError(String(e));
       }
     },
-    [archived],
+    [archived, cwd],
   );
   useEffect(() => {
     queueMicrotask(() => void load());
@@ -2839,13 +3031,23 @@ function Records({
     setPreview(values);
     setBusy(false);
   }
+  const visibleRows = rows.filter(
+    (t) =>
+      (!search ||
+        `${threadTitle(t)} ${t.cwd}`
+          .toLowerCase()
+          .includes(search.toLowerCase())) &&
+      (!older || now / 1000 - t.updatedAt > older * 86400),
+  );
   return (
-    <section className="monitor-page">
+    <section className="monitor-page workspace-management">
+      {cwd && <p className="workspace-management-path">{cwd}</p>}
       <p>归档保留历史；删除不可恢复。执行中或仍有后台活动时，清理会被阻止。</p>
       <div className="actions">
         <label>
           <input
             type="checkbox"
+            disabled={busy || !!preview}
             checked={archived}
             onChange={(e) => {
               setArchived(e.target.checked);
@@ -2855,16 +3057,24 @@ function Records({
           已归档
         </label>
         <input
+          disabled={busy || !!preview}
           aria-label="搜索记录"
           placeholder="搜索已加载记录"
           value={search}
-          onChange={(e) => setSearch(e.target.value)}
+          onChange={(e) => {
+            setSearch(e.target.value);
+            setSelected([]);
+          }}
         />
         <label>
           最近未活动
           <select
+            disabled={busy || !!preview}
             value={older}
-            onChange={(e) => setOlder(Number(e.target.value))}
+            onChange={(e) => {
+              setOlder(Number(e.target.value));
+              setSelected([]);
+            }}
           >
             <option value={0}>不限</option>
             <option value={7}>7 天</option>
@@ -2878,14 +3088,33 @@ function Records({
         {selected.length} 条。
       </p>
       <div className="actions">
+        {cwd && (
+          <label>
+            <input
+              type="checkbox"
+              aria-label="全选当前列表"
+              disabled={busy || !!preview || !visibleRows.length}
+              checked={
+                !!visibleRows.length &&
+                visibleRows.every((t) => selected.includes(t.id))
+              }
+              onChange={(e) =>
+                setSelected(
+                  e.target.checked ? visibleRows.map((t) => t.id) : [],
+                )
+              }
+            />
+            全选
+          </label>
+        )}
         <button
-          disabled={!connected || busy || !selected.length}
+          disabled={!connected || busy || !!preview || !selected.length}
           onClick={() => void prepare(archived ? "unarchive" : "archive")}
         >
           {archived ? "恢复归档" : "归档"}
         </button>
         <button
-          disabled={!connected || busy || !selected.length}
+          disabled={!connected || busy || !!preview || !selected.length}
           onClick={() => void prepare("delete")}
         >
           删除
@@ -2893,7 +3122,9 @@ function Records({
       </div>
       {error && <p role="alert">{error}</p>}
       {results.map((text, i) => (
-        <p key={i}>{text}</p>
+        <p className="workspace-operation-result" key={i}>
+          {text}
+        </p>
       ))}
       <div className="records-table">
         <table>
@@ -2906,48 +3137,47 @@ function Records({
             </tr>
           </thead>
           <tbody>
-            {rows
-              .filter(
-                (t) =>
-                  (!search || `${threadTitle(t)} ${t.cwd}`.includes(search)) &&
-                  (!older || now / 1000 - t.updatedAt > older * 86400),
-              )
-              .map((t) => (
-                <tr key={t.id}>
-                  <td>
-                    <input
-                      aria-label={`选择 ${threadTitle(t)}`}
-                      type="checkbox"
-                      checked={selected.includes(t.id)}
-                      onChange={(e) =>
-                        setSelected((old) =>
-                          e.target.checked
-                            ? [...old, t.id]
-                            : old.filter((id) => id !== t.id),
-                        )
-                      }
-                    />
-                  </td>
-                  <td>
-                    <button className="quiet" onClick={() => open(t.id)}>
-                      {threadTitle(t)}
-                    </button>
-                    <small>{t.cwd}</small>
-                  </td>
-                  <td>
-                    {new Date(t.updatedAt * 1000).toLocaleDateString("zh-CN")}
-                  </td>
-                  <td>{connected ? t.status.type : "状态待确认"}</td>
-                </tr>
-              ))}
+            {visibleRows.map((t) => (
+              <tr key={t.id}>
+                <td>
+                  <input
+                    aria-label={`选择 ${threadTitle(t)}`}
+                    type="checkbox"
+                    disabled={busy || !!preview}
+                    checked={selected.includes(t.id)}
+                    onChange={(e) =>
+                      setSelected((old) =>
+                        e.target.checked
+                          ? [...old, t.id]
+                          : old.filter((id) => id !== t.id),
+                      )
+                    }
+                  />
+                </td>
+                <td>
+                  <button className="quiet" onClick={() => open(t.id)}>
+                    {threadTitle(t)}
+                  </button>
+                  <small>{t.cwd}</small>
+                </td>
+                <td>
+                  {new Date(t.updatedAt * 1000).toLocaleDateString("zh-CN")}
+                </td>
+                <td>{connected ? t.status.type : "状态待确认"}</td>
+              </tr>
+            ))}
           </tbody>
         </table>
       </div>
+      {!visibleRows.length && <p>没有符合条件的对话</p>}
       {cursor && (
-        <button onClick={() => void load(cursor)}>加载更多记录</button>
+        <button disabled={busy || !!preview} onClick={() => void load(cursor)}>
+          加载更多记录
+        </button>
       )}
       {preview && (
-        <Modal
+        <RecordsConfirmation
+          inline={!!cwd}
           title={
             action === "delete"
               ? "永久删除确认"
@@ -2966,9 +3196,10 @@ function Records({
           </p>
           {preview.map((p) => (
             <section key={p.id}>
-              <code>{p.id}</code>
               {p.error ? (
-                <p role="alert">无法核对影响范围：{p.error}</p>
+                <p role="alert">
+                  {p.id}：无法核对影响范围：{p.error}
+                </p>
               ) : (
                 p.value?.scope.map((t) => (
                   <p key={t.id}>
@@ -2987,8 +3218,11 @@ function Records({
               setBusy(true);
               const next = [];
               for (const p of preview) {
+                const label = rows.find((t) => t.id === p.id)
+                  ? threadTitle(rows.find((t) => t.id === p.id)!)
+                  : p.id;
                 if (p.error || !p.value) {
-                  next.push(`${p.id}：未执行，影响范围未确认`);
+                  next.push(`${label}：未执行，影响范围未确认`);
                   continue;
                 }
                 try {
@@ -2999,10 +3233,10 @@ function Records({
                   const items = r?.result?.items as
                     { id: string; state: string }[] | undefined;
                   next.push(
-                    `${p.id}：${!r ? "失败或结果待确认，请核查回执" : items?.some((i) => i.state !== "succeeded") ? "部分失败：" + items.map((i) => i.id + " " + i.state).join("；") : "已确认"}`,
+                    `${label}：${!r ? "失败或结果待确认，请核查回执" : items?.some((i) => i.state !== "succeeded") ? "部分失败：" + items.map((i) => i.id + " " + i.state).join("；") : "已确认"}`,
                   );
                 } catch (e) {
-                  next.push(`${p.id}：${String(e)}`);
+                  next.push(`${label}：${String(e)}`);
                 }
               }
               setResults(next);
@@ -3024,9 +3258,32 @@ function Records({
           <button disabled={busy} onClick={() => setPreview(null)}>
             取消
           </button>
-        </Modal>
+        </RecordsConfirmation>
       )}
     </section>
+  );
+}
+
+function RecordsConfirmation({
+  inline,
+  title,
+  close,
+  children,
+}: {
+  inline: boolean;
+  title: string;
+  close: () => void;
+  children: React.ReactNode;
+}) {
+  return inline ? (
+    <section className="records-confirmation" aria-label={title}>
+      <h3>{title}</h3>
+      {children}
+    </section>
+  ) : (
+    <Modal title={title} close={close}>
+      {children}
+    </Modal>
   );
 }
 

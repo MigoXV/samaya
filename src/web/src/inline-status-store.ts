@@ -87,6 +87,7 @@ export async function printStatus(tid: string, turnId: string | null) {
     tid,
     entries(tid).map((row) => (row.id === entry.id ? entry : row)),
   );
+  return !!entry.data;
 }
 
 export function useStatusEntries(tid: string) {
