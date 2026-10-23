@@ -29,7 +29,7 @@ import type {
   SlashCommand,
 } from "./composer-model";
 import "./composer.css";
-import { promptHistory } from "./prompt-history";
+import { promptHistory, rememberPrompt } from "./prompt-history";
 
 type Candidate = {
   key: string;
@@ -61,6 +61,9 @@ export function ComposerInput({
   modeControl,
   onToggleMode,
   submitDisabled = false,
+  textOnly = false,
+  submitLabel,
+  onCancel,
 }: {
   value: string;
   onChange: (s: string) => void;
@@ -81,6 +84,9 @@ export function ComposerInput({
   modeControl?: ReactNode;
   onToggleMode?: () => void;
   submitDisabled?: boolean;
+  textOnly?: boolean;
+  submitLabel?: string;
+  onCancel?: () => void;
 }) {
   const [catalog, setCatalog] = useState<InputCatalog | null>(null),
     [error, setError] = useState(""),
@@ -103,6 +109,12 @@ export function ComposerInput({
     draft: string;
   } | null>(null);
   const identity = threadId || cwd;
+  useEffect(() => {
+    if (textOnly) {
+      input.current?.focus();
+      input.current?.select();
+    }
+  }, [textOnly]);
   useEffect(() => {
     const closeOutside = (event: Event) => {
       const element = addMenu.current;
@@ -129,10 +141,11 @@ export function ComposerInput({
   }, [identity]);
   const attachmentScope = fileScope(cwd, threadId);
   const [files] = useFileDraft(attachmentScope);
-  const filesPending = files.some((file) => file.status !== "ready");
+  const filesPending =
+    !textOnly && files.some((file) => file.status !== "ready");
   const [dragging, setDragging] = useState(false);
   function addSelected(selected: File[]) {
-    if (disabled || !selected.length) return;
+    if (textOnly || disabled || !selected.length) return;
     const pictures = selected.filter((file) => IMAGE_TYPES.includes(file.type));
     const documents = selected.filter(
       (file) => !IMAGE_TYPES.includes(file.type),
@@ -349,12 +362,19 @@ export function ComposerInput({
       ?.scrollIntoView({ block: "nearest" });
   }, [selected]);
   const trigger =
+    textOnly ||
     shellInput(value) !== null ||
     dismissed ||
     (images.length && value.startsWith("/"))
       ? null
       : inputTrigger(value, caret);
-  const mode = manual ? (manual === "commands" ? "/" : "$") : trigger?.mode;
+  const mode = textOnly
+    ? null
+    : manual
+      ? manual === "commands"
+        ? "/"
+        : "$"
+      : trigger?.mode;
   const query = manual ? "" : trigger?.query.toLowerCase() || "";
   const ready = catalog?.cwd === cwd;
   const candidates: Candidate[] = [];
@@ -425,6 +445,10 @@ export function ComposerInput({
         )),
   );
   function change(text: string) {
+    if (textOnly) {
+      onChange(text.replace(/[\r\n]+/g, " "));
+      return;
+    }
     onChange(text);
     onReferences(references.filter((r) => hasReference(text, r.name)));
     setLiteral(false);
@@ -463,7 +487,8 @@ export function ComposerInput({
   }
   function browse(c: SlashCommand) {
     if (c.name !== "skills" && c.name !== "apps") return false;
-    if (slashInput(value)?.name === c.name) onChange("");
+    if (value.startsWith("/")) onChange("");
+    rememberPrompt(cwd, "/" + c.name);
     setManual(c.name);
     setSelected(0);
     setCaret(0);
@@ -473,6 +498,10 @@ export function ComposerInput({
   }
   function submit() {
     recall.current = null;
+    if (textOnly) {
+      if (!disabled && !submitDisabled && value.trim()) onSubmit();
+      return;
+    }
     if (submitDisabled || readingImages || filesPending) return;
     if (disabled || (!value.trim() && !images.length && !files.length) || stale)
       return;
@@ -530,7 +559,7 @@ export function ComposerInput({
     active && !!onStop && !value.trim() && !images.length && !files.length;
   return (
     <div className="composer-shell">
-      {shellInput(value) !== null && (
+      {!textOnly && shellInput(value) !== null && (
         <small className="muted" role="status">
           Shell 命令 · 当前工作区直接执行
         </small>
@@ -594,8 +623,9 @@ export function ComposerInput({
         onDragOver={(event) => {
           if (!event.dataTransfer.types.includes("Files")) return;
           event.preventDefault();
-          event.dataTransfer.dropEffect = disabled ? "none" : "copy";
-          if (!disabled) setDragging(true);
+          event.dataTransfer.dropEffect =
+            disabled || textOnly ? "none" : "copy";
+          if (!disabled && !textOnly) setDragging(true);
         }}
         onDragLeave={(event) => {
           if (!event.currentTarget.contains(event.relatedTarget as Node | null))
@@ -617,7 +647,7 @@ export function ComposerInput({
           <small className="composer-drop-hint">松开以上传文件</small>
         )}
         <FileAttachments
-          files={files}
+          files={textOnly ? [] : files}
           scope={attachmentScope}
           cwd={cwd}
           tid={threadId}
@@ -718,10 +748,23 @@ export function ComposerInput({
             setCaret(e.target.selectionStart);
           }}
           onSelect={(e) => setCaret(e.currentTarget.selectionStart)}
-          onPaste={(event) => void pasteImages(event)}
+          onPaste={(event) => {
+            if (!textOnly) void pasteImages(event);
+          }}
           placeholder={placeholder ?? (active ? "追加当前指令…" : "发送消息…")}
           onKeyDown={(e) => {
             if (e.nativeEvent.isComposing || e.keyCode === 229) return;
+            if (textOnly) {
+              if (e.key === "Escape" && onCancel) {
+                e.preventDefault();
+                e.stopPropagation();
+                onCancel();
+              } else if (e.key === "Enter") {
+                e.preventDefault();
+                submit();
+              }
+              return;
+            }
             if (
               e.key === "Tab" &&
               e.shiftKey &&
@@ -832,7 +875,7 @@ export function ComposerInput({
           }}
         />
         <div className="composer-toolbar">
-          <details className="composer-add" ref={addMenu}>
+          <details className="composer-add" ref={addMenu} hidden={textOnly}>
             <summary aria-label="添加上下文">
               <img src="/figma/plus.svg" alt="" />
             </summary>
@@ -898,7 +941,8 @@ export function ComposerInput({
                 className="primary composer-send"
                 data-action={stopMode ? "stop" : "send"}
                 aria-label={
-                  stopMode
+                  submitLabel ||
+                  (stopMode
                     ? "停止当前轮次"
                     : shellInput(value) !== null
                       ? "执行 Shell 命令"
@@ -906,7 +950,7 @@ export function ComposerInput({
                         ? "追加指令"
                         : threadId
                           ? "开始下一轮"
-                          : "派发任务"
+                          : "派发任务")
                 }
                 disabled={
                   stopMode

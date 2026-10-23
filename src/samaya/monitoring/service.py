@@ -110,7 +110,15 @@ class Monitor:
             cursor = page.get("nextCursor")
             if not cursor:
                 break
-        loaded = await self.loaded_ids()
+        loaded = await self.loaded_ids() - (
+            self.projection.deleted | self.projection.archived
+        )
+        found = {
+            tid: t
+            for tid, t in found.items()
+            if tid not in self.projection.deleted
+            and tid not in self.projection.archived
+        }
         self.loaded = loaded
         for tid, thread in found.items():
             if tid not in self.projection.records:
@@ -138,6 +146,8 @@ class Monitor:
 
     async def refresh(self, tid: str):
         async with self.read_locks[tid], self.semaphore:
+            if tid in self.projection.deleted or tid in self.projection.archived:
+                return
             generation, version = (
                 self.connection.generation,
                 self.projection.versions.get(tid, 0),
@@ -178,6 +188,8 @@ class Monitor:
                 if tid in self.loaded and tid not in self.joined:
                     await self.queries.join(tid)
                     self.joined.add(tid)
+                if tid in self.projection.deleted or tid in self.projection.archived:
+                    return
                 if tid not in self.projection.records:
                     self.projection.records[tid] = {
                         "thread": thread,
@@ -288,7 +300,9 @@ class Monitor:
                         ids = await self.catalog()
                         targets = ids
                     else:
-                        self.loaded = await self.loaded_ids()
+                        self.loaded = await self.loaded_ids() - (
+                            self.projection.deleted | self.projection.archived
+                        )
                         targets = self.loaded | {
                             tid
                             for tid in self.projection.dirty

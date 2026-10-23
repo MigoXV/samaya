@@ -10,6 +10,9 @@ class Projection:
         self.records: dict[str, dict] = {}
         self.dirty: set[str] = set()
         self.removed: set[str] = set()
+        # Confirmed deletions must outlive flushes and stale in-flight reads.
+        self.deleted: set[str] = set()
+        self.archived: set[str] = set()
         self.versions: dict[str, int] = {}
         self.changes: deque[dict] = deque(maxlen=100)
         self.last_connection = "connecting"
@@ -115,6 +118,41 @@ class Projection:
                     for tid, r in self.records.items()
                 }
             self.dirty.update(self.records)
+            return
+        if method == "samaya/operation" and params.get("state") == "succeeded":
+            action, result = params.get("action"), params.get("result") or {}
+            if action == "unarchive" and tid and tid not in self.deleted:
+                self.archived.discard(tid)
+                self.removed.discard(tid)
+                self.touch(tid)
+                self.refresh_queue.add(tid)
+                return
+            ids = set()
+            if action == "delete":
+                ids = {t["id"] for t in result.get("scope", [])}
+                if tid:
+                    ids.add(tid)
+                self.deleted.update(ids)
+            elif action == "archive":
+                # The native archive receipt explicitly verifies each descendant.
+                ids = {
+                    t["id"]
+                    for t in result.get("items", [])
+                    if t["state"] == "succeeded"
+                }
+                self.archived.update(ids)
+            for target in ids:
+                self.touch(target)  # Invalidate any read started before cleanup.
+                self.records.pop(target, None)
+                self.dirty.discard(target)
+                self.refresh_queue.discard(target)
+                self.removed.add(target)
+            for key in list(self.summaries):
+                if key[0] in ids:
+                    del self.summaries[key]
+            if ids:
+                return
+        if tid in self.deleted or tid in self.archived:
             return
         if not tid or method.endswith(("Delta", "/delta")):
             return

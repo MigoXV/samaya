@@ -145,9 +145,12 @@ def register_routes(application: FastAPI, config: Settings) -> None:
 
     @application.get("/api/threads")
     async def threads(
-        archived: bool = False, cursor: str | None = None, search: str | None = None
+        archived: bool = False,
+        cursor: str | None = None,
+        search: str | None = None,
+        cwd: str | None = None,
     ):
-        return await service().sessions.threads(archived, cursor, search)
+        return await service().sessions.threads(archived, cursor, search, cwd)
 
     @application.get("/api/threads/{tid}")
     async def thread(tid: str, subscribe: bool = False):

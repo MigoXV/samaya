@@ -20,7 +20,8 @@ Samaya 采用可收起任务侧栏、连续对话和一体输入框。任务监�
 | --- | --- |
 | `/model`、`/reasoning`、`/fast`、`/plan` | 读取当前 daemon 的真实选项，确认后更新会话设置，影响后续轮次 |
 | `/permissions`、`/memories` | 选择可用权限配置或会话记忆模式；执行时再次校验选项 |
-| `/rename`、`/compact` | 重命名或原生上下文压缩；压缩需要空闲轮次 |
+| `/rename` | 原输入框填入并选中会话名，Enter 直接保存，Esc 或取消退出，不弹确认框 |
+| `/compact` | 原生上下文压缩，需要空闲轮次 |
 | `/review` | 原生审查未提交改动、基础分支或指定提交 |
 | `/fork` | 直接创建持久分支并进入新会话，不打开确认弹窗；失败保留输入 |
 | `/side`（`/btw`） | 临时会话分支；临时会话不承诺持久保存 |
@@ -153,3 +154,27 @@ Figma 白垣／苍渊对应：新会话 `224:12329` / `224:3486`，默认模式 
 设计：[白垣](https://www.figma.com/design/TZOGfIsv1ESAQckxwg4lpa?node-id=296-24199)、[苍渊](https://www.figma.com/design/TZOGfIsv1ESAQckxwg4lpa?node-id=296-24235)。
 
 用量条左侧浅色表示剩余，右侧深色表示已用；文字仅显示左侧剩余，辅助技术读取的进度值也为剩余比例。颜色档位根据剩余占比判断紧张程度。Token 数字按 K/M/B 简写，最多保留一位小数；右上角仅保留时间。
+
+## 命令完成与输入清理
+
+通过候选选择的命令（如 `/sta` → `/status`）在成功读取或执行后清除原命令草稿，包含会话内保存的草稿；不要求输入完整命令名。复制与导航成功后同样消费命令，技能／应用浏览入口清除命令前缀；`/init` 仍按设计填入待检查正文。取消、读取失败、命令不可用及执行未确认时保留输入，异步完成不会清除等待期间新写的草稿。普通答复成功不再在输入框上方显示“答复已发送／已确认”的全局提示；请求卡片继续反映服务端的处理状态，错误与未确认回执保持可见。
+
+## 会话操作与命令历史
+
+侧栏每条对话提供省略号按钮，悬停、聚焦、选中和触摸设备上可见；右键同一行打开同一份菜单，只有“重命名、归档、删除”。右键不会切换当前对话；点击菜单重命名直接在左侧对话标题处编辑，Enter 或失焦保存，Esc 取消；不切换对话、不占用消息输入框。`/rename` 仍在主输入框编辑。名字按字面处理，`/` 和 `!` 不会触发命令，也不会发送消息；保存失败保留名字和编辑状态。归档保留范围预览确认；菜单删除首次点击后原位变为“确定删除”，后台静默获取范围和摘要，第二次点击执行，失败留在菜单内。两者保留服务端范围校验与保护，运行中或有后台命令时仍拒绝清理。菜单支持方向键、Esc、点击外部关闭，滚动与窄屏下保持在可视区域。
+
+成功执行的斜杠命令按完整命令名加入工作区本地输入历史，↑/↓可回溯，包括 `/sta` 补全后的 `/status`、查看命令及成功重命名后的 `/rename 名称`；失败或取消的命令不记录。离开会话或切换工作区时丢弃未执行的首字符为 `/` 的草稿，普通文字草稿继续保留；历史记录与临时草稿分别处理。
+
+Figma：[内联重命名 · 白垣](https://www.figma.com/design/TZOGfIsv1ESAQckxwg4lpa?node-id=316-12139)、[苍渊](https://www.figma.com/design/TZOGfIsv1ESAQckxwg4lpa?node-id=316-12336)、[对话操作菜单 · 白垣](https://www.figma.com/design/TZOGfIsv1ESAQckxwg4lpa?node-id=316-12533)、[苍渊](https://www.figma.com/design/TZOGfIsv1ESAQckxwg4lpa?node-id=316-12622)。
+
+Figma 同步状态：[侧栏重命名·白垣](https://www.figma.com/design/TZOGfIsv1ESAQckxwg4lpa?node-id=322-15432)、[苍渊](https://www.figma.com/design/TZOGfIsv1ESAQckxwg4lpa?node-id=322-15684)；[原位删除确认·白垣](https://www.figma.com/design/TZOGfIsv1ESAQckxwg4lpa?node-id=319-12362)、[苍渊](https://www.figma.com/design/TZOGfIsv1ESAQckxwg4lpa?node-id=319-12560)。
+
+删除成功回执到达后，监控立即移除该会话及返回范围内的后代，并发送列表移除补丁；过期目录、旧状态查询和延迟事件不能重新加入已删除条目。失败或结果待确认时保留条目，不按成功处理。
+
+## 工作区管理
+
+工作区标题旁新增省略号入口，进入 `/sessions?cwd=...`，刷新后保留当前工作区。页面使用独立的 `WorkspaceManagement` 组件，沿用任务总览的 1168px 外框、912px 主列、40px 筛选控件和 64px 对话行。服务端在分页前按工作目录精确筛选；只展示主会话，清理范围包含后代。支持搜索已加载对话、状态筛选、最近／最早活动排序、全选、批量归档、恢复归档和永久删除。路径只显示一次，长标题桌面一行、手机两行截断。全局记录管理保持原入口。
+
+批量操作集中在列表上方的固定操作行。归档与恢复先静默核对范围再执行；删除在原位变为“确定删除 N 个”，可展开检查后代及其它目录的影响范围，不另弹窗口。确认期间锁定筛选和选择，取消不执行操作。范围读取最多并行四项，写操作逐项执行；结果收成一行摘要，失败原因可展开，失败条目保留。失败或结果待确认不会自动重发。列表具有独立滚动区和稳定的滚动条占位，避免长记录把确认按钮推到页底。归档成功的条目立即退出侧栏与任务总览；部分失败只移除已核实成功的范围，恢复归档后重新核对显示。执行中或仍有后台命令的会话继续由服务端拒绝清理。
+
+Figma 独立 Page：[18 · 工作区管理](https://www.figma.com/design/TZOGfIsv1ESAQckxwg4lpa?node-id=328-15550)；现行桌面稿：[白垣](https://www.figma.com/design/TZOGfIsv1ESAQckxwg4lpa?node-id=328-15551)、[苍渊](https://www.figma.com/design/TZOGfIsv1ESAQckxwg4lpa?node-id=328-15749)；[手机稿](https://www.figma.com/design/TZOGfIsv1ESAQckxwg4lpa?node-id=332-13511)。图标已从现行稿导出到 `public/figma/workspace-management`，按主题使用语义颜色。浏览器回归入口：`pnpm --dir src/web run test:composer` 中的 `workspace-management.mjs`。

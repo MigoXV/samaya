@@ -63,6 +63,13 @@ try {
   await context.route("**/api/input-catalog?*", (route) =>
     route.fulfill({
       json: {
+        cwd:
+          state.records.find(
+            (r) =>
+              r.thread.id ===
+              new URL(route.request().url()).searchParams.get("threadId"),
+          )?.thread.cwd ||
+          new URL(route.request().url()).searchParams.get("cwd"),
         references: [],
         commands: [
           {
@@ -130,10 +137,12 @@ try {
   await expect(known).toHaveValue("");
   expect(calls.filter((c) => c.action === "create")).toHaveLength(1);
   const before = calls.length;
-  await known.fill("/status");
+  await known.fill("/sta");
+  await expect(page.getByRole("option", { name: /\/status/ })).toBeVisible();
   await known.press("Enter");
-  const status = page.getByRole("status", { name: "会话状态与用量" });
+  const status = page.getByRole("status", { name: "会话状态与用量" }).last();
   await expect(status).toContainText("2.5K");
+  await expect(known).toHaveValue("");
   await expect(status).toContainText("剩余 88%");
   await expect(status).toContainText("剩余 80%");
   await expect(status).toContainText("2.5M");
@@ -211,15 +220,62 @@ try {
   await page.setViewportSize({ width: 1440, height: 900 });
   await expect(page.getByRole("dialog")).toHaveCount(0);
   expect(calls).toHaveLength(before);
+  let statusFailure = true,
+    holdStatus = false,
+    releaseStatus;
+  await context.route("**/command-context?command=status", async (route) => {
+    if (statusFailure)
+      return route.fulfill({
+        status: 503,
+        json: { detail: "用量读取失败（测试）" },
+      });
+    if (holdStatus)
+      await new Promise((resolve) => {
+        releaseStatus = resolve;
+      });
+    return route.fallback();
+  });
+  await known.fill("/sta");
+  await page.getByRole("option", { name: /\/status/ }).click();
+  await expect(status).toContainText("用量读取失败（测试）");
+  await expect(known).toHaveValue("/sta");
+  statusFailure = false;
+  await known.fill("");
+  await known.fill("/sta");
+  await expect(page.getByRole("option", { name: /\/status/ })).toBeVisible();
+  await known.press("Tab");
+  await expect(status).toContainText("2.5K");
+  await expect(known).toHaveValue("");
+  holdStatus = true;
+  await known.fill("/sta");
+  await page.getByRole("option", { name: /\/status/ }).click();
+  await expect.poll(() => typeof releaseStatus).toBe("function");
+  await known.fill("读取期间输入的新草稿");
+  releaseStatus();
+  await expect(status).toContainText("2.5K");
+  await expect(known).toHaveValue("读取期间输入的新草稿");
+  expect(calls).toHaveLength(before);
   await page.reload();
   await expect(status).toContainText("2.5K");
+  await expect(known).toHaveValue("读取期间输入的新草稿");
   const nav = page.locator(".nav-workspaces");
   const laya = nav.locator('[data-sidebar-workspace="/demo/Laya"]');
   await expect(laya.locator(".nav-workspace-threads")).toBeVisible();
-  await expect(laya.locator(".nav-workspace-threads > button")).toHaveCount(11);
+  await expect(
+    laya.locator(
+      ".nav-workspace-threads :is(.nav-conversation, .nav-show-more)",
+    ),
+  ).toHaveCount(11);
   await laya.getByRole("button", { name: /再显示/ }).click();
-  await expect(laya.locator(".nav-workspace-threads > button")).toHaveCount(13);
-  await laya.locator(".nav-workspace-threads > button").nth(1).click();
+  await expect(
+    laya.locator(
+      ".nav-workspace-threads :is(.nav-conversation, .nav-show-more)",
+    ),
+  ).toHaveCount(13);
+  await laya
+    .locator(".nav-workspace-threads :is(.nav-conversation, .nav-show-more)")
+    .nth(1)
+    .click();
   await expect(page).toHaveURL(/thread=demo-/);
   for (const r of state.records) {
     r.turn && (r.turn.status = "completed");
@@ -247,7 +303,9 @@ try {
     "运行中 1",
   );
   const runningConversation = laya.locator('[data-conversation-id="demo-1"]');
-  await expect(runningConversation).toHaveClass(/conversation-running/);
+  await expect(runningConversation.locator("..")).toHaveClass(
+    /conversation-running/,
+  );
   await expect(
     runningConversation.locator(".nav-conversation-status"),
   ).toHaveText("运行中");

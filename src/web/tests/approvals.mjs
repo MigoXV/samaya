@@ -41,6 +41,8 @@ try {
     .toBe(1);
   expect(calls.at(-1).body.response).toEqual({ decision: "accept" });
   await expect(panel).toHaveCount(0);
+  await expect(page.locator(".operation-feedback[role=status]")).toHaveCount(0);
+  await page.screenshot({ path: "../../.samaya/approval-quiet.png" });
   state.pendingRequests = [
     { ...structuredClone(approval), id: 23, key: "approval-23" },
   ];

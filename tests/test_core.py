@@ -414,3 +414,42 @@ def test_usage_requires_authentication(web):
         app.state.runtime.connection.rpc = AsyncMock()
         assert client.get("/api/usage").status_code == 401
         app.state.runtime.connection.rpc.assert_not_called()
+
+
+def test_workspace_management_list_passes_exact_scope_and_cursor(web):
+    with TestClient(create_app(web)) as client:
+        runtime = client.app.state.runtime
+        runtime.sessions.threads = AsyncMock(
+            return_value={"data": [], "nextCursor": None}
+        )
+        response = client.get(
+            "/api/threads",
+            params={"cwd": "/demo/Laya", "archived": "true", "cursor": "next-page"},
+        )
+        assert response.status_code == 200
+        runtime.sessions.threads.assert_awaited_once_with(
+            True, "next-page", None, "/demo/Laya"
+        )
+
+
+@pytest.mark.asyncio
+async def test_workspace_filter_is_native_before_pagination(tmp_path):
+    from types import SimpleNamespace
+    from unittest.mock import Mock
+
+    store = Store(tmp_path)
+    service = Runtime(Settings(data_dir=tmp_path), store)
+    service.connection.state = "connected"
+    native = AsyncMock(
+        return_value=Mock(
+            model_dump=Mock(return_value={"data": [], "nextCursor": "next"})
+        )
+    )
+    service.connection.adapter = SimpleNamespace(
+        sdk=SimpleNamespace(thread_list=native)
+    )
+    result = await service.sessions.threads(cwd="/demo/Laya", cursor="before")
+    assert result["nextCursor"] == "next"
+    assert native.call_args.kwargs["cwd"] == "/demo/Laya"
+    assert native.call_args.kwargs["cursor"] == "before"
+    store.close()

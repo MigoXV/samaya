@@ -309,3 +309,142 @@ async def test_first_plan_before_new_turn_read_is_retained_without_reviving_old_
     await m.refresh("a")
     assert m.projection.records["a"]["turn"]["id"] == "new"
     assert m.projection.records["a"]["plan"]["steps"][0]["step"] == "verify"
+
+
+def deletion_event(state="succeeded"):
+    return {
+        "method": "samaya/operation",
+        "params": {
+            "threadId": "a",
+            "action": "delete",
+            "state": state,
+            "result": {"scope": [{"id": "a"}, {"id": "child"}]},
+        },
+    }
+
+
+def test_confirmed_delete_removes_entire_scope_immediately(service):
+    projection = service.monitor.projection
+    for tid in ("a", "child", "other"):
+        projection.records[tid] = record()
+        projection.touch(tid)
+        projection.refresh_queue.add(tid)
+    service.monitor.event(deletion_event())
+    assert set(projection.records) == {"other"}
+    assert projection.removed == {"a", "child"}
+    assert projection.dirty == {"other"}
+    assert projection.refresh_queue == {"other"}
+    # Flushing the removal patch or receiving late native events cannot undo deletion.
+    projection.removed.clear()
+    service.monitor.event(
+        {"method": "thread/started", "params": {"thread": {"id": "a"}}}
+    )
+    assert "a" not in projection.refresh_queue
+    assert "a" not in projection.dirty
+
+
+@pytest.mark.parametrize("state", ["failed", "uncertain", "pending"])
+def test_unconfirmed_delete_keeps_conversation_visible(service, state):
+    service.monitor.projection.records["a"] = record()
+    service.monitor.event(deletion_event(state))
+    assert "a" in service.monitor.projection.records
+    assert not service.monitor.projection.deleted
+    assert not service.monitor.projection.removed
+
+
+@pytest.mark.asyncio
+async def test_delete_invalidates_inflight_refresh_and_stale_catalog(service):
+    monitor = service.monitor
+    monitor.projection.records["a"] = record()
+    entered, release = asyncio.Event(), asyncio.Event()
+
+    async def read(method, params):
+        assert method == "thread/read"
+        entered.set()
+        await release.wait()
+        return {"thread": record()["thread"]}
+
+    service.connection.rpc = AsyncMock(side_effect=read)
+    service.sessions.turns = AsyncMock(return_value={"data": []})
+    task = asyncio.create_task(monitor.refresh("a"))
+    await entered.wait()
+    monitor.event(deletion_event())
+    release.set()
+    await task
+    assert "a" not in monitor.projection.records
+    service.connection.rpc.reset_mock()
+    await monitor.refresh("a")
+    service.connection.rpc.assert_not_called()
+    # Even a catalog response captured before deletion must not recreate the row.
+    service.sessions.threads = AsyncMock(return_value={"data": [record()["thread"]]})
+    monitor.loaded_ids = AsyncMock(return_value={"a"})
+    assert await monitor.catalog() == set()
+    assert monitor.snapshot()["records"] == []
+    assert "a" not in monitor.projection.records
+
+
+@pytest.mark.asyncio
+async def test_delete_receipt_updates_snapshot_and_removal_patch(service):
+    projection = service.monitor.projection
+    projection.records["a"] = record()
+    projection.records["child"] = record()
+    service.actions.execute = AsyncMock(
+        return_value=deletion_event()["params"]["result"]
+    )
+    result = await service.operations.execute(
+        "delete-once", "delete", {"threadId": "a", "digest": "verified"}
+    )
+    assert result["state"] == "succeeded"
+    assert service.monitor.snapshot()["records"] == []
+    task = asyncio.create_task(service.monitor.flush())
+    try:
+        await asyncio.sleep(0.3)
+        assert set(service.monitor.patches[-1]["removed"]) == {"a", "child"}
+        assert service.monitor.patches[-1]["records"] == []
+    finally:
+        task.cancel()
+        await asyncio.gather(task, return_exceptions=True)
+    # Retry with the same operation ID reads the receipt, never replays deletion.
+    await service.operations.execute(
+        "delete-once", "delete", {"threadId": "a", "digest": "verified"}
+    )
+    assert service.actions.execute.await_count == 1
+
+
+def test_partial_archive_removes_only_confirmed_items_and_restore_reappears(service):
+    projection = service.monitor.projection
+    for tid in ("a", "child"):
+        projection.records[tid] = record()
+    service.monitor.event(
+        {
+            "method": "samaya/operation",
+            "params": {
+                "threadId": "a",
+                "action": "archive",
+                "state": "succeeded",
+                "result": {
+                    "items": [
+                        {"id": "a", "state": "succeeded"},
+                        {"id": "child", "state": "failed"},
+                    ]
+                },
+            },
+        }
+    )
+    assert set(projection.records) == {"child"}
+    assert projection.archived == {"a"}
+    assert projection.removed == {"a"}
+    service.monitor.event(
+        {
+            "method": "samaya/operation",
+            "params": {
+                "threadId": "a",
+                "action": "unarchive",
+                "state": "succeeded",
+                "result": {},
+            },
+        }
+    )
+    assert not projection.archived
+    assert not projection.removed
+    assert "a" in projection.refresh_queue

@@ -136,6 +136,7 @@ class SessionQueries:
         archived: bool = False,
         cursor: str | None = None,
         search: str | None = None,
+        cwd: str | None = None,
     ) -> dict:
         result = await self.connection.connected().sdk.thread_list(
             archived=archived,
@@ -145,6 +146,7 @@ class SessionQueries:
             source_kinds=list(ThreadSourceKind),
             sort_key=ThreadSortKey.updated_at,
             use_state_db_only=True,
+            **({"cwd": cwd} if cwd is not None else {}),
         )
         data = result.model_dump(mode="json", by_alias=True)
         data["data"] = [normalize({**t, "archived": archived}) for t in data["data"]]

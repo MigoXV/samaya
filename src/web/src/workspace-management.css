@@ -1,0 +1,473 @@
+.workspace-management-mode .monitor-main > .monitor-toolbar {
+  display: none;
+}
+.workspace-manager {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  max-width: 1168px;
+  margin: 0 auto;
+  padding: 24px clamp(24px, 8.9vw, 128px) 32px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.workspace-manager > * {
+  flex-shrink: 0;
+}
+.workspace-manager button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 32px;
+  padding: 4px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  line-height: 20px;
+  white-space: nowrap;
+}
+.workspace-manager button:disabled {
+  cursor: default;
+}
+.workspace-manager .wm-heading {
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.workspace-manager .wm-heading h1 {
+  margin: 0;
+  font-size: 32px;
+  line-height: 44px;
+  font-weight: 500;
+}
+.workspace-manager .wm-back {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text-secondary);
+}
+.wm-narrow {
+  display: none;
+}
+.wm-icon {
+  display: inline-block;
+  flex: 0 0 16px;
+  width: 16px;
+  height: 16px;
+  background: currentColor;
+  mask-repeat: no-repeat;
+  mask-position: center;
+  mask-size: 16px 16px;
+}
+.wm-icon-left {
+  mask-image: url("/figma/workspace-management/left.svg");
+}
+.wm-icon-search {
+  mask-image: url("/figma/workspace-management/search.svg");
+}
+.wm-icon-down {
+  mask-image: url("/figma/workspace-management/down.svg");
+}
+.wm-icon-plus {
+  mask-image: url("/figma/workspace-management/plus.svg");
+}
+.wm-icon-check {
+  mask-image: url("/figma/workspace-management/check.svg");
+}
+.wm-icon-trash {
+  mask-image: url("/figma/workspace-management/trash.svg");
+  color: var(--av-danger);
+}
+.wm-identity {
+  min-height: 56px;
+  margin-top: 16px;
+}
+.workspace-manager .wm-identity h2 {
+  font-size: 18px;
+  font-weight: 500;
+  line-height: 28px;
+  margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.workspace-manager .wm-identity p {
+  font-size: 12px;
+  line-height: 20px;
+  color: var(--text-secondary);
+  margin: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.wm-scope {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 16px;
+}
+.wm-search {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 320px;
+  min-width: 100px;
+  height: 40px;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--text-secondary);
+}
+.workspace-manager .wm-search input {
+  min-width: 0;
+  width: 100%;
+  height: 38px;
+  min-height: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  padding: 0;
+  font-size: 14px;
+  line-height: 22px;
+  color: var(--text-primary);
+}
+.wm-search:focus-within {
+  outline: 2px solid var(--border-strong);
+  outline-offset: 2px;
+}
+.wm-search input:focus-visible {
+  outline: none;
+}
+.wm-select {
+  position: relative;
+  display: flex;
+  flex: 0 0 116px;
+  width: 116px;
+}
+.workspace-manager .wm-select select {
+  appearance: none;
+  width: 100%;
+  height: 40px;
+  min-height: 0;
+  padding: 0 30px 0 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--text-primary);
+  font-size: 12px;
+  line-height: 20px;
+}
+.wm-select > .wm-icon {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+.workspace-manager .wm-create {
+  margin-left: auto;
+  min-width: 116px;
+  min-height: 40px;
+  height: 40px;
+}
+.wm-batch {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 40px;
+  margin-top: 24px;
+  font-size: 12px;
+  line-height: 20px;
+}
+.wm-selection {
+  white-space: nowrap;
+}
+.wm-batch-actions {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+.wm-count {
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+.wm-batch .wm-sort {
+  flex-basis: 108px;
+  width: 108px;
+}
+.workspace-manager .wm-sort select {
+  height: 32px;
+}
+.wm-check {
+  position: relative;
+  display: inline-flex;
+  flex: 0 0 16px;
+  width: 16px;
+  height: 16px;
+}
+.workspace-manager .wm-check input {
+  position: absolute;
+  inset: 0;
+  width: 16px;
+  height: 16px;
+  min-height: 0;
+  padding: 0;
+  margin: 0;
+  opacity: 0;
+  z-index: 1;
+  cursor: pointer;
+}
+.wm-check > span {
+  position: absolute;
+  inset: 0;
+  border: 1px solid var(--border-strong);
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+}
+.wm-check input:is(:checked, :indeterminate) + span {
+  background: var(--selected);
+}
+.wm-check input:focus-visible + span {
+  outline: 2px solid var(--text-secondary);
+  outline-offset: 3px;
+}
+.wm-check .wm-icon {
+  width: 14px;
+  height: 14px;
+  flex-basis: 14px;
+  mask-size: 14px 14px;
+}
+.wm-check input:disabled {
+  cursor: default;
+}
+.wm-check input:disabled:not(:checked) + span {
+  opacity: 0.65;
+}
+.wm-feedback {
+  min-height: 28px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 12px;
+  line-height: 20px;
+  color: var(--text-secondary);
+}
+.wm-feedback > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.workspace-manager .wm-text-button {
+  min-height: 20px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  flex-shrink: 0;
+  color: var(--text-primary);
+  margin-left: auto;
+}
+.workspace-manager .wm-danger {
+  border-color: var(--av-danger);
+}
+.wm-details {
+  max-height: 160px;
+  overflow: auto;
+  border-block: 1px solid var(--border);
+  padding: 8px 12px;
+  margin: 4px 0;
+  font-size: 12px;
+}
+.workspace-manager .wm-details p {
+  margin: 4px 0;
+}
+.wm-details small {
+  overflow-wrap: anywhere;
+}
+.wm-list {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  scrollbar-gutter: stable;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.wm-conversation {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  min-height: 64px;
+  padding: 0 12px;
+  border-radius: 8px;
+}
+.wm-conversation:hover {
+  background: var(--hover);
+}
+.wm-conversation.is-selected {
+  background: var(--surface-subtle);
+}
+.workspace-manager .wm-conversation-body {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 0;
+  min-width: 0;
+  flex: 1;
+  min-height: 48px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  border-radius: 0;
+  color: var(--text-primary);
+  white-space: normal;
+  text-align: left;
+}
+.wm-conversation-title {
+  width: 100%;
+  font-size: 14px;
+  line-height: 22px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.wm-conversation-meta {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  line-height: 20px;
+  color: var(--text-secondary);
+}
+.workspace-manager .wm-enter {
+  flex: 0 0 88px;
+}
+.workspace-manager .wm-empty {
+  font-size: 14px;
+  line-height: 22px;
+  color: var(--text-secondary);
+  margin: 24px 12px;
+}
+.wm-footer {
+  min-height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 12px;
+  line-height: 20px;
+  color: var(--text-secondary);
+}
+.workspace-manager .wm-footer button {
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+@media (max-width: 799px) {
+  .workspace-manager {
+    padding: 16px 20px 24px;
+  }
+  .workspace-manager .wm-heading {
+    min-height: 44px;
+  }
+  .workspace-manager .wm-heading h1 {
+    font-size: 24px;
+    line-height: 36px;
+  }
+  .wm-wide {
+    display: none;
+  }
+  .wm-narrow {
+    display: inline;
+  }
+  .wm-scope {
+    flex-wrap: wrap;
+  }
+  .wm-search {
+    width: 100%;
+    flex-basis: 100%;
+  }
+  .wm-scope .wm-select {
+    flex: 1;
+    width: auto;
+    min-width: 0;
+  }
+  .workspace-manager .wm-create {
+    min-width: 0;
+    width: 94px;
+    padding-inline: 8px;
+  }
+  .wm-batch-actions {
+    gap: 8px;
+  }
+  .workspace-manager .wm-batch button {
+    padding-inline: 8px;
+    gap: 6px;
+  }
+  .wm-batch .wm-count {
+    display: none;
+  }
+  .wm-batch:has(.wm-danger) .wm-icon-trash {
+    width: 14px;
+    flex-basis: 14px;
+    mask-size: 14px;
+  }
+  .wm-feedback {
+    min-height: 44px;
+  }
+  .wm-feedback > span {
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+  .wm-conversation {
+    min-height: 72px;
+    gap: 12px;
+    padding-inline: 8px;
+  }
+  .wm-conversation-title {
+    white-space: normal;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    overflow: hidden;
+    line-height: 20px;
+  }
+  .workspace-manager .wm-enter {
+    display: none;
+  }
+}
+.wm-icon-archive {
+  mask-image: url("/figma/workspace-management/archive.svg");
+}
+.workspace-manager label {
+  margin-bottom: 0;
+  flex-direction: row;
+}
+.wm-list {
+  max-height: 568px;
+}
+@media (max-width: 799px) {
+  .wm-list {
+    max-height: none;
+  }
+}
+.wm-conversation-title {
+  max-width: 620px;
+}
+@media (max-width: 799px) {
+  .wm-conversation-title {
+    max-width: none;
+  }
+}
