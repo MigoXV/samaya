@@ -11,7 +11,10 @@ import { HistoryPagination } from "./HistoryPagination";
 import type { HistoryPage } from "./HistoryPagination";
 import type { Item, Turn } from "./types";
 
-type Live = { text: string; kind: string };
+type Live = {
+  text: string;
+  kind: "agentMessage" | "plan" | "commandExecution" | "mcpToolCall";
+};
 type Summary = {
   diff: string | null;
   notice?: string | null;
@@ -316,6 +319,20 @@ function TurnHistory({
                 ...page.filter((i) => !old.some((o) => o.id === i.id)),
               ],
         );
+        if (turn.status !== "inProgress") {
+          // Replace observed plan text only when its authoritative final item arrives.
+          let changed = false;
+          for (const item of page) {
+            if (
+              item.type === "plan" &&
+              chunks.current[item.id]?.kind === "plan"
+            ) {
+              delete chunks.current[item.id];
+              changed = true;
+            }
+          }
+          if (changed) setLive({ ...chunks.current });
+        }
         if (more || !hasLoaded.current) {
           pageCursor.current = r.nextCursor;
           setCursor(r.nextCursor);
@@ -335,7 +352,7 @@ function TurnHistory({
         requests.current.delete(controller);
       }
     },
-    [base],
+    [base, turn.status],
   );
   useEffect(() => {
     onPaging(turn.id, {
@@ -405,10 +422,19 @@ function TurnHistory({
           ? old.map((i) => (i.id === item.id ? item : i))
           : [...old, item],
       );
+    const retainPlans = () => {
+      // Reconnection must not erase the plan prefix already shown to the user.
+      chunks.current = Object.fromEntries(
+        Object.entries(chunks.current).filter(
+          ([, value]) => value.kind === "plan",
+        ),
+      );
+      setLive({ ...chunks.current });
+    };
     es.addEventListener("snapshot", () => {
-      chunks.current = {};
-      setLive({});
-      completed.current.clear();
+      retainPlans();
+      for (const [id, item] of completed.current)
+        if (item.type !== "plan") completed.current.delete(id);
       void load();
       void reloadSummary();
     });
@@ -422,6 +448,7 @@ function TurnHistory({
       if (
         [
           "item/agentMessage/delta",
+          "item/plan/delta",
           "item/commandExecution/outputDelta",
         ].includes(event.method)
       ) {
@@ -430,9 +457,12 @@ function TurnHistory({
           text: (
             (chunks.current[p.itemId]?.text || "") + (p.delta || "")
           ).slice(-100000),
-          kind: event.method.includes("agentMessage")
-            ? "agentMessage"
-            : "commandExecution",
+          kind:
+            event.method === "item/plan/delta"
+              ? "plan"
+              : event.method === "item/agentMessage/delta"
+                ? "agentMessage"
+                : "commandExecution",
         };
         if (!timer)
           timer = setTimeout(() => {
@@ -457,8 +487,7 @@ function TurnHistory({
       } else if (event.method === "samaya/turnSummaryChanged") {
         void reloadSummary();
       } else if (event.method === "turn/completed") {
-        chunks.current = {};
-        setLive({});
+        retainPlans();
         void load();
       }
     };
@@ -527,7 +556,10 @@ function TurnHistory({
             ...item,
             type: fragment.kind,
             status: "inProgress",
-            text: fragment.kind === "agentMessage" ? fragment.text : item.text,
+            text:
+              fragment.kind === "agentMessage" || fragment.kind === "plan"
+                ? fragment.text
+                : item.text,
             aggregatedOutput:
               fragment.kind === "commandExecution"
                 ? fragment.text
@@ -540,7 +572,7 @@ function TurnHistory({
         id={`activity-${turn.id}-${item.id}`}
         hidden={
           tab === "result" &&
-          !["fileChange", "agentMessage"].includes(item.type)
+          !["fileChange", "agentMessage", "plan"].includes(item.type)
         }
         data-item-id={item.id}
       >
