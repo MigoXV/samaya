@@ -50,6 +50,7 @@ class Monitor:
         self.wake = asyncio.Event()
 
         self.projection = Projection()
+        self.activities = store.activities()
         self.stopping = False
 
     def event(self, event: dict) -> None:
@@ -61,6 +62,11 @@ class Monitor:
         )
         if self.projection.refresh_queue:
             self.wake.set()
+
+    def activity(self, tid: str, seq: int):
+        self.activities[tid] = {"lastActivityId": seq, "lastActivityAt": time.time()}
+        # Reuse the bounded patch cadence without scheduling a native read per delta.
+        self.projection.dirty.add(tid)
 
     def turn_summary(self, tid: str, turn_id: str) -> dict:
         return self.projection.turn_summary(tid, turn_id)
@@ -82,7 +88,10 @@ class Monitor:
     def snapshot(self, records=None):
         return {
             "records": [
-                self.projection.summary_record(r)
+                {
+                    **self.projection.summary_record(r),
+                    **self.activities.get(r["thread"]["id"], {}),
+                }
                 for r in (
                     self.projection.records.values() if records is None else records
                 )

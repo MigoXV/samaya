@@ -21,6 +21,12 @@ export function PlanActions({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const seen = useRef(new Set<string>());
+  const revision = useRef(0);
+  const dismiss = () => {
+    revision.current++;
+    setCandidate(null);
+    setError("");
+  };
   useEffect(() => {
     let alive = true;
     const completed = (event: Event) => {
@@ -38,6 +44,7 @@ export function PlanActions({
       )
         return;
       seen.current.add(data.turn.id);
+      const request = ++revision.current;
       void (async () => {
         try {
           const [mode, page] = await Promise.all([
@@ -51,16 +58,29 @@ export function PlanActions({
           const plan = page.data
             .map((row) => row.item)
             .find((item) => item.type === "plan" && item.text?.trim());
-          if (alive && mode.current === "plan" && plan)
+          if (
+            alive &&
+            request === revision.current &&
+            mode.current === "plan" &&
+            plan
+          )
             setCandidate({ turnId: data.turn.id, planItemId: plan.id });
         } catch {
           /* A missed completion never fabricates a plan decision. */
         }
       })();
     };
+    const continued = (event: Event) => {
+      if ((event as CustomEvent<{ threadId: string }>).detail.threadId === tid)
+        dismiss();
+    };
+    window.addEventListener("samaya:input-accepted", continued);
+    window.addEventListener("samaya:turn-started", continued);
     window.addEventListener("samaya:turn-completed", completed);
     return () => {
       alive = false;
+      window.removeEventListener("samaya:input-accepted", continued);
+      window.removeEventListener("samaya:turn-started", continued);
       window.removeEventListener("samaya:turn-completed", completed);
     };
   }, [tid, editable]);
@@ -105,11 +125,7 @@ export function PlanActions({
         >
           清空上下文执行
         </button>
-        <button
-          type="button"
-          disabled={busy}
-          onClick={() => setCandidate(null)}
-        >
+        <button type="button" disabled={busy} onClick={dismiss}>
           留在计划模式
         </button>
       </div>

@@ -33,6 +33,7 @@ class Store:
         PRAGMA journal_mode=WAL;
         CREATE TABLE IF NOT EXISTS operations(id TEXT PRIMARY KEY, fingerprint TEXT, state TEXT, result TEXT, created REAL);
         CREATE TABLE IF NOT EXISTS events(id INTEGER PRIMARY KEY AUTOINCREMENT, payload TEXT, created REAL);
+        CREATE TABLE IF NOT EXISTS thread_activity(thread_id TEXT PRIMARY KEY, event_id INTEGER, observed REAL);
         CREATE TABLE IF NOT EXISTS watched(id TEXT PRIMARY KEY);
         CREATE TABLE IF NOT EXISTS token_usage(thread_id TEXT PRIMARY KEY, payload TEXT, observed REAL);
         """)
@@ -89,7 +90,15 @@ class Store:
         ).fetchone()
         return {"usage": json.loads(row[0]), "observedAt": row[1]} if row else None
 
-    def event(self, payload: dict) -> int:
+    def activities(self) -> dict[str, dict]:
+        return {
+            tid: {"lastActivityId": seq, "lastActivityAt": observed}
+            for tid, seq, observed in self.db.execute(
+                "SELECT thread_id,event_id,observed FROM thread_activity"
+            )
+        }
+
+    def event(self, payload: dict, *, activity_thread: str | None = None) -> int:
         if payload.get("method") == "app/list/updated":
             payload = {"method": "samaya/catalogChanged", "params": {}}
         if payload.get("method") == "thread/tokenUsage/updated":
@@ -104,6 +113,11 @@ class Store:
             (json.dumps(payload), time.time()),
         )
         seq = cursor.lastrowid or 0
+        if activity_thread:
+            self.db.execute(
+                "INSERT OR REPLACE INTO thread_activity VALUES(?,?,?)",
+                (activity_thread, seq, time.time()),
+            )
         self.db.execute("DELETE FROM events WHERE id < ?", (seq - 10000,))
         self.db.commit()
         return seq

@@ -133,6 +133,13 @@ export function useMonitor() {
       if (event.method === "samaya/operation" && event.params)
         acceptOperationReceipt(event.params);
       if (
+        event.method === "turn/started" &&
+        Number(e.lastEventId) > notificationFloor
+      )
+        window.dispatchEvent(
+          new CustomEvent("samaya:turn-started", { detail: event.params }),
+        );
+      if (
         event.method === "turn/completed" &&
         event.params?.turn?.status === "completed" &&
         Number(e.lastEventId) > notificationFloor

@@ -178,3 +178,18 @@ def test_identical_app_notifications_do_not_invalidate_read_cache():
     catalog.observe_apps(params)
     assert catalog.apps_cache.revision == revision + 1
     assert catalog.skills_cache.revision == 0
+
+
+def test_global_turn_start_keeps_identity_without_history():
+    event = {
+        "method": "turn/started",
+        "params": {
+            "threadId": "a",
+            "turn": {"id": "new", "status": "inProgress", "items": ["large-body"]},
+        },
+    }
+    result = scoped_event(event, "global", None, None)
+    assert result["params"] == {
+        "threadId": "a",
+        "turn": {"id": "new", "status": "inProgress"},
+    }

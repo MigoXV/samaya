@@ -186,6 +186,15 @@ export async function operation(
           }
         }
       }
+      if (
+        ["send", "steer"].includes(action) &&
+        (receipt.state === "pending" || receipt.state === "succeeded")
+      )
+        window.dispatchEvent(
+          new CustomEvent("samaya:input-accepted", {
+            detail: { threadId: body.threadId },
+          }),
+        );
       if (receipt.state === "pending") {
         if (localStorage.getItem("samaya.operation." + operationId)) {
           localStorage.setItem(

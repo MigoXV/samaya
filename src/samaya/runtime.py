@@ -8,6 +8,7 @@ from samaya.composer.commands import CommandService
 from samaya.config import Settings
 from samaya.decisions import mcp
 from samaya.decisions.service import Decisions
+from samaya.monitoring.activity import activity_thread
 from samaya.monitoring.service import Monitor
 from samaya.operations import Operations
 from samaya.sessions.actions import SessionActions
@@ -83,6 +84,7 @@ class Runtime:
 
     async def publish(self, event: dict) -> None:
         self.monitor.event(event)
+        active_thread = activity_thread(event)
         if event.get("method") == "turn/diff/updated":
             # Large disposable diff observations are read on demand, not retained
             # in the durable journal or broadcast to every global monitor.
@@ -97,5 +99,7 @@ class Runtime:
                 "method": "samaya/requestChanged",
                 "params": {"threadId": event.get("params", {}).get("threadId")},
             }
-        self.store.event(event)
+        seq = self.store.event(event, activity_thread=active_thread)
+        if active_thread:
+            self.monitor.activity(active_thread, seq)
         self.changed.notify()

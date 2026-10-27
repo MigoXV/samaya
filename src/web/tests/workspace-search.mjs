@@ -32,7 +32,7 @@ try {
   await expect(headings).toHaveCount(3);
   const before = await positions();
   for (const heading of await headings.all()) {
-    await heading.locator("button[aria-expanded]").click();
+    await heading.locator("button[aria-expanded]:not([aria-haspopup])").click();
   }
   expect(await positions()).toEqual(before);
   await expect(headings.first().locator(".workspace-disclosure")).toHaveCSS(
@@ -40,7 +40,7 @@ try {
     "matrix(0, 1, -1, 0, 0, 0)",
   );
   for (const heading of await headings.all()) {
-    await heading.locator("button[aria-expanded]").click();
+    await heading.locator("button[aria-expanded]:not([aria-haspopup])").click();
   }
   expect(await positions()).toEqual(before);
   const search = page.getByRole("searchbox", { name: "搜索工作区" });
