@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { api, ApiError } from "./api";
+import { api, ApiError, acceptOperationReceipt } from "./api";
 import type { MonitorSnapshot, Observation } from "./monitor";
 export function useMonitor() {
   const [data, setData] = useState<MonitorSnapshot | null>(null),
@@ -92,8 +92,7 @@ export function useMonitor() {
   );
   useEffect(() => {
     alive.current = true;
-    queueMicrotask(() => void refresh());
-    const es = new EventSource("/api/events");
+    const es = new EventSource("/api/events?scope=global");
     let notificationFloor = Infinity;
     es.onopen = () => {
       setOnline(true);
@@ -131,6 +130,8 @@ export function useMonitor() {
     });
     es.onmessage = (e) => {
       const event = JSON.parse(e.data);
+      if (event.method === "samaya/operation" && event.params)
+        acceptOperationReceipt(event.params);
       if (
         event.method === "turn/completed" &&
         event.params?.turn?.status === "completed" &&

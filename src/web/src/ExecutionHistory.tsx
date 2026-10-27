@@ -399,7 +399,9 @@ function TurnHistory({
   }, [base, tab, turn.status]);
   useEffect(() => {
     if (streamCursor === null || turn.status !== "inProgress") return;
-    const es = new EventSource(`/api/events?after=${streamCursor}`);
+    const es = new EventSource(
+      `/api/events?scope=thread&threadId=${encodeURIComponent(tid)}&turnId=${encodeURIComponent(turn.id)}&after=${streamCursor}`,
+    );
     let summaryVersion = 0;
     const reloadSummary = async () => {
       const request = ++summaryVersion;

@@ -475,30 +475,24 @@ try {
   const beforeUncertain = selections.length;
   await page.getByRole("menuitemradio", { name: /Model B/ }).click();
   await expect(page.locator('.model-menu [role="alert"]')).toContainText(
-    "提交结果待确认",
+    "提交结果正在后台核对",
   );
   await expect(trigger).toContainText("Model A");
   await expect(trigger.locator(".model-spinner")).toHaveCount(0);
   await expect(page.locator(".monitor-feedback")).toHaveCount(0);
+  // Uncertain receipts reconcile in the background; settings can be reread
+  // without opening the former global receipt-blocking dialog or replaying a write.
   await expect(
     page.locator(".model-menu").getByRole("button", { name: "核查操作回执" }),
-  ).toBeVisible();
-  await context.route("**/api/operations/*", (route) =>
-    route.fulfill({
-      json: { state: "failed", result: { message: "演示：切换未执行" } },
-    }),
-  );
+  ).toHaveCount(0);
   await page
     .locator(".model-menu")
-    .getByRole("button", { name: "核查操作回执" })
+    .getByRole("button", { name: "重新读取", exact: true })
     .click();
-  const receiptDialog = page.getByRole("dialog", { name: "核查操作回执" });
-  await receiptDialog
-    .getByRole("button", { name: "查询回执", exact: true })
-    .click();
-  await expect(receiptDialog).toContainText("切换未执行");
-  await expect(page.locator(".operation-receipts")).toHaveCount(0);
-  await receiptDialog.press("Escape");
+  await expect(
+    page.getByRole("menuitemradio", { name: /Model A/ }),
+  ).toBeEnabled();
+  await expect(trigger).toContainText("Model A");
   expect(selections.length).toBe(beforeUncertain + 1);
   expect(errors).toEqual([]);
   console.log(

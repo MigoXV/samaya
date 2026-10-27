@@ -285,3 +285,62 @@ async def test_reasoning_context_exposes_model_default(services):
     assert context["defaultValue"] == "high"
     assert context["fields"][0]["value"] == "high"
     assert all(c.args[0] != "thread/settings/update" for c in con.rpc.call_args_list)
+
+
+@pytest.mark.parametrize(
+    ("value", "profile", "policy", "reviewer"),
+    [
+        (":read-only", ":read-only", "on-request", "user"),
+        (":workspace", ":workspace", "on-request", "user"),
+        ("auto-review", ":workspace", "on-request", "auto_review"),
+        (":danger-full-access", ":danger-full-access", "never", "user"),
+    ],
+)
+async def test_permissions_map_to_native_policy_and_confirm(
+    services, value, profile, policy, reviewer
+):
+    _, cmd, con, _, _ = services
+    current = {
+        "activePermissionProfile": {"id": ":workspace"},
+        "approvalPolicy": "on-request",
+        "approvalsReviewer": "user",
+    }
+    cmd.queries.settings = AsyncMock(side_effect=lambda *args, **kwargs: dict(current))
+
+    async def rpc(method, params):
+        if method == "permissionProfile/list":
+            return {
+                "data": [
+                    {"id": x, "allowed": True}
+                    for x in (":read-only", ":workspace", ":danger-full-access")
+                ]
+            }
+        if method == "thread/settings/update":
+            current.update(
+                activePermissionProfile={"id": params["permissions"]},
+                approvalPolicy=params["approvalPolicy"],
+                approvalsReviewer=params["approvalsReviewer"],
+            )
+            return {}
+        return {}
+
+    con.rpc.side_effect = rpc
+    result = await cmd.execute(
+        {
+            "threadId": "t",
+            "command": "permissions",
+            "expectedTurnId": "last",
+            "args": {"value": value},
+        }
+    )
+    patch = next(
+        c.args[1]
+        for c in con.rpc.call_args_list
+        if c.args[0] == "thread/settings/update"
+    )
+    assert (
+        patch["permissions"],
+        patch["approvalPolicy"],
+        patch["approvalsReviewer"],
+    ) == (profile, policy, reviewer)
+    assert result["settingsPending"] is False

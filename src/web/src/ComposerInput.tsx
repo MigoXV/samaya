@@ -61,6 +61,7 @@ export function ComposerInput({
   modeControl,
   onToggleMode,
   submitDisabled = false,
+  stopDisabled = false,
   textOnly = false,
   submitLabel,
   onCancel,
@@ -84,6 +85,7 @@ export function ComposerInput({
   modeControl?: ReactNode;
   onToggleMode?: () => void;
   submitDisabled?: boolean;
+  stopDisabled?: boolean;
   textOnly?: boolean;
   submitLabel?: string;
   onCancel?: () => void;
@@ -298,7 +300,10 @@ export function ComposerInput({
     let alive = true;
     const controller = new AbortController();
     if (!cwd) return;
+    let inFlight = false;
     const fetchCatalog = async (force = false) => {
+      if (inFlight) return;
+      inFlight = true;
       setLoading(true);
       try {
         const q = new URLSearchParams(threadId ? { threadId } : { cwd });
@@ -313,6 +318,7 @@ export function ComposerInput({
       } catch (e) {
         if (alive) setError(String(e));
       } finally {
+        inFlight = false;
         if (alive) setLoading(false);
       }
     };
@@ -954,7 +960,7 @@ export function ComposerInput({
                 }
                 disabled={
                   stopMode
-                    ? disabled
+                    ? disabled || stopDisabled
                     : disabled ||
                       submitDisabled ||
                       readingImages ||

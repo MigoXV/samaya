@@ -58,18 +58,94 @@ class Projection:
     def compact(turn: dict | None) -> dict | None:
         if not turn:
             return None
-        result = copy.deepcopy(turn)
-        result["items"] = result.get("items", [])[-12:]
-        for item in result["items"]:
-            for key in ("text", "aggregatedOutput"):
+        result = {
+            k: turn[k]
+            for k in ("id", "status", "startedAt", "completedAt")
+            if k in turn
+        }
+        if turn.get("error"):
+            result["error"] = {"message": str(turn["error"].get("message", ""))[:512]}
+        result["items"] = []
+        text_budget = 512
+        for item in reversed(turn.get("items", [])[-12:]):
+            summary = {
+                k: item[k] for k in ("id", "type", "status", "exitCode") if k in item
+            }
+            for key in ("text", "aggregatedOutput", "tool", "name"):
                 if isinstance(item.get(key), str):
-                    item[key] = item[key][-2000:]
-            # Exact diffs and full logs are read on demand; never imply this is complete.
-            if "changes" in item:
-                item["changes"] = [
-                    {"path": c.get("path"), "kind": c.get("kind")}
-                    for c in item["changes"]
-                ]
+                    limit = text_budget if key in ("text", "aggregatedOutput") else 120
+                    summary[key] = item[key][:limit]
+                    if key in ("text", "aggregatedOutput"):
+                        text_budget -= len(summary[key])
+            if "changes" in item or "changeCount" in item:
+                summary["changeCount"] = item.get(
+                    "changeCount", len(item.get("changes", []))
+                )
+            summary["summaryOnly"] = True
+            result["items"].append(summary)
+        result["items"].reverse()
+        return result
+
+    @classmethod
+    def summary_record(cls, record: dict) -> dict:
+        thread = record["thread"]
+        result = {
+            k: record[k]
+            for k in (
+                "confirmedAt",
+                "progressAt",
+                "eventAt",
+                "requestsUnknown",
+                "historyAvailable",
+            )
+            if k in record
+        }
+        result["thread"] = {
+            k: thread[k]
+            for k in (
+                "id",
+                "name",
+                "cwd",
+                "updatedAt",
+                "status",
+                "parentThreadId",
+                "canAcceptDirectInput",
+                "historyAvailable",
+                "historyNotice",
+                "archived",
+                "model",
+                "reasoningEffort",
+                "serviceTier",
+                "recencyAt",
+            )
+            if k in thread
+        }
+        result["thread"]["preview"] = str(thread.get("preview") or "")[:240]
+        result["turn"] = cls.compact(record.get("turn"))
+        result["error"] = str(record["error"])[:512] if record.get("error") else None
+        result["terminals"] = [
+            {
+                k: (v[:512] if isinstance(v, str) else v)
+                for k, v in terminal.items()
+                if k in ("itemId", "processId", "command", "cwd", "osPid")
+            }
+            for terminal in record.get("terminals", [])
+        ]
+        plan = record.get("plan")
+        result["plan"] = (
+            {
+                "explanation": str(plan.get("explanation") or "")[:512],
+                "steps": [
+                    {
+                        "step": str(step.get("step", ""))[:512],
+                        "status": step.get("status"),
+                    }
+                    for step in plan.get("steps", [])
+                ],
+            }
+            if plan
+            else None
+        )
         return result
 
     def touch(self, tid: str):

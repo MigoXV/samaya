@@ -1,11 +1,13 @@
 """Resolve explicit input references using the same daemon as task execution."""
 
 import asyncio
+import hashlib
+import json
 import os
 import re
-import time
 from pathlib import Path
 
+from samaya.cache import ReadCache
 from samaya.codex.connection import Connection
 from samaya.config import Settings
 from samaya.sessions.queries import SessionQueries
@@ -19,10 +21,40 @@ class InputCatalog:
         self, config: Settings, connection: Connection, queries: SessionQueries
     ):
         self.config, self.connection, self.queries = config, connection, queries
-        self.cache: dict[tuple, tuple[float, dict]] = {}
+        self.skills_cache = ReadCache()
+        self.apps_cache = ReadCache()
+        self.apps_signature: str | None = None
 
-    def invalidate(self):
-        self.cache.clear()
+    def invalidate(self, kind=None):
+        if kind != "apps":
+            self.skills_cache.invalidate()
+        if kind != "skills":
+            self.apps_cache.invalidate()
+
+    def observe_apps(self, params: dict):
+        # The daemon also emits list notifications after a read. An identical
+        # list must not invalidate the very read that is populating the cache.
+        if not isinstance(params.get("data"), list):
+            self.invalidate("apps")
+            return
+        rows = sorted(
+            (self.app_summary(item) for item in params["data"]),
+            key=lambda r: r.get("id", ""),
+        )
+        signature = hashlib.sha256(
+            json.dumps(rows, sort_keys=True).encode()
+        ).hexdigest()
+        if signature != self.apps_signature:
+            self.apps_signature = signature
+            self.invalidate("apps")
+
+    @staticmethod
+    def app_summary(item: dict) -> dict:
+        return {
+            k: (v[:512] if k == "description" and isinstance(v, str) else v)
+            for k, v in item.items()
+            if k in ("id", "name", "description", "isEnabled", "isAccessible")
+        }
 
     async def directory(self, tid: str | None, cwd: str | None) -> str:
         if tid:
@@ -35,14 +67,19 @@ class InputCatalog:
         self, tid: str | None = None, cwd: str | None = None, refresh=False
     ):
         cwd = await self.directory(tid, cwd)
-        key = (self.connection.generation, tid, cwd)
-        cached = self.cache.get(key)
-        if cached and not refresh and time.monotonic() - cached[0] < 30:
-            return cached[1]
+        generation = self.connection.generation
         self.connection.connected()
         skills, apps = await asyncio.gather(
-            self.connection.rpc("skills/list", {"cwds": [cwd], "forceReload": refresh}),
-            self._apps(tid, refresh),
+            self.skills_cache.get(
+                (generation, cwd),
+                lambda: self.connection.rpc(
+                    "skills/list", {"cwds": [cwd], "forceReload": refresh}
+                ),
+                refresh,
+            ),
+            self.apps_cache.get(
+                (generation, tid), lambda: self._apps(tid, refresh), refresh
+            ),
             return_exceptions=True,
         )
         references, errors = [], []
@@ -62,8 +99,10 @@ class InputCatalog:
                             "path": item["path"],
                             "label": (item.get("interface") or {}).get("displayName")
                             or item["name"],
-                            "description": item.get("shortDescription")
-                            or item.get("description", ""),
+                            "description": (
+                                item.get("shortDescription")
+                                or item.get("description", "")
+                            )[:512],
                             "enabled": item.get("enabled", False),
                             "source": item.get("pluginId")
                             or item.get("scope", "local"),
@@ -85,7 +124,7 @@ class InputCatalog:
                         "name": slug,
                         "path": "app://" + item["id"],
                         "label": item["name"],
-                        "description": item.get("description") or "已连接应用",
+                        "description": (item.get("description") or "已连接应用")[:512],
                         "enabled": item.get("isEnabled", True)
                         and item.get("isAccessible", False),
                         "source": "app",
@@ -97,9 +136,6 @@ class InputCatalog:
             "errors": errors,
             "prompts": self.prompts(),
         }
-        if len(self.cache) >= 64:
-            self.cache.pop(next(iter(self.cache)))
-        self.cache[key] = (time.monotonic(), result)
         return result
 
     async def _apps(self, tid, refresh):
@@ -114,7 +150,7 @@ class InputCatalog:
                     "forceRefetch": refresh,
                 },
             )
-            data.extend(page.get("data", []))
+            data.extend(self.app_summary(item) for item in page.get("data", []))
             cursor = page.get("nextCursor")
             if not cursor:
                 return data

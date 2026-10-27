@@ -4,6 +4,7 @@ import json
 import time
 
 from fastapi import FastAPI, HTTPException, Query, Request
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 from starlette.concurrency import run_in_threadpool
 
@@ -122,7 +123,9 @@ def register_routes(application: FastAPI, config: Settings) -> None:
 
     @application.get("/api/monitor")
     async def monitor():
-        return service().monitor.snapshot()
+        # Projection already contains JSON-native values; avoid a second recursive
+        # FastAPI conversion of every record on the event-loop thread.
+        return JSONResponse(service().monitor.snapshot())
 
     @application.get("/api/threads/{tid}/turns")
     async def turns(
@@ -169,7 +172,7 @@ def register_routes(application: FastAPI, config: Settings) -> None:
         return await service().sessions.preview(tid)
 
     @application.post("/api/operations")
-    async def operation(body: Operation):
+    async def operation(body: Operation, request: Request):
         # Bound message/request size independently of frontend controls.
         envelope = body.body
         if body.action in ("send", "steer") and body.body.get("images"):
@@ -182,6 +185,13 @@ def register_routes(application: FastAPI, config: Settings) -> None:
                 raise HTTPException(413, "图片消息过大，图片总大小不能超过 10 MB")
         if len(json.dumps(envelope)) > 200000:
             raise HTTPException(413, "请求过大")
+        if "respond-async" in request.headers.get("prefer", ""):
+            receipt = await service().operations.execute(
+                body.operationId, body.action, body.body, wait=False
+            )
+            return JSONResponse(
+                receipt, status_code=202 if receipt["state"] == "pending" else 200
+            )
         return await service().operations.execute(
             body.operationId, body.action, body.body
         )

@@ -1,5 +1,6 @@
 """Model capabilities and workspace defaults shared by drafts and live threads."""
 
+from samaya.cache import ReadCache
 from samaya.codex.connection import Connection
 
 
@@ -22,17 +23,28 @@ def model_options(rows: list[dict], current_model: str | None) -> list[dict]:
     ]
 
 
+async def model_rows(connection: Connection) -> list[dict]:
+    cache = getattr(connection, "model_catalog", None)
+    if cache is None:
+        connection.model_catalog = cache = ReadCache(limit=1)
+
+    async def load():
+        rows, cursor = [], None
+        while True:
+            page = await connection.rpc("model/list", {"limit": 100, "cursor": cursor})
+            rows.extend(page.get("data", []))
+            cursor = page.get("nextCursor")
+            if not cursor:
+                return rows
+
+    return await cache.get(getattr(connection, "generation", 0), load)
+
+
 async def draft_settings(connection: Connection, cwd: str) -> dict:
     config = (
         await connection.rpc("config/read", {"cwd": cwd, "includeLayers": False})
     )["config"]
-    rows, cursor = [], None
-    while True:
-        page = await connection.rpc("model/list", {"limit": 100, "cursor": cursor})
-        rows.extend(page.get("data", []))
-        cursor = page.get("nextCursor")
-        if not cursor:
-            break
+    rows = await model_rows(connection)
     model = config.get("model") or next(
         (m["model"] for m in rows if m.get("isDefault")), None
     )

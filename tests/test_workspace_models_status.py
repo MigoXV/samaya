@@ -80,6 +80,10 @@ async def test_first_thread_start_receives_validated_selection(tmp_path, models)
         assert start["model"] == "a"
         assert start["config"] == {"model_reasoning_effort": "low"}
         assert start["serviceTier"] == "priority"
+        assert "approvalPolicy" not in start and "sandbox" not in start
+        assert not any(
+            c.args[0] == "thread/settings/update" for c in con.rpc.call_args_list
+        )
         assert store.watched() == ["fresh"]
         con.rpc.reset_mock()
         with pytest.raises(ValueError, match="思考强度"):

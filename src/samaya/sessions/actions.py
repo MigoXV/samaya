@@ -35,6 +35,106 @@ class SessionActions:
     async def execute(self, action: str, b: dict) -> dict:
         adapter = self.connection.connected()
         tid = b.get("threadId", "")
+        if action == "plan_execute":
+            thread = await self.queries.idle(tid)
+            if thread.get("canAcceptDirectInput") is False:
+                raise ValueError("此子智能体不接受直接输入")
+            turns = thread.get("turns") or []
+            if (
+                not turns
+                or turns[-1]["id"] != b["turnId"]
+                or turns[-1]["status"] != "completed"
+            ):
+                raise ValueError("计划所在轮次已变化，请重新查看")
+            settings = await self.queries.settings(tid, refresh=True)
+            mode = (settings.get("collaborationMode") or {}).get("mode", "default")
+            if mode != "plan":
+                raise ValueError("当前已不在计划模式，请重新查看")
+            cursor = None
+            plan = None
+            while True:
+                page = await self.queries.items(
+                    tid, b["turnId"], cursor=cursor, limit=100
+                )
+                plan = next(
+                    (
+                        row["item"]
+                        for row in page["data"]
+                        if row["item"].get("id") == b["planItemId"]
+                        and row["item"].get("type") == "plan"
+                    ),
+                    None,
+                )
+                cursor = page.get("nextCursor")
+                if plan or not cursor:
+                    break
+            if not plan or not plan.get("text", "").strip():
+                raise ValueError("计划内容不可用，请重新查看")
+            target = tid
+            if b["clearContext"]:
+                profile = settings.get("activePermissionProfile") or {}
+                if (
+                    not profile.get("id")
+                    or not settings.get("approvalPolicy")
+                    or not settings.get("approvalsReviewer")
+                ):
+                    raise ValueError("无法确认当前权限，暂时不能清空上下文执行")
+                params = {
+                    "cwd": thread["cwd"],
+                    "permissions": profile["id"],
+                    "approvalPolicy": settings["approvalPolicy"],
+                    "approvalsReviewer": settings["approvalsReviewer"],
+                    "historyMode": "paginated",
+                    "threadSource": "user",
+                    "ephemeral": False,
+                }
+                if settings.get("model"):
+                    params["model"] = settings["model"]
+                if settings.get("serviceTier"):
+                    params["serviceTier"] = settings["serviceTier"]
+                if settings.get("reasoningEffort"):
+                    params["config"] = {
+                        "model_reasoning_effort": settings["reasoningEffort"]
+                    }
+                created = await self.connection.rpc("thread/start", params)
+                target = created["thread"]["id"]
+                self.store.watch(target)
+                self.queries.created(created)
+            else:
+                await self.connection.rpc(
+                    "thread/settings/update",
+                    {
+                        "threadId": tid,
+                        "collaborationMode": {
+                            "mode": "default",
+                            "settings": {
+                                "model": settings.get("model") or thread.get("model"),
+                                "reasoning_effort": settings.get("reasoningEffort"),
+                                "developer_instructions": None,
+                            },
+                        },
+                    },
+                )
+            text = (
+                "请执行以下已确认的计划：\n\n" + plan["text"]
+                if b["clearContext"]
+                else "Implement the plan."
+            )
+            try:
+                inputs = await self.catalog.inputs(
+                    target, text, [], thread["cwd"], [], []
+                )
+                result = await self.connection.rpc(
+                    "turn/start", {"threadId": target, "input": inputs}
+                )
+            except Exception:
+                if target != tid:
+                    return {
+                        "threadId": target,
+                        "warning": "新会话已创建，执行未确认，请打开会话核对。",
+                    }
+                raise
+            return {"threadId": target, "turn": result.get("turn")}
         if action == "create":
             cwd = str(self.config.directory(b["cwd"]))
             selection = {}
@@ -51,8 +151,6 @@ class SessionActions:
                 "thread/start",
                 {
                     "cwd": cwd,
-                    "approvalPolicy": "never",
-                    "sandbox": "workspace-write",
                     "serviceName": "samaya",
                     "historyMode": "paginated",
                     "threadSource": "user",
@@ -65,14 +163,6 @@ class SessionActions:
             self.store.watch(created_id)
             self.queries.created(started)
             try:
-                await self.connection.rpc(
-                    "thread/settings/update",
-                    {
-                        "threadId": created_id,
-                        "approvalPolicy": "on-request",
-                        "approvalsReviewer": "user",
-                    },
-                )
                 if b.get("name"):
                     await self.connection.rpc(
                         "thread/name/set", {"threadId": created_id, "name": b["name"]}
@@ -102,14 +192,35 @@ class SessionActions:
             return result
         if action == "send":
             await self.queries.join(tid)
-            thread = await self.queries.idle(tid)
+            thread = (
+                (await self.queries.read(tid))["thread"]
+                if b.get("reconcileLatest")
+                else await self.queries.idle(tid)
+            )
             self.config.directory(thread["cwd"])
             if thread.get("canAcceptDirectInput") is False:
                 raise ValueError("此子智能体不接受直接输入，请返回主会话")
             latest = thread.get("turns", [])[-1]["id"] if thread.get("turns") else None
-            if b.get("expectedTurnId") != latest:
+            if not b.get("reconcileLatest") and b.get("expectedTurnId") != latest:
                 raise ValueError("其他客户端已更新会话，请刷新后再发送")
             self.store.watch(tid)
+            active = active_turn(thread)
+            if active and b.get("reconcileLatest"):
+                return await self.connection.rpc(
+                    "turn/steer",
+                    {
+                        "threadId": tid,
+                        "expectedTurnId": active["id"],
+                        "input": await self.catalog.inputs(
+                            tid,
+                            b.get("text", ""),
+                            b.get("references", []),
+                            b.get("expectedCwd"),
+                            b.get("images", []),
+                            b.get("files", []),
+                        ),
+                    },
+                )
             result = await self.connection.rpc(
                 "turn/start",
                 {

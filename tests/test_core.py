@@ -61,6 +61,50 @@ async def test_browser_disconnect_does_not_cancel_submission(tmp_path):
     store.close()
 
 
+async def test_async_acceptance_and_interrupt_do_not_wait_for_send(tmp_path):
+    store = Store(tmp_path)
+    service = Runtime(Settings(data_dir=tmp_path), store)
+    started, release = asyncio.Event(), asyncio.Event()
+
+    async def dispatch(action, body):
+        if action == "send":
+            started.set()
+            await release.wait()
+        return {"action": action}
+
+    service.operations.dispatch = AsyncMock(side_effect=dispatch)
+    try:
+        accepted = await service.operations.execute(
+            "async-send",
+            "send",
+            {"threadId": "a", "text": "hello", "expectedTurnId": None},
+            wait=False,
+        )
+        assert accepted["state"] == "pending"
+        await asyncio.wait_for(started.wait(), 1)
+        stopped = await asyncio.wait_for(
+            service.operations.execute(
+                "stop", "interrupt", {"threadId": "a", "turnId": "turn"}
+            ),
+            1,
+        )
+        assert stopped["state"] == "succeeded"
+        duplicate = await service.operations.execute(
+            "async-send",
+            "send",
+            {"threadId": "a", "text": "hello", "expectedTurnId": None},
+            wait=False,
+        )
+        assert duplicate["state"] == "pending"
+        release.set()
+        await asyncio.gather(*service.operations.tasks)
+        assert store.receipt("async-send")["state"] == "succeeded"
+        assert service.operations.dispatch.await_count == 2
+    finally:
+        await service.operations.close()
+        store.close()
+
+
 @pytest.mark.asyncio
 async def test_interrupt_rejects_stale_turn_without_touching_others(tmp_path):
     store = Store(tmp_path)
@@ -144,6 +188,31 @@ def test_spa_api_and_actual_assets(web):
             client.get("/api/status", headers={"Host": "attacker.example"}).status_code
             == 403
         )
+
+
+def test_async_operation_http_acknowledges_before_completion(web):
+    with TestClient(create_app(web)) as client:
+        operations = client.app.state.runtime.operations
+        operations.execute = AsyncMock(
+            return_value={
+                "operationId": "async-operation-123",
+                "state": "pending",
+                "result": None,
+            }
+        )
+        csrf = client.get("/api/auth").json()["csrf"]
+        response = client.post(
+            "/api/operations",
+            headers={"X-Samaya-CSRF": csrf, "Prefer": "respond-async"},
+            json={
+                "operationId": "async-operation-123",
+                "action": "send",
+                "body": {"threadId": "t", "expectedTurnId": None, "text": "hello"},
+            },
+        )
+        assert response.status_code == 202
+        assert response.json()["state"] == "pending"
+        assert operations.execute.await_args.kwargs == {"wait": False}
 
 
 def test_two_screenshots_can_pass_http_operation_limit(web):
@@ -301,7 +370,7 @@ async def test_created_thread_identity_survives_optional_setup_failure(tmp_path)
         ]
     )
     result = await service.operations.execute(
-        "create-once", "create", {"cwd": str(tmp_path)}
+        "create-once", "create", {"cwd": str(tmp_path), "name": "test"}
     )
     assert result["state"] == "succeeded"
     assert result["result"]["threadId"] == "created-once"

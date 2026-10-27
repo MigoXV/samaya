@@ -4,7 +4,7 @@ import asyncio
 import time
 
 from samaya.composer.catalog import InputCatalog
-from samaya.composer.models import model_options
+from samaya.composer.models import model_options, model_rows
 from samaya.sessions.models import active_turn
 
 # Native UI commands are handled by the existing workbench; the rest by this service.
@@ -133,7 +133,7 @@ class CommandService:
     async def model_settings(self, tid, refresh=False, thread=None):
         thread = thread or (await self.queries.read(tid, latest_only=True))["thread"]
         configured = await self.queries.settings(tid, refresh=refresh)
-        rows = await self.pages("model/list")
+        rows = await model_rows(self.connection)
         current_model = configured.get("model") or thread.get("model")
         models = model_options(rows, current_model)
         selected = next((m for m in models if m["model"] == current_model), {})
@@ -232,11 +232,43 @@ class CommandService:
                 ]
         elif command == "permissions":
             rows = await self.pages("permissionProfile/list", {"cwd": cwd})
+            allowed = {r["id"] for r in rows if r.get("allowed")}
+            configured = await self.queries.settings(tid, refresh=True)
+            profile = (configured.get("activePermissionProfile") or {}).get("id")
+            current = (
+                "auto-review"
+                if profile == ":workspace"
+                and configured.get("approvalsReviewer") == "auto_review"
+                else profile
+            )
+            options = []
+            for value, profile_id, label in (
+                (":read-only", ":read-only", "只读"),
+                (":workspace", ":workspace", "默认权限"),
+                ("auto-review", ":workspace", "自动帮我审批"),
+                (":danger-full-access", ":danger-full-access", "完全访问"),
+            ):
+                if profile_id in allowed:
+                    options.append({"value": value, "label": label})
+            options.extend(
+                choices(
+                    [
+                        r
+                        for r in rows
+                        if r.get("allowed")
+                        and r["id"]
+                        not in {":read-only", ":workspace", ":danger-full-access"}
+                    ],
+                    "id",
+                    "description",
+                )
+            )
             result["fields"] = [
                 field(
                     "value",
-                    "权限配置（可能扩大文件与网络访问）",
-                    choices([r for r in rows if r.get("allowed")], "id", "description"),
+                    "权限配置",
+                    options,
+                    current or "",
                 )
             ]
         elif command == "memories":
@@ -396,7 +428,7 @@ class CommandService:
         # These settings affect subsequent turns, so a new turn doesn't stale
         # the selection. Keep model/capability checks below for real conflicts.
         if (
-            cmd not in ("model", "reasoning", "fast")
+            cmd not in ("model", "reasoning", "fast", "permissions")
             and b.get("expectedTurnId") != context["expectedTurnId"]
         ):
             raise ValueError("轮次已变化，请重新打开命令")
@@ -430,6 +462,20 @@ class CommandService:
                         "developer_instructions": None,
                     },
                 }
+            elif cmd == "permissions":
+                patch.update(
+                    {
+                        "permissions": ":workspace"
+                        if value == "auto-review"
+                        else value,
+                        "approvalPolicy": "never"
+                        if value == ":danger-full-access"
+                        else "on-request",
+                        "approvalsReviewer": "auto_review"
+                        if value == "auto-review"
+                        else "user",
+                    }
+                )
             else:
                 patch[
                     {
@@ -470,6 +516,19 @@ class CommandService:
                         "settingsPending": actual != value,
                     }
                 except Exception:  # noqa: BLE001 - write acknowledged; do not invite replay
+                    return {**result, "settingsPending": True}
+            if cmd == "permissions":
+                try:
+                    confirmed = await self.queries.settings(tid, refresh=True)
+                    profile = (confirmed.get("activePermissionProfile") or {}).get("id")
+                    return {
+                        **result,
+                        "settingsPending": profile != patch["permissions"]
+                        or confirmed.get("approvalPolicy") != patch["approvalPolicy"]
+                        or confirmed.get("approvalsReviewer")
+                        != patch["approvalsReviewer"],
+                    }
+                except Exception:  # noqa: BLE001 - the write may already have succeeded
                     return {**result, "settingsPending": True}
             if cmd in ("model", "reasoning", "fast"):
                 try:

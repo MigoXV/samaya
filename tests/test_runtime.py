@@ -107,12 +107,12 @@ async def test_reconnect_preserves_observation_but_invalidates_old_decisions(
             }
         )
         await eventually(lambda: not runtime.decisions.pending)
-        for adapter in adapters:
-            assert adapter.sdk.thread_resume.await_count >= 1
-            assert all(
-                call.args[0] == "watched"
-                for call in adapter.sdk.thread_resume.await_args_list
-            )
+        assert sum(method == "thread/resume" for method, _ in calls) >= len(adapters)
+        assert all(
+            params["threadId"] == "watched"
+            for method, params in calls
+            if method == "thread/resume"
+        )
         assert not any(method in ("turn/start", "thread/start") for method, _ in calls)
     finally:
         await asyncio.wait_for(runtime.close(), 2)

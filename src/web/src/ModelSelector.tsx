@@ -201,7 +201,11 @@ export function ModelSelector({
     !settings.editable;
   useEffect(() => {
     onPendingChange?.(
-      loading || saving || awaitingSync || !!error || !settings,
+      (loading && !settings) ||
+        saving ||
+        awaitingSync ||
+        (!settings && !!error) ||
+        !settings,
     );
   }, [loading, saving, awaitingSync, error, settings, onPendingChange]);
   const canToggleFast = !locked && !!fastTier;
