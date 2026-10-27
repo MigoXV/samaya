@@ -13,6 +13,7 @@ GLOBAL_METHODS = {
     "samaya/operation",
     "serverRequest/resolved",
     "turn/completed",
+    "turn/started",
 }
 
 
@@ -21,7 +22,7 @@ def scoped_event(event: dict, scope: str, thread_id: str | None, turn_id: str | 
     if scope == "global":
         if method not in GLOBAL_METHODS:
             return None
-        if method == "turn/completed":
+        if method in ("turn/completed", "turn/started"):
             # Completion listeners need identity/status, never full turn history.
             turn = params.get("turn", {})
             return {

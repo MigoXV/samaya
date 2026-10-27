@@ -68,8 +68,10 @@ try {
   p.on("pageerror", (e) => errors.push(e.message));
   await p.goto(process.env.SAMAYA_UI_TEST_URL || "http://127.0.0.1:8788");
   await p
-    .getByRole("button", { name: "管理 Laya 工作区", exact: true })
+    .getByRole("navigation", { name: "工作区会话" })
+    .getByRole("button", { name: "Laya 工作区菜单", exact: true })
     .click();
+  await p.getByRole("menuitem", { name: "工作区管理" }).click();
   await expect(p.getByRole("heading", { level: 1 })).toHaveText("工作区管理");
   await expect(p.locator(".workspace-management-path")).toHaveText(
     "/demo/Laya",
@@ -190,8 +192,10 @@ try {
   await expect(p.locator(".workspace-manager")).toHaveCount(0);
   await p.setViewportSize({ width: 1440, height: 960 });
   await p
-    .getByRole("button", { name: "管理 Laya 工作区", exact: true })
+    .getByRole("navigation", { name: "工作区会话" })
+    .getByRole("button", { name: "Laya 工作区菜单", exact: true })
     .click();
+  await p.getByRole("menuitem", { name: "工作区管理" }).click();
   await p.getByRole("button", { name: "新建对话", exact: true }).click();
   expect(new URL(p.url()).pathname).toBe("/");
   expect(new URL(p.url()).searchParams.get("workspace")).toBe("/demo/Laya");

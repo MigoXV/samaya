@@ -9,6 +9,9 @@ const context = await browser.newContext({
   viewport: { width: 1440, height: 960 },
 });
 const state = fixture(40);
+state.records.forEach((r) => {
+  r.thread.recencyAt = r.thread.updatedAt;
+});
 for (let i = 20; i < 30; i++)
   state.records[i].thread.cwd = `/demo/project-${i}`;
 const { calls, broadcast } = await install(context, state);
@@ -21,6 +24,7 @@ await expect(projects).toHaveCount(4);
 const originalOrder = await projects.evaluateAll((nodes) =>
   nodes.map((n) => n.title),
 );
+// Metadata refresh is not a conversation interaction.
 state.records[28].thread.updatedAt += 1000;
 await broadcast();
 expect(
@@ -30,7 +34,9 @@ expect(
   await projects.first().evaluate((n) => n.getBoundingClientRect().height),
 ).toBeGreaterThanOrEqual(28);
 await expect(
-  page.locator(".monitor-nav svg.lucide:not(.workspace-disclosure)"),
+  page.locator(
+    ".monitor-nav svg.lucide:not(.workspace-disclosure):not(.lucide-ellipsis)",
+  ),
 ).toHaveCount(6);
 const globalCount = await page
   .locator(".monitor-nav-items")
@@ -173,7 +179,9 @@ expect(
     .allTextContents(),
 ).toEqual(sidebarNavigation);
 await expect(
-  page.locator(".monitor-nav svg.lucide:not(.workspace-disclosure)"),
+  page.locator(
+    ".monitor-nav svg.lucide:not(.workspace-disclosure):not(.lucide-ellipsis)",
+  ),
 ).toHaveCount(6);
 await expect(page.locator(".task-navigation")).toHaveCount(0);
 for (const height of await projects.evaluateAll((nodes) =>

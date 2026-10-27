@@ -1,3 +1,5 @@
+import { WorkspaceMenu, HiddenWorkspaces } from "./WorkspaceMenu";
+import { activityAt, type WorkspaceVisibility } from "./workspace-visibility";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Archive, ChevronRight, Ellipsis, Pencil, Trash2 } from "lucide-react";
@@ -30,7 +32,9 @@ export function WorkspaceNavigation({
   onDelete,
   onRename,
   manage,
+  visibility,
 }: {
+  visibility: WorkspaceVisibility;
   paths: string[];
   records: Map<string, Observation>;
   requests: Pending[];
@@ -198,12 +202,15 @@ export function WorkspaceNavigation({
     );
   }, [expanded]);
   const activity = workspaceActivity(records, connected, requests);
-  const orderedPaths = [
-    ...new Set([...(selectedCwd ? [selectedCwd] : []), ...paths]),
-  ];
+  const orderedPaths = [...new Set(paths)].filter(
+    (cwd) => !visibility.hidden.has(cwd),
+  );
   return (
     <nav className="nav-workspaces" aria-label="工作区会话">
-      <span className="eyebrow">工作区</span>
+      <div className="workspace-list-heading">
+        <span className="eyebrow">工作区</span>
+        <HiddenWorkspaces visibility={visibility} />
+      </div>
       {(more ? orderedPaths : orderedPaths.slice(0, 4)).map((cwd) => {
         const name = cwd.split("/").filter(Boolean).at(-1) || cwd;
         const tasks = [...records.values()]
@@ -215,7 +222,7 @@ export function WorkspaceNavigation({
           )
           .sort(
             (a, b) =>
-              b.thread.updatedAt - a.thread.updatedAt ||
+              activityAt(b) - activityAt(a) ||
               a.thread.id.localeCompare(b.thread.id),
           );
         const count = activity.get(cwd)?.running.size || 0,
@@ -250,14 +257,11 @@ export function WorkspaceNavigation({
                       : status(cwd).replace("运行中", "")}
                 </small>
               </button>
-              <button
-                className="nav-workspace-manage"
-                aria-label={`管理 ${name} 工作区`}
-                title="工作区管理"
-                onClick={() => manage(cwd)}
-              >
-                <Ellipsis size={16} aria-hidden="true" />
-              </button>
+              <WorkspaceMenu
+                cwd={cwd}
+                manage={manage}
+                visibility={visibility}
+              />
               <button
                 className="nav-workspace-create"
                 disabled={!connected}

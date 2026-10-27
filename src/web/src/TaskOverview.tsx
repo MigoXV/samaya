@@ -1,3 +1,9 @@
+import { WorkspaceMenu, HiddenWorkspaces } from "./WorkspaceMenu";
+import {
+  activityAt,
+  workspaceRecency,
+  type WorkspaceVisibility,
+} from "./workspace-visibility";
 import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import {
@@ -31,6 +37,9 @@ export function TaskOverview({
   visibleIds,
   create,
   connected,
+  visibility,
+  manage,
+  searching,
 }: {
   records: Map<string, Observation>;
   requests: Pending[];
@@ -42,7 +51,10 @@ export function TaskOverview({
   controls: ReactNode;
   visibleIds: Set<string>;
   create: (cwd: string) => void;
+  searching: boolean;
   connected: boolean;
+  visibility: WorkspaceVisibility;
+  manage: (cwd: string) => void;
 }) {
   const activity = workspaceActivity(records, connected, requests);
   const allRoots = [...records.values()].filter(
@@ -52,7 +64,8 @@ export function TaskOverview({
     (r) =>
       (!r.thread.parentThreadId || !records.has(r.thread.parentThreadId)) &&
       (!project || r.thread.cwd === project) &&
-      visibleIds.has(r.thread.id),
+      visibleIds.has(r.thread.id) &&
+      (searching || !visibility.hidden.has(r.thread.cwd)),
   );
   const pendingIds = new Set(
     requests.map((p) => rootId(p.params.threadId, records)),
@@ -88,14 +101,7 @@ export function TaskOverview({
     if (initialized && list.current) list.current.scrollTop = position.current;
   }, [initialized]);
   const prefix = useId();
-  const activityAt = (r: Observation) =>
-    r.thread.recencyAt ?? r.thread.updatedAt ?? 0;
-  const workspaceRecency = new Map<string, number>();
-  for (const r of allRoots)
-    workspaceRecency.set(
-      r.thread.cwd || "",
-      Math.max(workspaceRecency.get(r.thread.cwd || "") || 0, activityAt(r)),
-    );
+  const recency = workspaceRecency(records);
   const byWorkspace = new Map<string, Observation[]>();
   for (const r of roots) {
     const key = r.thread.cwd || "";
@@ -113,7 +119,7 @@ export function TaskOverview({
           activityAt(b) - activityAt(a) ||
           a.thread.id.localeCompare(b.thread.id),
       ),
-      updatedAt: workspaceRecency.get(cwd) || 0,
+      updatedAt: recency.get(cwd) || 0,
     }))
     .sort((a, b) => b.updatedAt - a.updatedAt || a.cwd.localeCompare(b.cwd));
   const row = (r: Observation) => (
@@ -157,7 +163,10 @@ export function TaskOverview({
           >
             <header>
               <h2>最近活跃的工作区</h2>
-              <small>{workspaces.length} 个工作区</small>
+              <div className="workspace-list-heading">
+                <HiddenWorkspaces visibility={visibility} />
+                <small>{workspaces.length} 个工作区</small>
+              </div>
             </header>
             <div
               ref={list}
@@ -258,6 +267,11 @@ export function TaskOverview({
                         <span aria-hidden="true">＋</span>
                         <span className="workspace-create-label">新建会话</span>
                       </button>
+                      <WorkspaceMenu
+                        cwd={cwd}
+                        manage={manage}
+                        visibility={visibility}
+                      />
                     </header>
                     <div
                       id={bodyId}

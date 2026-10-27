@@ -1,4 +1,8 @@
 import {
+  useWorkspaceVisibility,
+  workspaceRecency,
+} from "./workspace-visibility";
+import {
   Search,
   PanelsTopLeft,
   Pin,
@@ -315,34 +319,6 @@ export function MonitorWorkbench({ logout }: { logout: () => void }) {
   });
   const [opened, setOpened] = useState<string[]>([]);
   const [projectMenu, setProjectMenu] = useState(false);
-  const [projectVisits, setProjectVisits] = useState<string[]>(() => {
-    try {
-      const value = JSON.parse(
-        localStorage.getItem("samaya.projectVisits") || "[]",
-      );
-      return Array.isArray(value)
-        ? value.filter((p): p is string => typeof p === "string")
-        : [];
-    } catch {
-      return [];
-    }
-  });
-  const visitProject = useCallback((path: string) => {
-    if (path)
-      setProjectVisits((old) =>
-        [path, ...old.filter((p) => p !== path)].slice(0, 30),
-      );
-  }, []);
-  useEffect(() => {
-    try {
-      localStorage.setItem(
-        "samaya.projectVisits",
-        JSON.stringify(projectVisits),
-      );
-    } catch {
-      /* Navigation remains available without storage. */
-    }
-  }, [projectVisits]);
   const [taskNav, setTaskNav] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [sidebarScroll, setSidebarScroll] = useState(0);
@@ -472,27 +448,26 @@ export function MonitorWorkbench({ logout }: { logout: () => void }) {
   );
   const projects = useMemo(
     () =>
-      [...new Set([...records.values()].map((r) => r.thread.cwd))]
+      [
+        ...new Set(
+          [...records.values()].map(
+            (r) =>
+              records.get(rootId(r.thread.id, records))?.thread.cwd ||
+              r.thread.cwd,
+          ),
+        ),
+      ]
         .filter(Boolean)
         .sort(),
     [records],
   );
-  useEffect(() => {
-    if (!data?.initialized || projectVisits.length || !ordered.length) return;
-    // Seed once from observed activity; subsequent stream updates never reorder shortcuts.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setProjectVisits(
-      [
-        ...new Set(
-          [...ordered]
-            .sort((a, b) => b.thread.updatedAt - a.thread.updatedAt)
-            .map((r) => r.thread.cwd),
-        ),
-      ]
-        .filter(Boolean)
-        .slice(0, 30),
-    );
-  }, [data?.initialized, ordered, projectVisits.length]);
+  const visibility = useWorkspaceVisibility(records, data?.cursor || 0);
+  const restoreWorkspace = visibility.restore;
+  const recency = workspaceRecency(records);
+  const orderedProjects = [...projects].sort(
+    (a, b) =>
+      (recency.get(b) || 0) - (recency.get(a) || 0) || a.localeCompare(b),
+  );
   const unknownRoots = useMemo(() => {
     const ids = new Set<string>();
     for (const r of records.values())
@@ -672,7 +647,7 @@ export function MonitorWorkbench({ logout }: { logout: () => void }) {
       setError("");
       setNotice("");
       setFeedbackThread("");
-      visitProject(records.get(id)?.thread.cwd || "");
+      restoreWorkspace(records.get(id)?.thread.cwd || "");
       setOpened((old) => [id, ...old.filter((x) => x !== id)].slice(0, 30));
       setTaskTab("work");
       setReaderVisit((n) => n + 1);
@@ -693,7 +668,7 @@ export function MonitorWorkbench({ logout }: { logout: () => void }) {
       u.searchParams.set("thread", id);
       history.replaceState(null, "", u);
     },
-    [records, visitProject, view],
+    [records, restoreWorkspace, view],
   );
   const closeDetail = () => {
     setDraftWorkspace("");
@@ -1077,7 +1052,7 @@ export function MonitorWorkbench({ logout }: { logout: () => void }) {
     setTaskNav(false);
     setError("");
     setNotice("");
-    visitProject(path);
+    restoreWorkspace(path);
     const url = new URL(location.href);
     url.searchParams.delete("thread");
     url.searchParams.set("workspace", path);
@@ -1121,12 +1096,15 @@ export function MonitorWorkbench({ logout }: { logout: () => void }) {
           : `${{ overview: "任务总览", pinned: "置顶任务", attention: "待我处理", settings: "设置与连接", usage: "使用情况", records: "会话记录", changes: "最近变化" }[view]} — Samaya`;
   }, [view, workMode, draftWorkspace, selectedRecord]);
   useTaskNotifications(records, open);
-  const recentProjects = [
-    ...new Set([
-      ...projectVisits.filter((p) => projects.includes(p)),
-      ...projects,
-    ]),
-  ].slice(0, 4);
+  const recentProjects = orderedProjects
+    .filter((cwd) => !visibility.hidden.has(cwd))
+    .slice(0, 4);
+  const manageWorkspace = (cwd: string) => {
+    restoreWorkspace(cwd);
+    navigate("records");
+    setManagedWorkspace(cwd);
+    history.replaceState(null, "", "/sessions?cwd=" + encodeURIComponent(cwd));
+  };
   const selectOverviewProject = (path: string) => {
     const currentFilter = savedOverview.current.filter;
     navigate("overview");
@@ -1134,7 +1112,7 @@ export function MonitorWorkbench({ logout }: { logout: () => void }) {
     setFilter(currentFilter);
     setProject(path);
     setScroll(0);
-    visitProject(path);
+    restoreWorkspace(path);
   };
   const projectStatus = (path: string) => {
     const pending = requests.filter(
@@ -1235,7 +1213,8 @@ export function MonitorWorkbench({ logout }: { logout: () => void }) {
         />
         <WorkspaceNavigation
           requests={requests}
-          paths={[...projectVisits, ...projects]}
+          paths={orderedProjects}
+          visibility={visibility}
           records={records}
           selected={selected}
           connected={!!connected}
@@ -1246,15 +1225,7 @@ export function MonitorWorkbench({ logout }: { logout: () => void }) {
             setTaskNav(false);
             setSidebarCommand({ id, action });
           }}
-          manage={(cwd) => {
-            navigate("records");
-            setManagedWorkspace(cwd);
-            history.replaceState(
-              null,
-              "",
-              "/sessions?cwd=" + encodeURIComponent(cwd),
-            );
-          }}
+          manage={manageWorkspace}
           onRename={async (id, value) =>
             !!(await run(
               "command",
@@ -1415,6 +1386,9 @@ export function MonitorWorkbench({ logout }: { logout: () => void }) {
         )}
         {overviewMode && (
           <TaskOverview
+            searching={!!workspaceQuery.trim()}
+            visibility={visibility}
+            manage={manageWorkspace}
             controls={
               <OverviewScope
                 workspaceQuery={workspaceQuery}

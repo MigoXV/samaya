@@ -14,6 +14,8 @@ export type SummaryItem = {
 };
 export type SummaryTurn = Omit<Turn, "items"> & { items: SummaryItem[] };
 export type Observation = {
+  lastActivityId?: number;
+  lastActivityAt?: number;
   thread: Thread;
   turn: SummaryTurn | null;
   terminals: Terminal[];
