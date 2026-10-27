@@ -123,7 +123,9 @@ def register_routes(application: FastAPI, config: Settings) -> None:
 
     @application.get("/api/monitor")
     async def monitor():
-        return service().monitor.snapshot()
+        # Projection already contains JSON-native values; avoid a second recursive
+        # FastAPI conversion of every record on the event-loop thread.
+        return JSONResponse(service().monitor.snapshot())
 
     @application.get("/api/threads/{tid}/turns")
     async def turns(

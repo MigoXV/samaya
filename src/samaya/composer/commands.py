@@ -4,7 +4,7 @@ import asyncio
 import time
 
 from samaya.composer.catalog import InputCatalog
-from samaya.composer.models import model_options
+from samaya.composer.models import model_options, model_rows
 from samaya.sessions.models import active_turn
 
 # Native UI commands are handled by the existing workbench; the rest by this service.
@@ -133,7 +133,7 @@ class CommandService:
     async def model_settings(self, tid, refresh=False, thread=None):
         thread = thread or (await self.queries.read(tid, latest_only=True))["thread"]
         configured = await self.queries.settings(tid, refresh=refresh)
-        rows = await self.pages("model/list")
+        rows = await model_rows(self.connection)
         current_model = configured.get("model") or thread.get("model")
         models = model_options(rows, current_model)
         selected = next((m for m in models if m["model"] == current_model), {})

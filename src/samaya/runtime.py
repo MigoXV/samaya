@@ -1,5 +1,7 @@
 """Composition and lifecycle only; business operations belong to their services."""
 
+import asyncio
+
 from samaya.codex.connection import Connection
 from samaya.composer.catalog import InputCatalog
 from samaya.composer.commands import CommandService
@@ -16,6 +18,7 @@ from samaya.store import Store
 
 class Runtime:
     def __init__(self, config: Settings, store: Store):
+        self.maintenance: asyncio.Task | None = None
         self.store = store
         self.changed = ChangeSignal()
         self.connection = Connection(
@@ -35,8 +38,16 @@ class Runtime:
     async def start(self) -> None:
         await self.connection.start()
         self.monitor.start()
+        self.maintenance = asyncio.create_task(self.compact_replay())
+
+    async def compact_replay(self) -> None:
+        while await asyncio.to_thread(self.store.compact_catalog_events):
+            await asyncio.sleep(0.1)
 
     async def close(self) -> None:
+        if self.maintenance:
+            self.maintenance.cancel()
+            await asyncio.gather(self.maintenance, return_exceptions=True)
         await self.monitor.close()
         await self.connection.close()
         await self.operations.close()
@@ -54,12 +65,10 @@ class Runtime:
 
     async def receive(self, event: dict) -> None:
         self.sessions.observe_settings(event)
-        if event.get("method") in (
-            "skills/changed",
-            "app/list/updated",
-            "thread/settings/updated",
-        ):
-            self.catalog.invalidate()
+        if event.get("method") == "skills/changed":
+            self.catalog.invalidate("skills")
+        elif event.get("method") == "app/list/updated":
+            self.catalog.observe_apps(event.get("params", {}))
         self.decisions.observe(event)
         if event.get("method") == "samaya/connection":
             event = {**event, "params": self.status()}

@@ -79,9 +79,14 @@ class Monitor:
             task.cancel()
         await asyncio.gather(*self.tasks, return_exceptions=True)
 
-    def snapshot(self):
+    def snapshot(self, records=None):
         return {
-            "records": list(self.projection.records.values()),
+            "records": [
+                self.projection.summary_record(r)
+                for r in (
+                    self.projection.records.values() if records is None else records
+                )
+            ],
             "revision": self.revision,
             "generation": self.connection.connection_id,
             "cursor": self.store.cursor(),
@@ -357,18 +362,17 @@ class Monitor:
                 continue
             previous = state
             self.revision += 1
-            snapshot = self.snapshot()
+            snapshot = self.snapshot(
+                self.projection.records[t]
+                for t in self.projection.dirty
+                if t in self.projection.records
+            )
             # Request bodies/URLs stay memory-only. Browsers refetch these on a key change.
             snapshot.pop("pendingRequests")
             snapshot["requestKeys"] = list(self.decisions.pending)
             snapshot["requestStates"] = [
                 f"{k}:{p.get('responseState', '')}"
                 for k, p in self.decisions.pending.items()
-            ]
-            snapshot["records"] = [
-                self.projection.records[t]
-                for t in self.projection.dirty
-                if t in self.projection.records
             ]
             snapshot["removed"] = list(self.projection.removed)
             self.projection.dirty.clear()

@@ -222,3 +222,11 @@ Vite HMR 仅是开发辅助：`pnpm --dir src/web run dev`。本项目验收使�
 ### 授权请求
 
 命令执行、文件变更、额外权限及 MCP 授权请求直接出现在所属对话正文中，也可从“待我处理”打开。命令审批按服务端 `availableDecisions` 显示“允许本次”、取消或明确的规则授权；规则授权可展开查看完整范围，后端拒绝未提供的选项及被修改的规则。提交后等待原生请求确认，期间禁止重复提交。已由服务端消除的历史请求不会重放或自动批准。
+
+### 浏览器延迟与事件恢复
+
+任务总览仅传输摘要，完整消息、图片和工具结果由对话历史分页接口读取。全局事件连接使用 `scope=global`，正文连接使用 `scope=thread&threadId=...&turnId=...`；首次连接不回放旧事件，显式 `after` 或 `Last-Event-ID` 用于断线恢复。游标过期时重新读取快照。完整应用目录更新不进入浏览器事件日志，历史目录事件会分批压缩为轻量通知，事件编号保持不变。
+
+技能、应用和模型目录使用 30 秒短期缓存并合并并发读取。相同应用目录通知不会反复清空缓存；权限和模型的当前设置仍以原生确认结果为准。
+
+真实服务只读性能探针：从 `src/web` 运行 `node tests/runtime-latency.mjs`，通过 `SAMAYA_RUNTIME_TEST_URL` 指定服务，`SAMAYA_TEST_THREAD` 指定现有对话，`SAMAYA_TEST_STORAGE_STATE` 指定本地已登录的 Playwright storageState 文件。探针阻止所有写入 API，分别测试本机网络和 20 Mbps／20 ms 网络模拟；默认报告写入 `.samaya/latency-audit/after-browser.json`。认证文件只保存在本机，不提交版本库。

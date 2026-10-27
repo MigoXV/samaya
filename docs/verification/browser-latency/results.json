@@ -1,0 +1,112 @@
+{
+  "date": "2026-10-27",
+  "environment": "server-local Chromium, production HTTPS 8765; no client LAN measurement",
+  "http": {
+    "status": {
+      "samples": 20,
+      "p50Ms": 6.125,
+      "p95Ms": 7.27,
+      "maxMs": 13.29,
+      "bytes": 419
+    },
+    "monitor": {
+      "samples": 20,
+      "p50Ms": 80.77,
+      "p95Ms": 106.16,
+      "maxMs": 150.19,
+      "bytes": 1575954
+    },
+    "model-settings": {
+      "samples": 20,
+      "p50Ms": 40.215,
+      "p95Ms": 47.8,
+      "maxMs": 156.12,
+      "bytes": 5401
+    }
+  },
+  "browser": [
+    {
+      "throttled": false,
+      "elapsedMs": 16052,
+      "sse": {
+        "bytes": 551531,
+        "count": 43,
+        "fullCatalogEvents": 0
+      },
+      "monitorRequests": [
+        {
+          "ms": 97.31,
+          "bytes": 1448494
+        }
+      ],
+      "clickP95Ms": 73,
+      "clicks": [
+        73,
+        35,
+        55,
+        42,
+        29
+      ],
+      "inputP95Ms": 13.199999809265137,
+      "inputSamples": 30,
+      "longTasks": 3,
+      "longTaskTotalMs": 208,
+      "errors": []
+    },
+    {
+      "throttled": true,
+      "elapsedMs": 17518,
+      "sse": {
+        "bytes": 1958634,
+        "count": 319,
+        "fullCatalogEvents": 0
+      },
+      "monitorRequests": [
+        {
+          "ms": 750.736,
+          "bytes": 1575888
+        }
+      ],
+      "clickP95Ms": 67,
+      "clicks": [
+        67,
+        40,
+        40,
+        41,
+        39
+      ],
+      "inputP95Ms": 13.200000762939453,
+      "inputSamples": 30,
+      "longTasks": 5,
+      "longTaskTotalMs": 318,
+      "errors": []
+    }
+  ],
+  "catalogReads": [
+    {
+      "ms": 9320.11,
+      "status": 200,
+      "bytes": 1036304
+    },
+    {
+      "ms": 8396.45,
+      "status": 200,
+      "bytes": 1036304
+    },
+    {
+      "ms": 113.24,
+      "status": 200,
+      "bytes": 1036304
+    },
+    {
+      "ms": 115.59,
+      "status": 200,
+      "bytes": 1036304
+    },
+    {
+      "ms": 116.85,
+      "status": 200,
+      "bytes": 1036304
+    }
+  ]
+}

@@ -92,8 +92,7 @@ export function useMonitor() {
   );
   useEffect(() => {
     alive.current = true;
-    queueMicrotask(() => void refresh());
-    const es = new EventSource("/api/events");
+    const es = new EventSource("/api/events?scope=global");
     let notificationFloor = Infinity;
     es.onopen = () => {
       setOnline(true);

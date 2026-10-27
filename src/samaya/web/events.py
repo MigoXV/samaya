@@ -1,10 +1,45 @@
-"""Browser SSE replay and live monitor patches."""
+"""Scoped browser SSE replay and live monitor patches."""
 
 import asyncio
 import json
+from typing import Literal
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import StreamingResponse
+
+GLOBAL_METHODS = {
+    "samaya/connection",
+    "samaya/requestChanged",
+    "samaya/operation",
+    "serverRequest/resolved",
+    "turn/completed",
+}
+
+
+def scoped_event(event: dict, scope: str, thread_id: str | None, turn_id: str | None):
+    method, params = event.get("method"), event.get("params", {})
+    if scope == "global":
+        if method not in GLOBAL_METHODS:
+            return None
+        if method == "turn/completed":
+            # Completion listeners need identity/status, never full turn history.
+            turn = params.get("turn", {})
+            return {
+                "method": method,
+                "params": {
+                    "threadId": params.get("threadId"),
+                    "turn": {k: turn[k] for k in ("id", "status") if k in turn},
+                },
+            }
+    elif scope == "thread":
+        if params.get("threadId") != thread_id:
+            return None
+        if (
+            turn_id
+            and (params.get("turnId") or params.get("turn", {}).get("id")) != turn_id
+        ):
+            return None
+    return event
 
 
 def register_events(application: FastAPI) -> None:
@@ -12,38 +47,61 @@ def register_events(application: FastAPI) -> None:
         return application.state.runtime
 
     @application.get("/api/events")
-    async def events(request: Request, after: int = 0):
+    async def events(
+        request: Request,
+        after: int | None = None,
+        scope: Literal["all", "global", "thread"] = "all",
+        threadId: str | None = None,
+        turnId: str | None = None,
+    ):
+        if scope == "thread" and not threadId:
+            raise HTTPException(400, "对话订阅需要 threadId")
+        store = application.state.store
+        head = store.cursor()
         try:
-            cursor = max(after, int(request.headers.get("last-event-id", "0")))
+            explicit = after is not None or bool(request.headers.get("last-event-id"))
+            cursor = (
+                max(after or 0, int(request.headers.get("last-event-id", "0")))
+                if explicit
+                else head
+            )
+            if cursor < 0 or cursor > head:
+                raise ValueError
         except ValueError:
             raise HTTPException(400, "无效事件游标")
 
         async def stream():
             nonlocal cursor
             monitor_cursor = service().monitor.revision
-            # Every reconnect requests authoritative snapshots; replay alone is insufficient.
-            yield f"event: snapshot\ndata: {json.dumps({'cursor': application.state.store.cursor()})}\n\n"
+            # Capture before the browser fetches a snapshot: events racing that
+            # fetch remain replayable. First connections never replay old work.
+            yield f"event: snapshot\ndata: {json.dumps({'cursor': head})}\n\n"
             while not await request.is_disconnected():
-                # Subscribe before reading: changes during a slow network send
-                # must wake this reader too. Cancellation affects only this wait,
-                # never the native event consumer or another browser's stream.
                 wake = service().changed.event
                 monitor = service().monitor
-                if (
-                    monitor.patches
-                    and monitor_cursor < monitor.patches[0]["revision"] - 1
-                ):
-                    yield f"event: snapshot\ndata: {json.dumps({'cursor': application.state.store.cursor()})}\n\n"
-                    monitor_cursor = monitor.revision
-                for patch in list(monitor.patches):
-                    if patch["revision"] > monitor_cursor:
-                        monitor_cursor = patch["revision"]
-                        yield f"event: monitor\ndata: {json.dumps(patch, ensure_ascii=False)}\n\n"
-                rows = application.state.store.events(cursor)
+                if store.event_floor() > cursor + 1:
+                    cursor = store.cursor()
+                    yield f"event: snapshot\ndata: {json.dumps({'cursor': cursor, 'reason': 'cursor-expired'})}\n\n"
+                if scope != "thread":
+                    if (
+                        monitor.patches
+                        and monitor_cursor < monitor.patches[0]["revision"] - 1
+                    ):
+                        yield f"event: snapshot\ndata: {json.dumps({'cursor': store.cursor()})}\n\n"
+                        monitor_cursor = monitor.revision
+                    for patch in list(monitor.patches):
+                        if patch["revision"] > monitor_cursor:
+                            monitor_cursor = patch["revision"]
+                            yield f"event: monitor\ndata: {json.dumps(patch, ensure_ascii=False)}\n\n"
+                rows = store.events(cursor)
                 for row in rows:
                     cursor = row["id"]
-                    yield f"id: {cursor}\ndata: {json.dumps(row['data'], ensure_ascii=False)}\n\n"
+                    event = scoped_event(row["data"], scope, threadId, turnId)
+                    if event is not None:
+                        yield f"id: {cursor}\ndata: {json.dumps(event, ensure_ascii=False)}\n\n"
                 if rows:
+                    # Advance Last-Event-ID even when all records were filtered.
+                    yield f"id: {cursor}\nevent: cursor\ndata: {{}}\n\n"
                     continue
                 try:
                     await asyncio.wait_for(wake.wait(), 15)

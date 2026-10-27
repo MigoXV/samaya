@@ -1,7 +1,21 @@
 import type { Pending, Terminal, Thread, Turn } from "./types";
+export type SummaryItem = {
+  id: string;
+  type: string;
+  status?: string;
+  exitCode?: number;
+  text?: string;
+  aggregatedOutput?: string;
+  tool?: string;
+  name?: string;
+  changeCount?: number;
+  summaryOnly?: boolean;
+  changes?: { path: string }[];
+};
+export type SummaryTurn = Omit<Turn, "items"> & { items: SummaryItem[] };
 export type Observation = {
   thread: Thread;
-  turn: Turn | null;
+  turn: SummaryTurn | null;
   terminals: Terminal[];
   confirmedAt: number | null;
   progressAt: number | null;
@@ -145,7 +159,7 @@ export function progress(r: Observation): { text: string; source: string } {
     };
   if (last?.type === "fileChange")
     return {
-      text: `文件变更 ${last.changes?.length ?? ""} 项 · ${last.status || "状态待确认"}`,
+      text: `文件变更 ${last.changeCount ?? last.changes?.length ?? ""} 项 · ${last.status || "状态待确认"}`,
       source: "文件事件 · 非整个目录归属",
     };
   if (last?.type === "mcpToolCall")
@@ -174,7 +188,7 @@ export function recentFact(r: Observation): string | null {
   if (!item) return null;
   return item.type === "commandExecution"
     ? commandSummary(item)
-    : `已记录 ${item.changes?.length || 0} 项文件变更`;
+    : `已记录 ${item.changeCount ?? item.changes?.length ?? 0} 项文件变更`;
 }
 export function rootId(id: string, records: Map<string, Observation>): string {
   const seen = new Set<string>();

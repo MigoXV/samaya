@@ -26,7 +26,8 @@ class Store:
             raise RuntimeError(
                 "此 SAMAYA_DATA_DIR 已被另一实例使用；请仅运行一个 worker"
             ) from exc
-        self.db = sqlite3.connect(directory / "samaya.sqlite3")
+        self.path = directory / "samaya.sqlite3"
+        self.db = sqlite3.connect(self.path)
         os.chmod(directory / "samaya.sqlite3", 0o600)
         self.db.executescript("""
         PRAGMA journal_mode=WAL;
@@ -89,6 +90,8 @@ class Store:
         return {"usage": json.loads(row[0]), "observedAt": row[1]} if row else None
 
     def event(self, payload: dict) -> int:
+        if payload.get("method") == "app/list/updated":
+            payload = {"method": "samaya/catalogChanged", "params": {}}
         if payload.get("method") == "thread/tokenUsage/updated":
             params = payload.get("params", {})
             if params.get("threadId") and isinstance(params.get("tokenUsage"), dict):
@@ -109,10 +112,32 @@ class Store:
         return [
             {"id": row[0], "data": json.loads(row[1])}
             for row in self.db.execute(
-                "SELECT id,payload FROM events WHERE id>? ORDER BY id LIMIT 500",
-                (after,),
+                "SELECT id, CASE WHEN substr(payload,1,100) LIKE ? "
+                'THEN \'{"method":"samaya/catalogChanged","params":{}}\' ELSE payload END '
+                "FROM events WHERE id>? ORDER BY id LIMIT 500",
+                ('%"method": "app/list/updated"%', after),
             )
         ]
+
+    def event_floor(self) -> int:
+        return self.db.execute("SELECT COALESCE(MIN(id),0) FROM events").fetchone()[0]
+
+    def compact_catalog_events(self, limit: int = 20) -> bool:
+        """Bounded upgrade of disposable replay data, preserving cursor identities."""
+        with sqlite3.connect(self.path, timeout=5) as db:
+            rows = db.execute(
+                "SELECT id FROM events WHERE substr(payload,1,100) LIKE ? LIMIT ?",
+                ('%"method": "app/list/updated"%', limit),
+            ).fetchall()
+            if rows:
+                db.executemany(
+                    "UPDATE events SET payload=? WHERE id=?",
+                    [
+                        ("{" + '"method":"samaya/catalogChanged","params":{}}', row[0])
+                        for row in rows
+                    ],
+                )
+        return bool(rows)
 
     def cursor(self) -> int:
         return self.db.execute("SELECT COALESCE(MAX(id),0) FROM events").fetchone()[0]

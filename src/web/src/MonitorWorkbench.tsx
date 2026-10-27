@@ -2844,15 +2844,32 @@ function TaskComposer({
       return;
     }
     if (name === "copy") {
-      const message = [...(record.turn?.items || [])]
-        .reverse()
-        .find((i) => i.type === "agentMessage");
-      if (message?.text)
-        void navigator.clipboard
-          .writeText(message.text)
-          .then(finish)
-          .catch(() => setLocalError("复制失败，请手动选择回复。"));
-      else setLocalError("当前汇总没有完整回复，请在正文复制。");
+      void (async () => {
+        try {
+          if (!record.turn) throw new Error("当前没有可复制的回复");
+          let cursor: string | null = null;
+          do {
+            const page: {
+              data: { item: { type: string; text?: string } }[];
+              nextCursor: string | null;
+            } = await api(
+              `/threads/${encodeURIComponent(id)}/turns/${encodeURIComponent(record.turn.id)}/items?limit=100${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ""}`,
+            );
+            const message = page.data.find(
+              ({ item }) => item.type === "agentMessage" && item.text,
+            );
+            if (message?.item.text) {
+              await navigator.clipboard.writeText(message.item.text);
+              finish();
+              return;
+            }
+            cursor = page.nextCursor;
+          } while (cursor);
+          setLocalError("当前轮次没有可复制的回复。");
+        } catch {
+          setLocalError("复制失败，请在正文复制。");
+        }
+      })();
       return;
     }
     if (

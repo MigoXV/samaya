@@ -300,7 +300,10 @@ export function ComposerInput({
     let alive = true;
     const controller = new AbortController();
     if (!cwd) return;
+    let inFlight = false;
     const fetchCatalog = async (force = false) => {
+      if (inFlight) return;
+      inFlight = true;
       setLoading(true);
       try {
         const q = new URLSearchParams(threadId ? { threadId } : { cwd });
@@ -315,6 +318,7 @@ export function ComposerInput({
       } catch (e) {
         if (alive) setError(String(e));
       } finally {
+        inFlight = false;
         if (alive) setLoading(false);
       }
     };
