@@ -19,10 +19,18 @@ import {
   useState,
 } from "react";
 import type { Dispatch, ReactNode, SetStateAction } from "react";
-import { api, operation, pendingOperations, clearOperation } from "./api";
+import {
+  api,
+  operation,
+  pendingOperations,
+  clearOperation,
+  reconcileOperations,
+  acceptOperationReceipt,
+} from "./api";
 import { DirectoryPicker, Modal, RequestForm } from "./components";
 import { printStatus } from "./inline-status-store";
 import { ExecutionHistory } from "./ExecutionHistory";
+import { PlanActions } from "./PlanActions";
 import { GoalStatus } from "./GoalStatus";
 import { SearchPalette } from "./SearchPalette";
 import { ReadingSurface } from "./ReadingSurface";
@@ -805,8 +813,16 @@ export function MonitorWorkbench({ logout }: { logout: () => void }) {
       setNotice("");
     }
     operationError.current = "";
+    let released = false;
+    const release = () => {
+      if (released) return;
+      released = true;
+      submitting.current.delete(scope);
+      setInFlightScopes((old) => old.filter((value) => value !== scope));
+      setBusy((old) => (old === scope ? "" : old));
+    };
     try {
-      const result = await operation(action, body);
+      const result = await operation(action, body, release);
       if (action === "interrupt")
         setStopRequested((old) => ({
           ...old,
@@ -822,7 +838,7 @@ export function MonitorWorkbench({ logout }: { logout: () => void }) {
               : "",
         );
       }
-      if (options?.localFeedback) {
+      if (options?.localFeedback || result.state === "pending") {
         // The settings receipt already contains the authoritative selected values.
         // Global monitoring reconciles separately from the local saving indicator.
         void refresh().catch(() => {});
@@ -844,26 +860,56 @@ export function MonitorWorkbench({ logout }: { logout: () => void }) {
       if (options?.throwOnError) throw e;
       return null;
     } finally {
-      submitting.current.delete(scope);
-      setInFlightScopes((old) => old.filter((value) => value !== scope));
-      setBusy("");
+      release();
     }
   }
-  const unresolvedReceipts = receipts.filter(
-    (r) => !inFlightScopes.includes(r.scope),
-  );
-  const receiptEntry = unresolvedReceipts.length > 0 && (
-    <button
-      className="quiet operation-receipts"
-      onClick={() => setDialog("receipts")}
-      aria-label={`${unresolvedReceipts.length} 项操作待核查`}
-      title={`${unresolvedReceipts.length} 项操作待核查`}
-    >
-      {narrow
-        ? `${unresolvedReceipts.length} 回执`
-        : `${unresolvedReceipts.length} 项操作待核查`}
-    </button>
-  );
+  useEffect(() => {
+    const entries = receipts;
+    if (!entries.length) return;
+    const recover = () => {
+      void reconcileOperations(entries);
+    };
+    const visible = () => {
+      if (document.visibilityState === "visible") recover();
+    };
+    void reconcileOperations(
+      entries.filter((r) => !inFlightScopes.includes(r.scope)),
+    );
+    const timer = setInterval(recover, 8000);
+    window.addEventListener("focus", recover);
+    window.addEventListener("online", recover);
+    document.addEventListener("visibilitychange", visible);
+    return () => {
+      clearInterval(timer);
+      window.removeEventListener("focus", recover);
+      window.removeEventListener("online", recover);
+      document.removeEventListener("visibilitychange", visible);
+    };
+  }, [receipts, inFlightScopes]);
+  useEffect(() => {
+    const resolved = (event: Event) => {
+      const { entry, receipt } = (
+        event as CustomEvent<{
+          entry: { scope: string; threadId?: string };
+          receipt: Receipt;
+        }>
+      ).detail;
+      if (submitting.current.has(entry.scope)) return;
+      if (receipt.state === "failed") {
+        setFeedbackThread(entry.threadId || "");
+        setError(
+          "操作失败：" + String(receipt.result?.message || "请核对操作结果"),
+        );
+      } else if (feedbackThread === entry.threadId) {
+        setError((old) =>
+          old.includes("结果待确认") || old.includes("后台核对") ? "" : old,
+        );
+      }
+    };
+    window.addEventListener("samaya:receipt-resolved", resolved);
+    return () =>
+      window.removeEventListener("samaya:receipt-resolved", resolved);
+  }, [feedbackThread]);
   const operationFeedback = (
     <>
       {error && (
@@ -1233,7 +1279,6 @@ export function MonitorWorkbench({ logout }: { logout: () => void }) {
           }}
         />
         <div className="nav-bottom">
-          {!workMode && receiptEntry}
           {!workMode && !dialog && !requestTask && (error || notice) && (
             <button className="quiet" onClick={() => setDialog("receipts")}>
               查看操作反馈
@@ -1742,19 +1787,16 @@ export function MonitorWorkbench({ logout }: { logout: () => void }) {
                       </div>
                     </div>
 
-                    {receiptEntry}
-                    {error &&
-                      !feedbackForCurrentTask &&
-                      !unresolvedReceipts.length && (
-                        <button
-                          className="quiet operation-receipts"
-                          onClick={() => setDialog("receipts")}
-                          aria-label="查看操作反馈"
-                          title="查看操作反馈"
-                        >
-                          {narrow ? "反馈" : "查看操作反馈"}
-                        </button>
-                      )}
+                    {error && !feedbackForCurrentTask && (
+                      <button
+                        className="quiet operation-receipts"
+                        onClick={() => setDialog("receipts")}
+                        aria-label="查看操作反馈"
+                        title="查看操作反馈"
+                      >
+                        {narrow ? "反馈" : "查看操作反馈"}
+                      </button>
+                    )}
 
                     <button
                       className={
@@ -1971,6 +2013,29 @@ export function MonitorWorkbench({ logout }: { logout: () => void }) {
                           }
                           tab={taskTab}
                         />
+                        {selectedRecord.thread.canAcceptDirectInput === false &&
+                          selectedRecord.thread.parentThreadId && (
+                            <button
+                              className="quiet"
+                              onClick={() =>
+                                open(selectedRecord.thread.parentThreadId!)
+                              }
+                            >
+                              此子任务为只读 · 返回主对话
+                            </button>
+                          )}
+                        {taskTab === "work" && (
+                          <PlanActions
+                            key={selected}
+                            tid={selected}
+                            editable={
+                              selectedRecord.thread.canAcceptDirectInput !==
+                              false
+                            }
+                            run={run}
+                            open={open}
+                          />
+                        )}
                         {taskTab === "work" &&
                           (
                             requestsByRoot.get(rootId(selected, records)) ||
@@ -2021,13 +2086,11 @@ export function MonitorWorkbench({ logout }: { logout: () => void }) {
                           connected={!!connected}
                           busy={
                             busy === selected ||
-                            receipts.some(
-                              (receipt) => receipt.scope === selected,
-                            ) ||
                             (stopRequested[selected] ===
                               selectedRecord.turn?.id &&
                               selectedRecord.turn?.status === "inProgress")
                           }
+                          submissionBlocked={false}
                           run={run}
                           runSettings={(action, body) =>
                             run(action, body, {
@@ -2462,8 +2525,7 @@ export function MonitorWorkbench({ logout }: { logout: () => void }) {
                     setNotice(
                       `回执：${result.state} ${JSON.stringify(result.result || {})}`,
                     );
-                    if (["succeeded", "failed"].includes(result.state))
-                      clearOperation(r.operationId);
+                    acceptOperationReceipt(result);
                     await refresh();
                   } catch (e) {
                     setFeedbackThread(r.threadId || "");
@@ -2552,6 +2614,7 @@ function TaskComposer({
   record,
   connected,
   busy,
+  submissionBlocked,
   run,
   runSettings,
   inspectReceipts,
@@ -2563,6 +2626,7 @@ function TaskComposer({
   record: Observation;
   connected: boolean;
   busy: boolean;
+  submissionBlocked: boolean;
   run: (a: string, b: Record<string, unknown>) => Promise<Receipt | null>;
   runSettings: (
     a: string,
@@ -2599,6 +2663,35 @@ function TaskComposer({
   const [modelPending, setModelPending] = useState(true);
   const [localError, setLocalError] = useState("");
   const [goalRefresh, setGoalRefresh] = useState(0);
+  const failedDrafts = useCallback(
+    () =>
+      Object.keys(sessionStorage)
+        .filter((key) => key.startsWith("samaya.failedDraft." + id + "."))
+        .map((key) => ({ key, text: sessionStorage.getItem(key) || "" })),
+    [id],
+  );
+  const [failed, setFailed] = useState(failedDrafts);
+  useEffect(() => {
+    const restore = (event: Event) => {
+      const detail = (
+        event as CustomEvent<{
+          entry: { threadId?: string };
+          receipt: Receipt;
+          draft: string | null;
+        }>
+      ).detail;
+      if (
+        detail.entry.threadId === id &&
+        detail.receipt.state === "failed" &&
+        detail.draft
+      ) {
+        setDraft((current) => current || detail.draft || "");
+        setFailed(failedDrafts());
+      }
+    };
+    window.addEventListener("samaya:receipt-resolved", restore);
+    return () => window.removeEventListener("samaya:receipt-resolved", restore);
+  }, [id, failedDrafts]);
   const active = record.turn?.status === "inProgress";
   const mode = usePlanMode({
     tid: id,
@@ -2651,7 +2744,12 @@ function TaskComposer({
     }
   };
   const submit = async () => {
-    if (files.some((file) => file.status !== "ready")) return;
+    if (
+      busy ||
+      submissionBlocked ||
+      files.some((file) => file.status !== "ready")
+    )
+      return;
     const shell = shellInput(draft);
     if (
       shell !== null &&
@@ -2664,7 +2762,7 @@ function TaskComposer({
     }
     setLocalError("");
     const submitted = draft;
-    const r = await run(shell !== null ? "shell" : active ? "steer" : "send", {
+    const r = await run(shell !== null ? "shell" : "send", {
       command: shell,
       threadId: id,
       text: draft,
@@ -2673,6 +2771,7 @@ function TaskComposer({
       files: fileReferences(files),
       expectedCwd: record.thread.cwd,
       expectedTurnId: record.turn?.id || null,
+      reconcileLatest: true,
     });
     if (r) {
       rememberPrompt(record.thread.cwd, submitted);
@@ -2791,6 +2890,25 @@ function TaskComposer({
         }
       />
       {localError && <small role="alert">{localError}</small>}
+      {failed.length > 0 && (
+        <details className="failed-drafts">
+          <summary>查看未发送的内容</summary>
+          {failed.map((item) => (
+            <div key={item.key}>
+              <pre>{item.text}</pre>
+              <button
+                type="button"
+                onClick={() => {
+                  sessionStorage.removeItem(item.key);
+                  setFailed(failedDrafts());
+                }}
+              >
+                移除
+              </button>
+            </div>
+          ))}
+        </details>
+      )}
       {!command && feedback}
       <ComposerInput
         value={rename ? rename.value : draft}
@@ -2822,7 +2940,12 @@ function TaskComposer({
             />
           )
         }
-        submitDisabled={!rename && (mode.pending || modelPending)}
+        stopDisabled={busy || submissionBlocked}
+        submitDisabled={
+          busy ||
+          submissionBlocked ||
+          (!rename && (mode.pending || modelPending))
+        }
         modeControl={
           rename ? (
             <>
@@ -2855,7 +2978,7 @@ function TaskComposer({
         }
         disabled={
           !connected ||
-          (busy && !mode.pending) ||
+          (!!rename && busy) ||
           record.thread.canAcceptDirectInput === false ||
           record.thread.historyAvailable === false ||
           !!record.error

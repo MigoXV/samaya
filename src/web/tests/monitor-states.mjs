@@ -305,11 +305,11 @@ await scenario(
       .getByRole("button", { name: "确认删除", exact: true })
       .click();
     await expect(
-      p.getByText("demo-1：Error: 操作失败：演示：仍有后台命令", {
+      p.getByText("[演示] 复核语音推理异常：Error: 操作失败：演示：仍有后台命令", {
         exact: true,
       }),
     ).toBeVisible();
-    await expect(p.getByText("demo-10：已确认", { exact: true })).toBeVisible();
+    await expect(p.getByText("[演示] 生成报告目录：已确认", { exact: true })).toBeVisible();
   },
 );
 

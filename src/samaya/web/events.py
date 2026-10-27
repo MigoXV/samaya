@@ -24,6 +24,10 @@ def register_events(application: FastAPI) -> None:
             # Every reconnect requests authoritative snapshots; replay alone is insufficient.
             yield f"event: snapshot\ndata: {json.dumps({'cursor': application.state.store.cursor()})}\n\n"
             while not await request.is_disconnected():
+                # Subscribe before reading: changes during a slow network send
+                # must wake this reader too. Cancellation affects only this wait,
+                # never the native event consumer or another browser's stream.
+                wake = service().changed.event
                 monitor = service().monitor
                 if (
                     monitor.patches
@@ -42,8 +46,7 @@ def register_events(application: FastAPI) -> None:
                 if rows:
                     continue
                 try:
-                    async with service().changed:
-                        await asyncio.wait_for(service().changed.wait(), 15)
+                    await asyncio.wait_for(wake.wait(), 15)
                 except asyncio.TimeoutError:
                     yield ": heartbeat\n\n"
 

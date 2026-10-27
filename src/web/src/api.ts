@@ -37,6 +37,7 @@ export type PendingOperation = {
   action: string;
   threadId?: string;
   scope: string;
+  accepted?: boolean;
 };
 export function pendingOperations(): PendingOperation[] {
   const legacy = localStorage.getItem("samaya.pending");
@@ -68,14 +69,64 @@ export function clearOperation(id: string) {
   localStorage.removeItem("samaya.operation." + id);
   window.dispatchEvent(new Event("samaya:receipts"));
 }
+const receiptWaiters = new Map<string, (receipt: Receipt) => void>();
+export function acceptOperationReceipt(receipt: Receipt): boolean {
+  if (!["succeeded", "failed"].includes(receipt.state)) return false;
+  const entry = pendingOperations().find(
+    (p) => p.operationId === receipt.operationId,
+  );
+  if (!entry) return false;
+  const draftKey = "samaya.pendingDraft." + receipt.operationId;
+  const draft = sessionStorage.getItem(draftKey);
+  if (receipt.state === "failed" && draft && entry.threadId)
+    sessionStorage.setItem(
+      "samaya.failedDraft." + entry.threadId + "." + receipt.operationId,
+      draft,
+    );
+  sessionStorage.removeItem(draftKey);
+  receiptWaiters.get(receipt.operationId)?.(receipt);
+  clearOperation(receipt.operationId);
+  window.dispatchEvent(
+    new CustomEvent("samaya:receipt-resolved", {
+      detail: { entry, receipt, draft },
+    }),
+  );
+  return true;
+}
+const receiptReads = new Map<string, Promise<void>>();
+export async function reconcileOperations(
+  entries: PendingOperation[],
+): Promise<void> {
+  await Promise.all(
+    entries.map((entry) => {
+      const existing = receiptReads.get(entry.operationId);
+      if (existing) return existing;
+      const read = api<Receipt>(
+        "/operations/" + encodeURIComponent(entry.operationId),
+        { signal: AbortSignal.timeout(5000) },
+      )
+        .then((receipt) => {
+          if (receipt.operationId === entry.operationId)
+            acceptOperationReceipt(receipt);
+        })
+        .catch(() => {
+          /* Missing, unavailable or uncertain receipts remain protected; never replay writes. */
+        })
+        .finally(() => {
+          receiptReads.delete(entry.operationId);
+        });
+      receiptReads.set(entry.operationId, read);
+      return read;
+    }),
+  );
+}
 export async function operation(
   action: string,
   body: Record<string, unknown>,
+  onAccepted?: () => void,
 ): Promise<Receipt> {
   const scope = String(body.requestKey || body.threadId || "create");
   const submit = async () => {
-    if (pendingOperations().some((p) => p.scope === scope))
-      throw new Error("此对象有操作等待核查；请查询回执，其他任务仍可操作。");
     const operationId =
       crypto.randomUUID?.() ||
       Array.from(crypto.getRandomValues(new Uint8Array(16)), (b) =>
@@ -91,21 +142,86 @@ export async function operation(
       "samaya.operation." + operationId,
       JSON.stringify(entry),
     );
+    if (
+      (action === "send" || action === "steer") &&
+      typeof body.text === "string"
+    )
+      sessionStorage.setItem("samaya.pendingDraft." + operationId, body.text);
     window.dispatchEvent(new Event("samaya:receipts"));
     let receipt: Receipt;
     try {
-      receipt = await api<Receipt>("/operations", {
-        method: "POST",
-        body: JSON.stringify({ operationId, action, body }),
-      });
+      const confirmed = new Promise<Receipt>((resolve) =>
+        receiptWaiters.set(operationId, resolve),
+      );
+      const post = () =>
+        api<Receipt>("/operations", {
+          method: "POST",
+          headers: { Prefer: "respond-async" },
+          body: JSON.stringify({ operationId, action, body }),
+          signal: AbortSignal.timeout(30000),
+        });
+      const submission = navigator.locks
+        ? navigator.locks.request(
+            "samaya:" + scope,
+            { ifAvailable: true },
+            (lock) => {
+              if (!lock)
+                throw new ApiError("其它页面正在提交此对象，请稍后重试。", 409);
+              return post();
+            },
+          )
+        : post();
+      receipt = await Promise.race([confirmed, submission]);
+      if (receipt.state === "pending") {
+        if (!localStorage.getItem("samaya.operation." + operationId)) {
+          try {
+            receipt = await api<Receipt>(
+              "/operations/" + encodeURIComponent(operationId),
+              {
+                signal: AbortSignal.timeout(5000),
+              },
+            );
+          } catch {
+            /* Keep the accepted state until a receipt becomes available. */
+          }
+        }
+      }
+      if (receipt.state === "pending") {
+        if (localStorage.getItem("samaya.operation." + operationId)) {
+          localStorage.setItem(
+            "samaya.operation." + operationId,
+            JSON.stringify({ ...entry, accepted: true }),
+          );
+          window.dispatchEvent(new Event("samaya:receipts"));
+        }
+        onAccepted?.();
+        if (["send", "steer"].includes(action)) return receipt;
+      }
+      if (receipt.state === "pending") {
+        while (receipt.state === "pending") {
+          await new Promise((resolve) => setTimeout(resolve, 1000));
+          try {
+            receipt = await Promise.race([
+              confirmed,
+              api<Receipt>("/operations/" + encodeURIComponent(operationId), {
+                signal: AbortSignal.timeout(5000),
+              }),
+            ]);
+          } catch {
+            /* The accepted operation continues while connectivity recovers. */
+          }
+        }
+      }
     } catch (error) {
       if (error instanceof ApiError && error.status < 500) {
         clearOperation(operationId);
         throw error;
       }
-      throw new Error("提交结果待确认。请查询操作回执，不要重复发送。", {
+      throw new Error("提交结果正在后台核对。", {
         cause: error,
       });
+    } finally {
+      receiptWaiters.delete(operationId);
     }
     if (receipt.state === "succeeded" || receipt.state === "failed")
       clearOperation(operationId);
@@ -116,8 +232,5 @@ export async function operation(
       );
     return receipt;
   };
-  // Web Locks coordinate tabs before reserving a receipt. The server also checks turn/request identity.
-  return navigator.locks
-    ? navigator.locks.request("samaya:" + scope, submit)
-    : submit();
+  return submit();
 }

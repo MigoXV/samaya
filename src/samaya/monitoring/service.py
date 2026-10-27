@@ -14,6 +14,7 @@ from samaya.codex.connection import Connection
 from samaya.decisions.service import Decisions
 from samaya.sessions.models import normalize
 from samaya.sessions.queries import SessionQueries
+from samaya.signals import ChangeSignal
 from samaya.store import Store
 
 from .projection import Projection
@@ -26,7 +27,7 @@ class Monitor:
         queries: SessionQueries,
         decisions: Decisions,
         store: Store,
-        changed: asyncio.Condition,
+        changed: ChangeSignal,
     ):
         self.connection, self.queries, self.decisions, self.store, self.changed = (
             connection,
@@ -373,5 +374,4 @@ class Monitor:
             self.projection.dirty.clear()
             self.projection.removed.clear()
             self.patches.append(snapshot)
-            async with self.changed:
-                self.changed.notify_all()
+            self.changed.notify()

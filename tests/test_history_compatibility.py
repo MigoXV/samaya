@@ -213,6 +213,9 @@ async def test_cli_paginated_session_can_read_resume_and_send(queries):
     )
 
     async def rpc(method, params):
+        if method == "thread/resume":
+            await resume()
+            return {}
         if method == "thread/read":
             return {
                 "thread": {

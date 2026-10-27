@@ -61,6 +61,7 @@ export function ComposerInput({
   modeControl,
   onToggleMode,
   submitDisabled = false,
+  stopDisabled = false,
   textOnly = false,
   submitLabel,
   onCancel,
@@ -84,6 +85,7 @@ export function ComposerInput({
   modeControl?: ReactNode;
   onToggleMode?: () => void;
   submitDisabled?: boolean;
+  stopDisabled?: boolean;
   textOnly?: boolean;
   submitLabel?: string;
   onCancel?: () => void;
@@ -954,7 +956,7 @@ export function ComposerInput({
                 }
                 disabled={
                   stopMode
-                    ? disabled
+                    ? disabled || stopDisabled
                     : disabled ||
                       submitDisabled ||
                       readingImages ||

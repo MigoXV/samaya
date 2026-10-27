@@ -45,6 +45,7 @@ class Operations:
             "delete": ["threadId", "digest"],
             "unarchive": ["threadId"],
             "respond": ["threadId", "requestKey"],
+            "plan_execute": ["threadId", "turnId", "planItemId"],
         }
         if action not in required:
             raise ValueError("不支持的操作")
@@ -57,6 +58,8 @@ class Operations:
             raise ValueError("Shell 命令不能同时附带图片、文件或引用")
         if action == "respond" and not isinstance(body.get("response"), dict):
             raise ValueError("无效的输入响应")
+        if action == "plan_execute" and not isinstance(body.get("clearContext"), bool):
+            raise ValueError("缺少计划执行方式")
         if action in ("send", "steer"):
             uploaded = file_ids(body.get("files", []))
             message_inputs(
@@ -65,7 +68,9 @@ class Operations:
         if action == "send" and "expectedTurnId" not in body:
             raise ValueError("缺少会话版本，请刷新")
 
-    async def execute(self, key: str, action: str, body: dict) -> dict:
+    async def execute(
+        self, key: str, action: str, body: dict, *, wait: bool = True
+    ) -> dict:
         self.validate_action(action, body)
         fresh, receipt = self.store.reserve(key, {"action": action, "body": body})
         if not fresh:
@@ -74,12 +79,17 @@ class Operations:
         task = asyncio.create_task(self._execute(key, action, body))
         self.tasks.add(task)
         task.add_done_callback(self.tasks.discard)
+        if not wait:
+            return {"operationId": key, "state": "pending", "result": None}
         return await asyncio.shield(task)
 
     async def _execute(self, key: str, action: str, body: dict) -> dict:
         try:
-            async with self.locks[body.get("threadId", "create")]:
+            if action in ("respond", "interrupt"):
                 result = await self.dispatch(action, body)
+            else:
+                async with self.locks[body.get("threadId", "create")]:
+                    result = await self.dispatch(action, body)
             receipt = self.store.finish(key, "succeeded", result)
         except (ValueError, FileNotFoundError) as exc:
             receipt = self.store.finish(key, "failed", {"message": str(exc)})

@@ -1,7 +1,5 @@
 """Composition and lifecycle only; business operations belong to their services."""
 
-import asyncio
-
 from samaya.codex.connection import Connection
 from samaya.composer.catalog import InputCatalog
 from samaya.composer.commands import CommandService
@@ -12,13 +10,14 @@ from samaya.monitoring.service import Monitor
 from samaya.operations import Operations
 from samaya.sessions.actions import SessionActions
 from samaya.sessions.queries import SessionQueries
+from samaya.signals import ChangeSignal
 from samaya.store import Store
 
 
 class Runtime:
     def __init__(self, config: Settings, store: Store):
         self.store = store
-        self.changed = asyncio.Condition()
+        self.changed = ChangeSignal()
         self.connection = Connection(
             config, self.receive, self.restore, self.disconnected
         )
@@ -90,5 +89,4 @@ class Runtime:
                 "params": {"threadId": event.get("params", {}).get("threadId")},
             }
         self.store.event(event)
-        async with self.changed:
-            self.changed.notify_all()
+        self.changed.notify()

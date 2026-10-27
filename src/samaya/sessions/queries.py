@@ -50,6 +50,10 @@ class SessionQueries:
                     "reasoningEffort",
                     "serviceTier",
                     "collaborationMode",
+                    "approvalPolicy",
+                    "approvalsReviewer",
+                    "activePermissionProfile",
+                    "sandbox",
                 )
             },
         )
@@ -85,6 +89,10 @@ class SessionQueries:
                 "reasoningEffort": settings.get("effort"),
                 "serviceTier": settings.get("serviceTier"),
                 "collaborationMode": settings.get("collaborationMode"),
+                "approvalPolicy": settings.get("approvalPolicy"),
+                "approvalsReviewer": settings.get("approvalsReviewer"),
+                "activePermissionProfile": settings.get("activePermissionProfile"),
+                "sandbox": settings.get("sandbox"),
             },
         )
 
@@ -111,7 +119,16 @@ class SessionQueries:
             return dict(latest[2])
         values = {
             k: result.get(k)
-            for k in ("model", "reasoningEffort", "serviceTier", "collaborationMode")
+            for k in (
+                "model",
+                "reasoningEffort",
+                "serviceTier",
+                "collaborationMode",
+                "approvalPolicy",
+                "approvalsReviewer",
+                "activePermissionProfile",
+                "sandbox",
+            )
         }
         self.setting_snapshots[tid] = (generation, revision, values)
         return dict(values)
@@ -277,8 +294,8 @@ class SessionQueries:
             if self.is_fresh(thread):
                 return
         try:
-            await self.connection.connected().sdk.thread_resume(
-                tid, include_turns=False
+            await self.connection.rpc(
+                "thread/resume", {"threadId": tid, "excludeTurns": True}
             )
         except JsonRpcError as exc:
             # 0.160.0 creates paginated threads before their first rollout exists.

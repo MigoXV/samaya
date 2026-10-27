@@ -68,7 +68,9 @@ export function CommandDialog({
               f.name,
               f.type === "checkbox"
                 ? false
-                : f.value || f.options?.[0]?.value || "",
+                : f.value ||
+                  (name === "permissions" ? "" : f.options?.[0]?.value) ||
+                  "",
             ]),
           );
           if (
@@ -105,7 +107,9 @@ export function CommandDialog({
       );
       if (r) {
         setResult(r.result || {});
-        done(r);
+        if (r.result?.settingsPending) {
+          setError("设置已提交，原生状态尚未确认；请重新打开查看当前权限。");
+        } else done(r);
       } else setError("操作未确认，请查看工作区提示或操作回执。");
     } catch (e) {
       setError(String(e));
@@ -163,41 +167,64 @@ export function CommandDialog({
                     void submit();
                   }}
                 >
-                  {context.fields.map((f) => (
-                    <label key={f.name}>
-                      {f.label}
-                      {f.options ? (
-                        <select
-                          value={String(values[f.name] ?? "")}
-                          onChange={(e) =>
-                            setValues({ ...values, [f.name]: e.target.value })
-                          }
-                        >
-                          {f.options.map((o) => (
-                            <option key={o.value} value={o.value}>
-                              {o.label}
-                            </option>
-                          ))}
-                        </select>
-                      ) : f.type === "checkbox" ? (
-                        <input
-                          type="checkbox"
-                          checked={values[f.name] === true}
-                          onChange={(e) =>
-                            setValues({ ...values, [f.name]: e.target.checked })
-                          }
-                        />
-                      ) : (
-                        <input
-                          type={f.type}
-                          value={String(values[f.name] ?? "")}
-                          onChange={(e) =>
-                            setValues({ ...values, [f.name]: e.target.value })
-                          }
-                        />
-                      )}
-                    </label>
-                  ))}
+                  {context.fields.map((f) =>
+                    name === "permissions" && f.options ? (
+                      <fieldset className="permission-options" key={f.name}>
+                        <legend>{f.label}</legend>
+                        {f.options.map((o) => (
+                          <label key={o.value}>
+                            <input
+                              type="radio"
+                              name={f.name}
+                              value={o.value}
+                              checked={values[f.name] === o.value}
+                              onChange={() =>
+                                setValues({ ...values, [f.name]: o.value })
+                              }
+                            />
+                            {o.label}
+                          </label>
+                        ))}
+                      </fieldset>
+                    ) : (
+                      <label key={f.name}>
+                        {f.label}
+                        {f.options ? (
+                          <select
+                            value={String(values[f.name] ?? "")}
+                            onChange={(e) =>
+                              setValues({ ...values, [f.name]: e.target.value })
+                            }
+                          >
+                            {f.options.map((o) => (
+                              <option key={o.value} value={o.value}>
+                                {o.label}
+                              </option>
+                            ))}
+                          </select>
+                        ) : f.type === "checkbox" ? (
+                          <input
+                            type="checkbox"
+                            checked={values[f.name] === true}
+                            onChange={(e) =>
+                              setValues({
+                                ...values,
+                                [f.name]: e.target.checked,
+                              })
+                            }
+                          />
+                        ) : (
+                          <input
+                            type={f.type}
+                            value={String(values[f.name] ?? "")}
+                            onChange={(e) =>
+                              setValues({ ...values, [f.name]: e.target.value })
+                            }
+                          />
+                        )}
+                      </label>
+                    ),
+                  )}
                 </form>
               )}
             </>
@@ -207,6 +234,7 @@ export function CommandDialog({
               className="primary"
               disabled={
                 busy ||
+                (name === "permissions" && !values.value) ||
                 (!!context?.active &&
                   ["compact", "review", "fork", "side"].includes(name))
               }
@@ -217,7 +245,11 @@ export function CommandDialog({
           )}
           {result && (
             <div role="status">
-              <p>请求已确认；执行进展以任务记录为准。</p>
+              <p>
+                {result.settingsPending
+                  ? "设置已提交，等待原生状态确认。"
+                  : "请求已确认；执行进展以任务记录为准。"}
+              </p>
               {typeof url === "string" && /^https?:\/\//.test(url) && (
                 <a href={url} target="_blank" rel="noreferrer">
                   打开外部授权页面
