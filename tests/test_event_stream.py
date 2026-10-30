@@ -133,3 +133,25 @@ async def test_disconnected_and_slow_browsers_do_not_block_questions(runtime):
     finally:
         for browser in browsers:
             await browser.close()
+
+
+def test_global_mode_update_omits_settings_and_instructions():
+    from samaya.web.events import scoped_event
+
+    event = {
+        "method": "thread/settings/updated",
+        "params": {
+            "threadId": "a",
+            "threadSettings": {
+                "collaborationMode": {
+                    "mode": "default",
+                    "settings": {"developer_instructions": "private"},
+                },
+                "cwd": "/private",
+            },
+        },
+    }
+    assert scoped_event(event, "global", None, None) == {
+        "method": event["method"],
+        "params": {"threadId": "a", "mode": "default"},
+    }

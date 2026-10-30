@@ -14,6 +14,7 @@ export type SummaryItem = {
 };
 export type SummaryTurn = Omit<Turn, "items"> & { items: SummaryItem[] };
 export type Observation = {
+  orderAt?: number;
   lastActivityId?: number;
   lastActivityAt?: number;
   thread: Thread;

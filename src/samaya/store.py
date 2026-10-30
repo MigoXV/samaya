@@ -33,6 +33,8 @@ class Store:
         PRAGMA journal_mode=WAL;
         CREATE TABLE IF NOT EXISTS operations(id TEXT PRIMARY KEY, fingerprint TEXT, state TEXT, result TEXT, created REAL);
         CREATE TABLE IF NOT EXISTS events(id INTEGER PRIMARY KEY AUTOINCREMENT, payload TEXT, created REAL);
+        CREATE TABLE IF NOT EXISTS thread_order(thread_id TEXT PRIMARY KEY, ordered_at REAL);
+        CREATE TABLE IF NOT EXISTS ordering_turns(thread_id TEXT, turn_id TEXT, PRIMARY KEY(thread_id,turn_id));
         CREATE TABLE IF NOT EXISTS thread_activity(thread_id TEXT PRIMARY KEY, event_id INTEGER, observed REAL);
         CREATE TABLE IF NOT EXISTS watched(id TEXT PRIMARY KEY);
         CREATE TABLE IF NOT EXISTS token_usage(thread_id TEXT PRIMARY KEY, payload TEXT, observed REAL);

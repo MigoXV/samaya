@@ -194,6 +194,9 @@
   color: var(--text-primary);
   border-color: transparent;
 }
+.nav-conversation-row.conversation-running .nav-conversation-status {
+  color: var(--text-primary);
+}
 .monitor-nav .nav-conversation-row.conversation-running:hover {
   background: color-mix(in srgb, var(--selected) 80%, var(--hover));
 }

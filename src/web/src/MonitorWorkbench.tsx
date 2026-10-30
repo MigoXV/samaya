@@ -1,7 +1,4 @@
-import {
-  useWorkspaceVisibility,
-  workspaceRecency,
-} from "./workspace-visibility";
+import { useWorkspaceVisibility, workspaceOrder } from "./workspace-visibility";
 import {
   Search,
   PanelsTopLeft,
@@ -463,7 +460,7 @@ export function MonitorWorkbench({ logout }: { logout: () => void }) {
   );
   const visibility = useWorkspaceVisibility(records, data?.cursor || 0);
   const restoreWorkspace = visibility.restore;
-  const recency = workspaceRecency(records);
+  const recency = workspaceOrder(records);
   const orderedProjects = [...projects].sort(
     (a, b) =>
       (recency.get(b) || 0) - (recency.get(a) || 0) || a.localeCompare(b),

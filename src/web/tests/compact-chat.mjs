@@ -74,13 +74,15 @@ try {
     await expect(replies.nth(index).locator(".response-actions")).toHaveCount(
       0,
     );
-    await expect(replies.nth(index).getByRole("button")).toHaveCount(0);
+    await expect(
+      replies.nth(index).getByRole("button", { name: "复制本轮回复" }),
+    ).toHaveCount(0);
   }
   const finalReply = replies.nth(2);
   await page.mouse.move(0, 0);
   await expect(finalReply.locator(".response-actions")).toHaveCSS(
     "opacity",
-    "0",
+    "1",
   );
   await finalReply.hover();
   const copy = finalReply.getByRole("button", { name: "复制本轮回复" });
@@ -88,12 +90,16 @@ try {
     "opacity",
     "1",
   );
+  const bodyBox = await finalReply.locator(".markdown").boundingBox();
+  const actionBox = await finalReply.locator(".response-actions").boundingBox();
+  expect(actionBox.y).toBeGreaterThanOrEqual(bodyBox.y + bodyBox.height + 7);
+  expect(actionBox.x).toBe(bodyBox.x);
   const height = (await finalReply.boundingBox()).height;
   await copy.click();
   expect(await page.evaluate(() => window.__copied)).toBe(
     [items[1].text, items[3].text, items[4].text].join("\n\n"),
   );
-  await expect(copy).toHaveText("✓");
+  await expect(copy.locator("svg.lucide-check")).toHaveCount(1);
   expect((await finalReply.boundingBox()).height).toBe(height);
   await page.mouse.move(0, 0);
   await copy.focus();
@@ -109,6 +115,19 @@ try {
   await nextCopy.focus();
   await page.keyboard.press("Enter");
   expect(await page.evaluate(() => window.__copied)).toBe(items[6].text);
+  const codeCopy = replies.nth(1).getByRole("button", { name: "复制代码" });
+  await codeCopy.click();
+  expect(await page.evaluate(() => window.__copied)).toBe(
+    "const value = 42;\n",
+  );
+  await expect(codeCopy).toHaveText("已复制");
+  await expect(nextCopy.locator("svg.lucide-check")).toHaveCount(1);
+  await expect(codeCopy).toHaveText("复制代码", { timeout: 4000 });
+  await codeCopy.focus();
+  await page.keyboard.press("Enter");
+  expect(await page.evaluate(() => window.__copied)).toBe(
+    "const value = 42;\n",
+  );
   await page.evaluate(() => {
     window.__copyFails = true;
   });
@@ -118,6 +137,15 @@ try {
     "复制失败，请选择正文复制",
   );
   expect((await finalReply.boundingBox()).height).toBe(height);
+  await codeCopy.click();
+  await expect(replies.nth(1).getByRole("status")).toHaveText(
+    "复制失败，请选择正文复制",
+  );
+  await page.evaluate(() => {
+    window.__copyFails = false;
+  });
+  await codeCopy.click();
+  await expect(codeCopy).toHaveText("已复制");
   const input = page.locator(".task-composer textarea");
   const composer = page.locator(".task-composer .composer-input");
   await expect(composer.locator(".plan-shortcut")).toHaveCount(0);

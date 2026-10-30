@@ -1,3 +1,9 @@
+import {
+  acceptPlanModeRead,
+  getPlanMode,
+  subscribePlanMode,
+  useSharedPlanMode,
+} from "./plan-mode-state";
 import { useEffect, useRef, useState } from "react";
 import { api } from "./api";
 import type { Item, Receipt } from "./types";
@@ -17,6 +23,7 @@ export function PlanActions({
   ) => Promise<Receipt | null>;
   open: (id: string) => void;
 }) {
+  const modeState = useSharedPlanMode(tid);
   const [candidate, setCandidate] = useState<Candidate | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -45,6 +52,7 @@ export function PlanActions({
         return;
       seen.current.add(data.turn.id);
       const request = ++revision.current;
+      const modeVersion = getPlanMode(tid).version;
       void (async () => {
         try {
           const [mode, page] = await Promise.all([
@@ -61,6 +69,7 @@ export function PlanActions({
           if (
             alive &&
             request === revision.current &&
+            acceptPlanModeRead(tid, mode.current, modeVersion) &&
             mode.current === "plan" &&
             plan
           )
@@ -74,17 +83,26 @@ export function PlanActions({
       if ((event as CustomEvent<{ threadId: string }>).detail.threadId === tid)
         dismiss();
     };
+    let previousMode = getPlanMode(tid);
+    const unsubscribe = subscribePlanMode(() => {
+      const state = getPlanMode(tid);
+      if (state === previousMode) return;
+      previousMode = state;
+      if ((state.target ?? state.current) !== "plan") dismiss();
+    });
     window.addEventListener("samaya:input-accepted", continued);
     window.addEventListener("samaya:turn-started", continued);
     window.addEventListener("samaya:turn-completed", completed);
     return () => {
       alive = false;
+      unsubscribe();
       window.removeEventListener("samaya:input-accepted", continued);
       window.removeEventListener("samaya:turn-started", continued);
       window.removeEventListener("samaya:turn-completed", completed);
     };
   }, [tid, editable]);
-  if (!candidate) return null;
+  if (!candidate || (modeState.target ?? modeState.current) !== "plan")
+    return null;
   const execute = async (clearContext: boolean) => {
     if (busy) return;
     setBusy(true);

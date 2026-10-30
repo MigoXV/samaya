@@ -8,6 +8,7 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import StreamingResponse
 
 GLOBAL_METHODS = {
+    "thread/settings/updated",
     "samaya/connection",
     "samaya/requestChanged",
     "samaya/operation",
@@ -22,6 +23,16 @@ def scoped_event(event: dict, scope: str, thread_id: str | None, turn_id: str | 
     if scope == "global":
         if method not in GLOBAL_METHODS:
             return None
+        if method == "thread/settings/updated":
+            return {
+                "method": method,
+                "params": {
+                    "threadId": params.get("threadId"),
+                    "mode": (
+                        params.get("threadSettings", {}).get("collaborationMode") or {}
+                    ).get("mode"),
+                },
+            }
         if method in ("turn/completed", "turn/started"):
             # Completion listeners need identity/status, never full turn history.
             turn = params.get("turn", {})

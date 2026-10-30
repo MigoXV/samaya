@@ -1,3 +1,8 @@
+import {
+  acceptPlanModeRead,
+  getPlanMode,
+  useSharedPlanMode,
+} from "./plan-mode-state";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "./api";
 import type { Receipt } from "./types";
@@ -28,6 +33,7 @@ export function usePlanMode({
     body: Record<string, unknown>,
   ) => Promise<Receipt | null>;
 }) {
+  const shared = useSharedPlanMode(tid);
   const [settings, setSettings] = useState<Settings | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -49,6 +55,7 @@ export function usePlanMode({
     const controller = new AbortController();
     const load = async () => {
       const request = ++sequence.current;
+      const modeVersion = getPlanMode(tid).version;
       setLoading(true);
       try {
         const result = tid
@@ -69,6 +76,18 @@ export function usePlanMode({
           request === sequence.current &&
           !pending.current
         ) {
+          if (tid && !acceptPlanModeRead(tid, result.current, modeVersion)) {
+            // Keep capability metadata usable even if a newer mode confirmation
+            // overtook this first read. Never overwrite the confirmed mode.
+            setSettings(
+              (old) =>
+                old ?? {
+                  ...result,
+                  current: getPlanMode(tid).current ?? result.current,
+                },
+            );
+            return;
+          }
           setSettings(result);
           setError("");
           setUncertain(false);
@@ -89,8 +108,8 @@ export function usePlanMode({
       controller.abort();
       window.removeEventListener("focus", load);
     };
-  }, [tid, disabled, revision]);
-  const current = tid ? settings?.current : value;
+  }, [tid, disabled, revision, shared.refresh]);
+  const current = tid ? (shared.current ?? settings?.current) : value;
   const supported =
     settings?.modes.some((m) => m.value === "plan") &&
     settings.modes.some((m) => m.value === "default");
@@ -131,12 +150,13 @@ export function usePlanMode({
       if (!result) throw new Error("模式更新未确认，请核查操作回执。");
       if (result.result?.settingsPending || result.result?.mode !== target) {
         setUncertain(true);
-        setError("设置已提交，尚未确认；请重新读取，勿重复提交。");
+        setRevision((n) => n + 1);
       } else setSettings((old) => (old ? { ...old, current: target } : old));
     } catch (e) {
       if (alive.current) {
         setError(String(e));
         if (/待确认|回执/.test(String(e))) setUncertain(true);
+        setRevision((n) => n + 1);
       }
     } finally {
       pending.current = false;

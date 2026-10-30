@@ -15,6 +15,7 @@ const state = fixture(45);
 // Distinct activity timestamps make ordering observable, independent of statuses.
 state.records.forEach((r, i) => {
   r.thread.recencyAt = r.thread.updatedAt - 100;
+  r.orderAt = r.thread.recencyAt;
 });
 const { calls, broadcast } = await install(context, state);
 const page = await context.newPage();
@@ -63,7 +64,7 @@ const latest = state.records.find((r) => r.thread.id === "demo-44");
 latest.progressAt = Date.now() / 1000 + 200;
 await broadcast();
 await expect(groups.first()).toHaveAttribute("data-workspace", "/demo/Samaya");
-latest.thread.recencyAt = Date.now() / 1000 + 100;
+latest.orderAt = Date.now() / 1000 + 100;
 await broadcast();
 await expect(groups.first()).toHaveAttribute(
   "data-workspace",
