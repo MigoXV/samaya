@@ -1,3 +1,4 @@
+import { beginPlanMode, confirmPlanMode } from "./plan-mode-state";
 import type { Receipt } from "./types";
 export class ApiError extends Error {
   constructor(
@@ -120,7 +121,7 @@ export async function reconcileOperations(
     }),
   );
 }
-export async function operation(
+async function performOperation(
   action: string,
   body: Record<string, unknown>,
   onAccepted?: () => void,
@@ -242,4 +243,34 @@ export async function operation(
     return receipt;
   };
   return submit();
+}
+
+export async function operation(
+  action: string,
+  body: Record<string, unknown>,
+  onAccepted?: () => void,
+): Promise<Receipt> {
+  const target = (body.args as { value?: string })?.value;
+  const changingMode =
+    (target === "plan" || target === "default") &&
+    action === "command" &&
+    body.command === "plan" &&
+    typeof body.threadId === "string";
+  const tid = String(body.threadId || "");
+  if (changingMode) beginPlanMode(tid, target);
+  try {
+    const receipt = await performOperation(action, body, onAccepted);
+    if (changingMode)
+      confirmPlanMode(
+        tid,
+        typeof receipt.result?.mode === "string"
+          ? receipt.result.mode
+          : undefined,
+        !!receipt.result?.settingsPending,
+      );
+    return receipt;
+  } catch (error) {
+    if (changingMode) confirmPlanMode(tid, undefined, true);
+    throw error;
+  }
 }

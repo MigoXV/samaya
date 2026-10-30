@@ -1,5 +1,5 @@
 import { WorkspaceMenu, HiddenWorkspaces } from "./WorkspaceMenu";
-import { activityAt, type WorkspaceVisibility } from "./workspace-visibility";
+import { orderAt, type WorkspaceVisibility } from "./workspace-visibility";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Archive, ChevronRight, Ellipsis, Pencil, Trash2 } from "lucide-react";
@@ -222,8 +222,7 @@ export function WorkspaceNavigation({
           )
           .sort(
             (a, b) =>
-              activityAt(b) - activityAt(a) ||
-              a.thread.id.localeCompare(b.thread.id),
+              orderAt(b) - orderAt(a) || a.thread.id.localeCompare(b.thread.id),
           );
         const count = activity.get(cwd)?.running.size || 0,
           uncertain = activity.get(cwd)?.uncertain.size || 0;

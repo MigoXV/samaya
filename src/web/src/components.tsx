@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { MarkdownContent } from "./MarkdownContent";
+import { CopyButton } from "./CopyButton";
 import { ToolSummary } from "./ToolSummary";
 import { UserMessage } from "./UserMessage";
 import { api } from "./api";
@@ -157,45 +158,14 @@ function AgentReply({
   showAuthor: boolean;
   copyText?: string;
 }) {
-  const [notice, setNotice] = useState("");
-  useEffect(() => {
-    if (notice !== "已复制") return;
-    const timer = setTimeout(() => setNotice(""), 2000);
-    return () => clearTimeout(timer);
-  }, [notice]);
   return (
     <section className="message agent-reply">
       {showAuthor && <div className="sr-only">Codex</div>}
-      <div
-        className={`agent-reply-body${copyText === undefined ? " agent-reply-body-only" : ""}`}
-      >
+      <div className="agent-reply-body">
         <MarkdownContent text={item.text || ""} threadId={threadId} />
         {copyText !== undefined && (
           <div className="response-actions">
-            <button
-              type="button"
-              className="quiet"
-              aria-label="复制本轮回复"
-              title={notice || "复制本轮回复"}
-              onClick={() => {
-                void navigator.clipboard
-                  .writeText(copyText)
-                  .then(() => setNotice("已复制"))
-                  .catch(() => setNotice("复制失败，请选择正文复制"));
-              }}
-            >
-              {notice === "已复制" ? (
-                <span aria-hidden="true">✓</span>
-              ) : (
-                <img src="/figma/copy.svg" alt="" />
-              )}
-            </button>
-            <small
-              className={notice === "已复制" ? "sr-only" : "response-notice"}
-              role="status"
-            >
-              {notice}
-            </small>
+            <CopyButton label="复制本轮回复" getText={() => copyText} />
           </div>
         )}
       </div>

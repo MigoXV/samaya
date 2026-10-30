@@ -1,6 +1,7 @@
 import { WorkspaceMenu, HiddenWorkspaces } from "./WorkspaceMenu";
 import {
-  activityAt,
+  orderAt,
+  workspaceOrder,
   workspaceRecency,
   type WorkspaceVisibility,
 } from "./workspace-visibility";
@@ -102,6 +103,7 @@ export function TaskOverview({
   }, [initialized]);
   const prefix = useId();
   const recency = workspaceRecency(records);
+  const ordering = workspaceOrder(records);
   const byWorkspace = new Map<string, Observation[]>();
   for (const r of roots) {
     const key = r.thread.cwd || "";
@@ -114,14 +116,15 @@ export function TaskOverview({
       cwd,
       tasks: tasks.sort(
         (a, b) =>
-          Number(pendingIds.has(b.thread.id)) -
-            Number(pendingIds.has(a.thread.id)) ||
-          activityAt(b) - activityAt(a) ||
-          a.thread.id.localeCompare(b.thread.id),
+          orderAt(b) - orderAt(a) || a.thread.id.localeCompare(b.thread.id),
       ),
       updatedAt: recency.get(cwd) || 0,
     }))
-    .sort((a, b) => b.updatedAt - a.updatedAt || a.cwd.localeCompare(b.cwd));
+    .sort(
+      (a, b) =>
+        (ordering.get(b.cwd) || 0) - (ordering.get(a.cwd) || 0) ||
+        a.cwd.localeCompare(b.cwd),
+    );
   const row = (r: Observation) => (
     <button
       className={`overview-task ${pendingIds.has(r.thread.id) ? "needs-attention" : ""} ${activityClass(r)}`}

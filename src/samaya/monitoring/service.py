@@ -17,6 +17,7 @@ from samaya.sessions.queries import SessionQueries
 from samaya.signals import ChangeSignal
 from samaya.store import Store
 
+from .ordering import TurnOrdering
 from .projection import Projection
 
 
@@ -51,9 +52,15 @@ class Monitor:
 
         self.projection = Projection()
         self.activities = store.activities()
+        self.ordering = TurnOrdering(store)
         self.stopping = False
 
     def event(self, event: dict) -> None:
+        if event.get("method") == "turn/started":
+            self.ordering.seed(self.projection.records.values())
+        ordered = self.ordering.event(event)
+        if ordered:
+            self.projection.dirty.add(ordered)
         self.projection.event(
             event,
             connection_state=self.connection.state,
@@ -86,11 +93,13 @@ class Monitor:
         await asyncio.gather(*self.tasks, return_exceptions=True)
 
     def snapshot(self, records=None):
+        self.ordering.seed(self.projection.records.values())
         return {
             "records": [
                 {
                     **self.projection.summary_record(r),
                     **self.activities.get(r["thread"]["id"], {}),
+                    "orderAt": self.ordering.values.get(r["thread"]["id"], 0),
                 }
                 for r in (
                     self.projection.records.values() if records is None else records

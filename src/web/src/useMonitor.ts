@@ -1,3 +1,4 @@
+import { confirmPlanMode } from "./plan-mode-state";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api, ApiError, acceptOperationReceipt } from "./api";
 import type { MonitorSnapshot, Observation } from "./monitor";
@@ -130,6 +131,13 @@ export function useMonitor() {
     });
     es.onmessage = (e) => {
       const event = JSON.parse(e.data);
+      if (
+        event.method === "thread/settings/updated" &&
+        event.params?.threadId &&
+        event.params?.mode &&
+        Number(e.lastEventId) > notificationFloor
+      )
+        confirmPlanMode(event.params.threadId, event.params.mode, true);
       if (event.method === "samaya/operation" && event.params)
         acceptOperationReceipt(event.params);
       if (

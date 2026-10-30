@@ -60,6 +60,24 @@ export function activityAt(r: Observation) {
     r.thread.recencyAt ?? r.thread.updatedAt ?? 0,
   );
 }
+export function orderAt(r: Observation) {
+  return r.orderAt ?? r.thread.recencyAt ?? r.thread.updatedAt ?? 0;
+}
+export function workspaceOrder(records: Map<string, Observation>) {
+  const result = new Map<string, number>();
+  for (const r of records.values()) {
+    if (
+      r.thread.archived ||
+      (r.thread.parentThreadId && records.has(r.thread.parentThreadId))
+    )
+      continue;
+    result.set(
+      r.thread.cwd,
+      Math.max(result.get(r.thread.cwd) || 0, orderAt(r)),
+    );
+  }
+  return result;
+}
 export function workspaceRecency(records: Map<string, Observation>) {
   const result = new Map<string, number>();
   for (const r of records.values()) {

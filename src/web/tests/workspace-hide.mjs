@@ -10,6 +10,7 @@ try {
   state.records.forEach((r) => {
     r.thread.recencyAt = r.thread.updatedAt;
     r.lastActivityId = 1;
+    r.orderAt = r.thread.updatedAt;
   });
   const { broadcast } = await install(context, state);
   const page = await context.newPage();
@@ -61,7 +62,7 @@ try {
   await expect(second.locator(`[data-sidebar-workspace="${old}"]`)).toHaveCount(
     1,
   );
-  expect((await order())[0]).toBe(old);
+  expect((await order())[0]).toBe(before[0]);
   await page.getByRole("button", { name: "任务总览", exact: true }).click();
   const overview = page.locator(
     '.overview-workspace[data-workspace="/demo/Laya"]',
@@ -75,7 +76,7 @@ try {
   await nav.getByRole("button", { name: "已隐藏 1" }).click();
   await nav.getByRole("button", { name: "恢复 Laya", exact: true }).click();
   await expect(overview).toHaveCount(1);
-  expect((await order())[0]).toBe(old);
+  expect((await order())[0]).toBe(before[0]);
   // Hidden workspaces remain searchable; viewing a result restores without reordering.
   await nav.getByRole("button", { name: "Laya 工作区菜单" }).click();
   await page.getByRole("menuitem", { name: "暂时隐藏" }).click();
@@ -90,7 +91,7 @@ try {
   await expect(
     nav.locator('[data-sidebar-workspace="/demo/Laya"]'),
   ).toHaveCount(1);
-  expect((await order())[0]).toBe(old);
+  expect((await order())[0]).toBe(before[0]);
   await page.getByRole("button", { name: "任务总览", exact: true }).click();
   await page
     .getByRole("searchbox", { name: "搜索工作区", exact: true })
