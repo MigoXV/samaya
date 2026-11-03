@@ -193,7 +193,7 @@ class SessionActions:
         if action == "send":
             await self.queries.join(tid)
             thread = (
-                (await self.queries.read(tid))["thread"]
+                (await self.queries.read(tid, latest_only=True))["thread"]
                 if b.get("reconcileLatest")
                 else await self.queries.idle(tid)
             )

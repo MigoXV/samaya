@@ -27,8 +27,10 @@ import {
   clearOperation,
   reconcileOperations,
   acceptOperationReceipt,
+  type PendingOperation,
 } from "./api";
 import { DirectoryPicker, Modal, RequestForm } from "./components";
+import { DraftRecovery, type RecoverableDraft } from "./DraftRecovery";
 import { printStatus } from "./inline-status-store";
 import { ExecutionHistory } from "./ExecutionHistory";
 import { PlanActions } from "./PlanActions";
@@ -2054,6 +2056,9 @@ export function MonitorWorkbench({ logout }: { logout: () => void }) {
                         <TaskComposer
                           key={selected}
                           record={selectedRecord}
+                          pending={receipts.filter(
+                            (entry) => entry.threadId === selected,
+                          )}
                           connected={!!connected}
                           busy={
                             busy === selected ||
@@ -2583,6 +2588,7 @@ function NavButtons({
 }
 function TaskComposer({
   record,
+  pending,
   connected,
   busy,
   submissionBlocked,
@@ -2595,6 +2601,7 @@ function TaskComposer({
   navigateCommand,
 }: {
   record: Observation;
+  pending: PendingOperation[];
   connected: boolean;
   busy: boolean;
   submissionBlocked: boolean;
@@ -2860,6 +2867,24 @@ function TaskComposer({
     }
     setCommand({ item, args, finish });
   }
+  const recoverable: RecoverableDraft[] = [
+    ...pending.flatMap((entry) => {
+      const key = "samaya.pendingDraft." + entry.operationId;
+      const text = sessionStorage.getItem(key);
+      return text ? [{ key, text, pending: true }] : [];
+    }),
+    ...failed.map((item) => ({ ...item, pending: false })),
+  ];
+  function removeRecovered(item: RecoverableDraft) {
+    sessionStorage.removeItem(item.key);
+    setFailed(failedDrafts());
+    if (recoverable.length === 1)
+      requestAnimationFrame(() =>
+        document
+          .querySelector<HTMLTextAreaElement>(".task-composer textarea")
+          ?.focus(),
+      );
+  }
   return (
     <div className="task-composer">
       <GoalStatus
@@ -2878,27 +2903,30 @@ function TaskComposer({
         }
       />
       {localError && <small role="alert">{localError}</small>}
-      {failed.length > 0 && (
-        <details className="failed-drafts">
-          <summary>查看未发送的内容</summary>
-          {failed.map((item) => (
-            <div key={item.key}>
-              <pre>{item.text}</pre>
-              <button
-                type="button"
-                onClick={() => {
-                  sessionStorage.removeItem(item.key);
-                  setFailed(failedDrafts());
-                }}
-              >
-                移除
-              </button>
-            </div>
-          ))}
-        </details>
-      )}
       {!command && feedback}
       <ComposerInput
+        draftControl={
+          !rename &&
+          recoverable.length > 0 && (
+            <DraftRecovery
+              items={recoverable}
+              hasDraft={!!draft.trim()}
+              restore={(item) => {
+                setDraft(item.text);
+                if (!item.pending) removeRecovered(item);
+                requestAnimationFrame(() =>
+                  document
+                    .querySelector<HTMLTextAreaElement>(
+                      ".task-composer textarea",
+                    )
+                    ?.focus(),
+                );
+              }}
+              remove={removeRecovered}
+              inspect={inspectReceipts}
+            />
+          )
+        }
         value={rename ? rename.value : draft}
         onChange={rename ? (value) => setRename({ value }) : setDraft}
         references={rename ? [] : references}

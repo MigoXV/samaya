@@ -15,6 +15,8 @@ from samaya.config import Settings
 from .adapter import Adapter
 
 logger = logging.getLogger(__name__)
+RPC_TIMEOUT = 60
+RECONNECT_DELAY = 3
 
 
 class Connection:
@@ -109,7 +111,7 @@ class Connection:
             finally:
                 await adapter.close()
             if not self.stopping:
-                await asyncio.sleep(3)
+                await asyncio.sleep(RECONNECT_DELAY)
 
     def connected(self) -> Adapter:
         if self.state != "connected" or self.adapter is None:
@@ -117,7 +119,30 @@ class Connection:
         return self.adapter
 
     async def rpc(self, method: str, params: dict | None = None) -> dict:
+        adapter = self.connected()
         try:
-            return await asyncio.wait_for(self.connected().request(method, params), 60)
+            return await asyncio.wait_for(adapter.request(method, params), RPC_TIMEOUT)
+        except asyncio.TimeoutError as exc:
+            logger.warning(
+                "Codex RPC timed out method=%s thread=%s generation=%s",
+                method,
+                (params or {}).get("threadId", "-"),
+                self.generation,
+            )
+            if (
+                self.adapter is adapter
+                and self.state == "connected"
+                and not self.stopping
+            ):
+                # Cancelling asyncio.to_thread doesn't stop the SDK's blocking
+                # response waiter. Closing this transport wakes those waiters
+                # and lets the existing connection loop restore subscriptions.
+                self.state, self.error = "disconnected", "Codex 请求超时，正在重新连接"
+                self.ready.clear()
+                self.on_disconnected()
+                await asyncio.shield(adapter.close())
+            raise ConnectionError(
+                "Codex 请求超时，正在重新连接；本次操作结果待确认，不会自动重发。"
+            ) from exc
         except TransportClosedError as exc:
             raise ConnectionError("Codex 连接已断开；请等待恢复") from exc

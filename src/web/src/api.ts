@@ -234,7 +234,7 @@ async function performOperation(
       receiptWaiters.delete(operationId);
     }
     if (receipt.state === "succeeded" || receipt.state === "failed")
-      clearOperation(operationId);
+      acceptOperationReceipt(receipt);
     if (receipt.state !== "succeeded")
       throw new Error(
         (receipt.state === "failed" ? "操作失败：" : "结果待确认：") +

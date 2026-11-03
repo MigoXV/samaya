@@ -59,6 +59,7 @@ export function ComposerInput({
   placeholder,
   modelSelector,
   modeControl,
+  draftControl,
   onToggleMode,
   submitDisabled = false,
   stopDisabled = false,
@@ -83,6 +84,7 @@ export function ComposerInput({
   placeholder?: string;
   modelSelector?: ReactNode;
   modeControl?: ReactNode;
+  draftControl?: ReactNode;
   onToggleMode?: () => void;
   submitDisabled?: boolean;
   stopDisabled?: boolean;
@@ -928,6 +930,7 @@ export function ComposerInput({
               </button>
             </div>
           </details>
+          {draftControl}
           <div className="composer-toolbar-right">
             {modeControl}
             {modelSelector && (

@@ -1,0 +1,94 @@
+.draft-recovery {
+  flex: none;
+  margin-right: auto;
+}
+.composer-input .recovery-trigger {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  color: var(--text-secondary);
+}
+.recovery-count {
+  position: absolute;
+  top: 0;
+  right: -2px;
+  min-width: 12px;
+  border-radius: 4px;
+  background: var(--surface);
+  color: var(--text-primary);
+  font-size: 10px;
+  line-height: 12px;
+}
+.recovery-panel {
+  position: fixed;
+  inset: auto;
+  width: 360px;
+  max-width: calc(100vw - 32px);
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text-primary);
+  font-size: 13px;
+  line-height: 20px;
+}
+.recovery-panel > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+}
+.recovery-panel > header button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+}
+.recovery-item {
+  border-top: 1px solid var(--border);
+  padding: 8px 12px;
+}
+.recovery-item summary {
+  cursor: pointer;
+  overflow-wrap: anywhere;
+}
+.recovery-state {
+  margin-right: 8px;
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+.recovery-preview {
+  display: inline-block;
+  max-width: calc(100% - 72px);
+  overflow: hidden;
+  vertical-align: bottom;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.recovery-text {
+  max-height: 144px;
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.recovery-hint {
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+.recovery-actions {
+  display: flex;
+  gap: 8px;
+}
+.recovery-panel > footer {
+  padding: 8px 12px;
+  border-top: 1px solid var(--border);
+}

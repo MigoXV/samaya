@@ -13,6 +13,9 @@ from samaya.store import Store
 
 logger = logging.getLogger(__name__)
 
+QUEUE_TIMEOUT = 15
+DISPATCH_TIMEOUT = 120
+
 
 class Operations:
     def __init__(
@@ -84,13 +87,51 @@ class Operations:
         return await asyncio.shield(task)
 
     async def _execute(self, key: str, action: str, body: dict) -> dict:
+        dispatched = False
+
+        async def dispatch() -> dict:
+            nonlocal dispatched
+            dispatched = True
+            logger.info(
+                "operation dispatch action=%s id=%s thread=%s",
+                action,
+                key,
+                body.get("threadId", "-"),
+            )
+            return await asyncio.wait_for(self.dispatch(action, body), DISPATCH_TIMEOUT)
+
         try:
             if action in ("respond", "interrupt"):
-                result = await self.dispatch(action, body)
+                result = await dispatch()
             else:
-                async with self.locks[body.get("threadId", "create")]:
-                    result = await self.dispatch(action, body)
+                lock = self.locks[body.get("threadId", "create")]
+                await asyncio.wait_for(lock.acquire(), QUEUE_TIMEOUT)
+                try:
+                    result = await dispatch()
+                finally:
+                    lock.release()
             receipt = self.store.finish(key, "succeeded", result)
+        except asyncio.TimeoutError:
+            receipt = self.store.finish(
+                key,
+                "uncertain" if dispatched else "failed",
+                {
+                    "message": "操作结果超时未确认，请核对会话；不会自动重发。"
+                    if dispatched
+                    else "此会话的前一操作仍未完成，本次操作未执行，请稍后重试。"
+                },
+            )
+        except asyncio.CancelledError:
+            self.store.finish(
+                key,
+                "uncertain" if dispatched else "failed",
+                {
+                    "message": "服务已停止，操作结果待确认。"
+                    if dispatched
+                    else "服务已停止，本次排队操作未执行。",
+                },
+            )
+            raise
         except (ValueError, FileNotFoundError) as exc:
             receipt = self.store.finish(key, "failed", {"message": str(exc)})
         except Exception as exc:  # noqa: BLE001 - contain transport failures and uncertain submissions
