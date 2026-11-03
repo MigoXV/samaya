@@ -212,6 +212,75 @@ try {
   await expect(send).toBeEnabled();
   expect(posts).toHaveLength(2);
   await p.evaluate(() => window.__releaseLock());
+  // An async 202 receipt must keep the accepted message visible until confirmed.
+  await context.route("**/api/operations", async (route) => {
+    const op = route.request().postDataJSON();
+    posts.push(op);
+    receipts.set(op.operationId, {
+      operationId: op.operationId,
+      state: "pending",
+      result: null,
+    });
+    await route.fulfill({ status: 202, json: receipts.get(op.operationId) });
+  });
+  await editor.fill("已受理但尚未进入会话的内容");
+  await send.click();
+  await expect(editor).toHaveValue("");
+  const accepted = posts.at(-1).operationId;
+  const recovery = p.getByRole("button", { name: /暂存内容，/ });
+  const pending = p.getByRole("region", { name: "暂存内容", exact: true });
+  await expect(recovery).toBeVisible();
+  await expect(pending).toBeHidden();
+  const composerHeight = (
+    await p.locator(".task-composer .composer-input").boundingBox()
+  ).height;
+  await recovery.click();
+  await expect(pending).toContainText("已受理但尚未进入会话的内容");
+  await pending
+    .locator("summary")
+    .filter({ hasText: "已受理但尚未进入会话的内容" })
+    .click();
+  expect(
+    (await p.locator(".task-composer .composer-input").boundingBox()).height,
+  ).toBe(composerHeight);
+  await pending.getByRole("button", { name: "继续编辑", exact: true }).click();
+  await expect(pending).toBeHidden();
+  await expect(editor).toBeFocused();
+  await expect(editor).toHaveValue("已受理但尚未进入会话的内容");
+  expect(posts).toHaveLength(3);
+  // Reload keeps the pending draft; a definite queue failure restores it without replay.
+  await editor.fill("");
+  await p.reload();
+  await expect(recovery).toBeVisible();
+  await expect(pending).toBeHidden();
+  await recovery.click();
+  await expect(pending).toContainText("已受理但尚未进入会话的内容");
+  await p.keyboard.press("Escape");
+  await expect(pending).toBeHidden();
+  await expect(recovery).toBeFocused();
+  const failedReceipt = {
+    operationId: accepted,
+    threadId: "demo-6",
+    state: "failed",
+    action: "send",
+    result: { message: "前一操作未完成，本次操作未执行" },
+  };
+  receipts.set(accepted, failedReceipt);
+  await p.evaluate(
+    (receipt) =>
+      window.__emit("message", {
+        method: "samaya/operation",
+        params: receipt,
+      }),
+    failedReceipt,
+  );
+  await expect(editor).toHaveValue("已受理但尚未进入会话的内容");
+  await recovery.click();
+  await expect(
+    pending.locator(".recovery-state").filter({ hasText: "待确认" }),
+  ).toHaveCount(0);
+  await expect(pending).toContainText("未发送");
+  expect(posts).toHaveLength(3);
   expect(errors).toEqual([]);
   console.log(
     "Receipt recovery: editable drafts, no duplicate writes, terminal SSE, reload reconciliation, unknown protection, failure feedback and in-flight edits passed",

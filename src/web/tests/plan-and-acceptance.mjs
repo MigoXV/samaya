@@ -152,8 +152,10 @@ try {
     first,
   );
   await expect(editor).toHaveValue("新的草稿");
-  await page.getByText("查看未发送的内容").click();
-  await expect(page.locator(".failed-drafts pre")).toContainText("第一条");
+  await page.getByRole("button", { name: /暂存内容，/ }).click();
+  await expect(page.getByRole("region", { name: "暂存内容" })).toContainText(
+    "第一条",
+  );
   expect(errors).toEqual([]);
   await context.close();
   console.log("plan completion choices, execution and navigation passed");

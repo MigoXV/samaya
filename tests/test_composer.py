@@ -344,3 +344,49 @@ async def test_permissions_map_to_native_policy_and_confirm(
         patch["approvalsReviewer"],
     ) == (profile, policy, reviewer)
     assert result["settingsPending"] is False
+
+
+async def test_skill_validation_never_waits_for_app_catalog(services):
+    import asyncio
+
+    c, _, con, t, _ = services
+    original = con.rpc.side_effect
+
+    async def rpc(method, params):
+        if method == "app/list":
+            await asyncio.Event().wait()
+        return await original(method, params)
+
+    con.rpc.side_effect = rpc
+    ref = {"type": "skill", "name": "train", "path": "/skills/train/SKILL.md"}
+    inputs = await asyncio.wait_for(c.inputs("t", "$train run", [ref], t["cwd"]), 1)
+    assert inputs[-1] == ref
+    assert all(call.args[0] != "app/list" for call in con.rpc.call_args_list)
+
+
+async def test_app_refresh_applies_only_to_first_page(services):
+    c, _, con, _, _ = services
+
+    async def rpc(method, params):
+        assert method == "app/list"
+        if params["forceRefetch"]:
+            return {
+                "data": [{"id": "first", "name": "First"}],
+                "nextCursor": "page-two",
+            }
+        assert params["cursor"] == "page-two"
+        return {"data": [{"id": "second", "name": "Second"}], "nextCursor": None}
+
+    con.rpc.side_effect = rpc
+    result = await c._apps("t", True)
+    assert [r["id"] for r in result] == ["first", "second"]
+    assert con.rpc.await_count == 2
+
+
+async def test_repeating_app_cursor_fails_instead_of_looping(services):
+    c, _, con, _, _ = services
+    con.rpc.side_effect = None
+    con.rpc.return_value = {"data": [], "nextCursor": "same"}
+    with pytest.raises(ValueError, match="游标未前进"):
+        await c._apps("t", True)
+    assert con.rpc.await_count == 2

@@ -955,6 +955,20 @@ dialog::backdrop {
   max-width: 100%;
   overflow: auto;
 }
+.markdown table th,
+.markdown table td {
+  min-width: 8em;
+  max-width: none;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: normal;
+  font-size: inherit;
+}
+.markdown table td code,
+.markdown table td small {
+  display: inline;
+  margin-top: 0;
+}
 .markdown blockquote {
   border-left: 2px solid var(--border-strong);
   margin-left: 0;

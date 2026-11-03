@@ -64,7 +64,12 @@ class InputCatalog:
         return str(self.config.directory(cwd))
 
     async def discover(
-        self, tid: str | None = None, cwd: str | None = None, refresh=False
+        self,
+        tid: str | None = None,
+        cwd: str | None = None,
+        refresh=False,
+        *,
+        include_apps: bool = True,
     ):
         cwd = await self.directory(tid, cwd)
         generation = self.connection.generation
@@ -79,7 +84,9 @@ class InputCatalog:
             ),
             self.apps_cache.get(
                 (generation, tid), lambda: self._apps(tid, refresh), refresh
-            ),
+            )
+            if include_apps
+            else asyncio.sleep(0, result=[]),
             return_exceptions=True,
         )
         references, errors = [], []
@@ -140,6 +147,7 @@ class InputCatalog:
 
     async def _apps(self, tid, refresh):
         data, cursor = [], None
+        seen = set()
         while True:
             page = await self.connection.rpc(
                 "app/list",
@@ -147,13 +155,16 @@ class InputCatalog:
                     "threadId": tid,
                     "limit": 100,
                     "cursor": cursor,
-                    "forceRefetch": refresh,
+                    "forceRefetch": refresh and cursor is None,
                 },
             )
             data.extend(self.app_summary(item) for item in page.get("data", []))
             cursor = page.get("nextCursor")
             if not cursor:
                 return data
+            if cursor in seen:
+                raise ValueError("应用目录分页游标未前进，请重新读取")
+            seen.add(cursor)
 
     @staticmethod
     def prompts():
@@ -198,7 +209,13 @@ class InputCatalog:
         inputs = message_inputs(text, images if images is not None else [])
         if not references:
             return inputs
-        current = await self.discover(tid, refresh=True)
+        current = await self.discover(
+            tid,
+            refresh=True,
+            include_apps=any(
+                isinstance(r, dict) and r.get("type") == "mention" for r in references
+            ),
+        )
         if expected_cwd != current["cwd"]:
             raise ValueError("工作目录已变化，请重新选择技能或应用")
         allowed = {
