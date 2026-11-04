@@ -31,8 +31,13 @@ def register_auth(application: FastAPI, config: Settings) -> None:
     def signature(value: str) -> str:
         return hmac.new(secret, value.encode(), hashlib.sha256).hexdigest()
 
+    def cookie_name(request: Request) -> str:
+        # Cookies share a host across ports; each public port needs its own name.
+        port = request.url.port or (443 if request.url.scheme == "https" else 80)
+        return f"samaya_session_{port}"
+
     def valid_session(request: Request) -> str | None:
-        value = request.cookies.get("samaya_session", "")
+        value = request.cookies.get(cookie_name(request), "")
         try:
             payload, sig = value.rsplit(".", 1)
             timestamp = int(payload.split(":")[0])
@@ -118,7 +123,7 @@ def register_auth(application: FastAPI, config: Settings) -> None:
         payload = f"{int(time.time())}:{secrets.token_hex(24)}"
         value = payload + "." + signature(payload)
         response.set_cookie(
-            "samaya_session",
+            cookie_name(request),
             value,
             httponly=True,
             secure=config.secure_cookie,
@@ -128,6 +133,6 @@ def register_auth(application: FastAPI, config: Settings) -> None:
         return {"authenticated": True, "csrf": signature(value)}
 
     @application.post("/api/logout")
-    async def logout(response: Response):
-        response.delete_cookie("samaya_session")
+    async def logout(request: Request, response: Response):
+        response.delete_cookie(cookie_name(request))
         return {"ok": True}
