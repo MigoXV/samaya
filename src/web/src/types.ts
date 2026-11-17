@@ -3,6 +3,8 @@ export type Item = {
   id: string;
   type: string;
   text?: string;
+  phase?: "commentary" | "partial_answer" | "final_answer" | null;
+  samayaTiming?: { startedAtMs?: number | null; completedAtMs?: number | null };
   content?: { type: string; text?: string; url?: string; path?: string }[];
   command?: string;
   cwd?: string;
@@ -11,6 +13,12 @@ export type Item = {
   exitCode?: number;
   changes?: { path: string; kind: unknown; diff?: string }[];
   [key: string]: unknown;
+};
+export type ItemEntry = {
+  item: Item;
+  turnId?: string;
+  startedAtMs?: number | null;
+  completedAtMs?: number | null;
 };
 export type Turn = {
   id: string;

@@ -1,6 +1,6 @@
 import { useContext, useEffect, useId, useRef, useState } from "react";
 import type { ComponentProps } from "react";
-import { defaultUrlTransform } from "react-markdown";
+import { PlatformLink } from "./PlatformLink";
 import {
   FileLinkThread,
   downloadFailure,
@@ -12,12 +12,9 @@ export function FileLink({ href, children, title }: ComponentProps<"a">) {
   const threadId = useContext(FileLinkThread);
   if (!href || !threadId || !isLocalFileLink(href))
     return (
-      <a
-        href={href ? defaultUrlTransform(href) || undefined : undefined}
-        title={title}
-      >
+      <PlatformLink href={href} title={title}>
         {children}
-      </a>
+      </PlatformLink>
     );
   const url = fileDownloadUrl(threadId, href);
   return (

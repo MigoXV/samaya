@@ -45,8 +45,8 @@ for (const theme of ["vallum", "abyssus"]) {
         ".monitor-brand",
         ".task-live-status",
         ".task-reading-heading h1",
-        ".history-view .turn-divider",
-        ".history-view .tool-sequence summary",
+        ".history-view .work-disclosure",
+        ".history-view .work-activity > summary",
         ".message.user .prose",
         ".model-effort",
       ].map((sel) => {

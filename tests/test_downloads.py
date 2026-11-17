@@ -149,3 +149,17 @@ def test_special_files_and_permission_errors(download_client, tmp_path, monkeypa
     monkeypatch.setattr(Path, "open", denied)
     assert download_client.get(URL, params={"path": "private.txt"}).status_code == 403
     assert download_client.head(URL, params={"path": "private.txt"}).status_code == 403
+
+
+def test_image_preview(download_client, tmp_path):
+    (tmp_path / "image.svg").write_text('<svg xmlns="http://www.w3.org/2000/svg"/>')
+    url = "/api/threads/example/files/preview"
+    r = download_client.get(url, params={"path": "image.svg"})
+    assert r.status_code == 200
+    assert r.headers["content-type"].startswith("image/svg+xml")
+    assert r.headers["content-disposition"].startswith("inline")
+    assert "sandbox" in r.headers["content-security-policy"]
+    (tmp_path / "page.html").write_text("<script>alert(1)</script>")
+    assert download_client.get(url, params={"path": "page.html"}).status_code == 415
+    download_client.cookies.clear()
+    assert download_client.get(url, params={"path": "image.svg"}).status_code == 401

@@ -616,10 +616,10 @@
   border-color: var(--border-strong);
   outline: none;
 }
-.composer-input:has(textarea:focus-visible) {
+.composer-input:has(.composer-editor:focus-visible) {
   border-color: var(--focus-ring);
 }
-.task-composer textarea:focus-visible {
+.task-composer .composer-editor:focus-visible {
   outline: none;
 }
 .command-record:not([open]) > summary::before {

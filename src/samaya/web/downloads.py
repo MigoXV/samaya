@@ -16,7 +16,9 @@ _SCHEME = re.compile(r"^[a-zA-Z][a-zA-Z\d+.-]*:")
 _RELATIVE_SOURCE = re.compile(r"^[^/:]+\.[^/:]+:[1-9]\d*(?::[1-9]\d*)?$")
 
 
-def download_response(directory: Path, link: str) -> FileResponse:
+def download_response(
+    directory: Path, link: str, preview: bool = False
+) -> FileResponse:
     value = link.strip()
     if value.lower().startswith(("file:", "sandbox:")):
         try:
@@ -51,11 +53,23 @@ def download_response(directory: Path, link: str) -> FileResponse:
             # Check readability before sending headers, including HEAD requests.
             with resolved.open("rb"):
                 pass
+            image_types = {
+                ".png": "image/png",
+                ".jpg": "image/jpeg",
+                ".jpeg": "image/jpeg",
+                ".gif": "image/gif",
+                ".webp": "image/webp",
+                ".avif": "image/avif",
+                ".svg": "image/svg+xml",
+            }
+            media_type = image_types.get(resolved.suffix.lower()) if preview else None
+            if preview and not media_type:
+                raise HTTPException(415, "此文件类型不支持图片预览")
             return FileResponse(
                 resolved,
                 filename=path.name,
-                media_type="application/octet-stream",
-                content_disposition_type="attachment",
+                media_type=media_type or "application/octet-stream",
+                content_disposition_type="inline" if preview else "attachment",
                 stat_result=info,
             )
         except (FileNotFoundError, NotADirectoryError):

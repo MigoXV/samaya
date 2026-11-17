@@ -33,6 +33,11 @@ def register_routes(application: FastAPI, config: Settings) -> None:
         directory = config.directory(await service().catalog.directory(tid, None))
         return await run_in_threadpool(download_response, directory, path)
 
+    @application.api_route("/api/threads/{tid}/files/preview", methods=["GET", "HEAD"])
+    async def image_preview(tid: str, path: str = Query(min_length=1, max_length=8192)):
+        directory = config.directory(await service().catalog.directory(tid, None))
+        return await run_in_threadpool(download_response, directory, path, True)
+
     @application.post("/api/uploads")
     async def upload(
         request: Request,

@@ -1984,6 +1984,15 @@ export function MonitorWorkbench({ logout }: { logout: () => void }) {
                               waitingUnknown(selectedRecord, EMPTY)
                             )
                           }
+                          workState={
+                            !connected
+                              ? "disconnected"
+                              : requestsByRoot.get(rootId(selected, records))?.length || waitingUnknown(selectedRecord, EMPTY)
+                                ? "waiting"
+                                : selectedRecord.error || !selectedRecord.confirmedAt || tick - selectedRecord.confirmedAt * 1000 > 45000
+                                  ? "stale"
+                                  : "running"
+                          }
                           tab={taskTab}
                         />
                         {selectedRecord.thread.canAcceptDirectInput === false &&

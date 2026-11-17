@@ -29,30 +29,30 @@ try {
   const input = p.getByRole("textbox", { name: "补充当前任务", exact: true });
   await input.focus();
   await p.keyboard.press("ArrowUp");
-  await expect(input).toHaveValue("原生历史中的提示词");
+  await expect(input).toHaveText("原生历史中的提示词");
   await p.keyboard.press("ArrowDown");
-  await expect(input).toHaveValue("");
+  await expect(input).toHaveText("");
   await input.fill("新的提示词");
   await input.press("Enter");
-  await expect(input).toHaveValue("");
+  await expect(input).toHaveText("");
   expect(calls.at(-1).body.text).toBe("新的提示词");
   await input.press("ArrowUp");
-  await expect(input).toHaveValue("新的提示词");
+  await expect(input).toHaveText("新的提示词");
   await input.press("ArrowUp");
-  await expect(input).toHaveValue("原生历史中的提示词");
+  await expect(input).toHaveText("原生历史中的提示词");
   await input.press("ArrowDown");
-  await expect(input).toHaveValue("新的提示词");
+  await expect(input).toHaveText("新的提示词");
   await input.press("ArrowDown");
-  await expect(input).toHaveValue("");
+  await expect(input).toHaveText("");
   await input.fill("未发送的草稿");
   await input.evaluate((el) => el.setSelectionRange(0, 0));
   await input.press("ArrowUp");
-  await expect(input).toHaveValue("新的提示词");
+  await expect(input).toHaveText("新的提示词");
   await input.press("ArrowDown");
-  await expect(input).toHaveValue("未发送的草稿");
+  await expect(input).toHaveText("未发送的草稿");
   await input.fill("第一行\n第二行");
   await input.press("ArrowUp");
-  await expect(input).toHaveValue("第一行\n第二行");
+  await expect(input).toHaveText("第一行\n第二行");
   await input.press("ArrowLeft");
   await expect(p).toHaveURL(/thread=demo-6/);
   await input.evaluate((el) => el.blur());
@@ -60,12 +60,12 @@ try {
   await expect(p.locator(".task-overview")).toBeVisible();
   await p.keyboard.press("ArrowRight");
   await expect(p).toHaveURL(/thread=demo-6/);
-  await expect(input).toHaveValue("第一行\n第二行");
+  await expect(input).toHaveText("第一行\n第二行");
   await input.fill("");
   await p.reload();
   await input.focus();
   await input.press("ArrowUp");
-  await expect(input).toHaveValue("新的提示词");
+  await expect(input).toHaveText("新的提示词");
   await c.route("**/api/input-catalog?*", (route) =>
     route.fulfill({
       json: {
@@ -90,19 +90,19 @@ try {
   await p.reload();
   await input.fill("/sta");
   await p.getByRole("option", { name: /\/status/ }).click();
-  await expect(input).toHaveValue("");
+  await expect(input).toHaveText("");
   await input.press("ArrowUp");
-  await expect(input).toHaveValue("/status");
+  await expect(input).toHaveText("/status");
   await input.press("ArrowDown");
-  await expect(input).toHaveValue("");
+  await expect(input).toHaveText("");
   await input.fill("/未执行的命令");
   await input.evaluate((n) => n.blur());
   await p.keyboard.press("ArrowLeft");
   await expect(p.locator(".task-overview")).toBeVisible();
   await p.keyboard.press("ArrowRight");
-  await expect(input).toHaveValue("");
+  await expect(input).toHaveText("");
   await input.press("ArrowUp");
-  await expect(input).toHaveValue("/status");
+  await expect(input).toHaveText("/status");
   const sidebar = p.locator(".nav-workspaces");
   await sidebar
     .getByRole("button", { name: "在 Samaya 工作区新建会话", exact: true })
@@ -115,7 +115,7 @@ try {
   await sidebar
     .getByRole("button", { name: "在 Samaya 工作区新建会话", exact: true })
     .click();
-  await expect(draft).toHaveValue("");
+  await expect(draft).toHaveText("");
   await draft.fill("普通草稿仍要保留");
   await sidebar
     .getByRole("button", { name: "在 Laya 工作区新建会话", exact: true })
@@ -123,7 +123,7 @@ try {
   await sidebar
     .getByRole("button", { name: "在 Samaya 工作区新建会话", exact: true })
     .click();
-  await expect(draft).toHaveValue("普通草稿仍要保留");
+  await expect(draft).toHaveText("普通草稿仍要保留");
   console.log(
     "Prompt recall: native history, successful sends, reload, older/newer, draft restoration, multiline caret and left/right navigation passed.",
   );

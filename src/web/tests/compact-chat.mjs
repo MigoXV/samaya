@@ -146,7 +146,7 @@ try {
   });
   await codeCopy.click();
   await expect(codeCopy).toHaveText("已复制");
-  const input = page.locator(".task-composer textarea");
+  const input = page.locator(".task-composer .composer-editor");
   const composer = page.locator(".task-composer .composer-input");
   await expect(composer.locator(".plan-shortcut")).toHaveCount(0);
   await expect(composer.locator(".plan-mode-button svg")).toHaveCount(0);
@@ -171,9 +171,9 @@ try {
           mainCenter: (main.left + main.right) / 2,
           heading: box(".task-heading").height,
           overflow: document.documentElement.scrollWidth > innerWidth,
-          textBottom: box(".composer-input textarea").bottom,
+          textBottom: box(".composer-input .composer-editor").bottom,
           toolbarTop: box(".composer-toolbar").top,
-          textWidth: box(".composer-input textarea").width,
+          textWidth: box(".composer-input .composer-editor").width,
         };
       });
       expect(geometry.width).toBeLessThanOrEqual(860);

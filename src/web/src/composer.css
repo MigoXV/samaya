@@ -19,7 +19,7 @@
   border-radius: var(--composer-radius);
   background: var(--surface);
 }
-.composer-input textarea {
+.composer-input .composer-editor {
   display: block;
   box-sizing: border-box;
   width: 100%;
@@ -295,7 +295,7 @@
 .composer-model-slot {
   display: contents;
 }
-.composer-input textarea:placeholder-shown {
+.composer-input .composer-editor:empty {
   white-space: pre;
 }
 .composer-images {
@@ -361,30 +361,30 @@
 }
 
 /* Only the text scrolls; controls and thumbnails remain outside its viewport. */
-.composer-input textarea {
+.composer-input .composer-editor {
   scrollbar-width: thin;
   scrollbar-color: color-mix(in srgb, var(--text-secondary) 25%, transparent)
     transparent;
 }
 @supports selector(::-webkit-scrollbar) {
-  .composer-input textarea {
+  .composer-input .composer-editor {
     scrollbar-width: auto;
     scrollbar-color: auto;
   }
-  .composer-input textarea::-webkit-scrollbar {
+  .composer-input .composer-editor::-webkit-scrollbar {
     width: 4px;
   }
-  .composer-input textarea::-webkit-scrollbar-track {
+  .composer-input .composer-editor::-webkit-scrollbar-track {
     background: transparent;
   }
-  .composer-input textarea::-webkit-scrollbar-thumb {
+  .composer-input .composer-editor::-webkit-scrollbar-thumb {
     border-radius: 2px;
     background: color-mix(in srgb, var(--text-secondary) 25%, transparent);
   }
-  .composer-input textarea:hover::-webkit-scrollbar-thumb {
+  .composer-input .composer-editor:hover::-webkit-scrollbar-thumb {
     background: color-mix(in srgb, var(--text-secondary) 40%, transparent);
   }
-  .composer-input textarea::-webkit-scrollbar-button {
+  .composer-input .composer-editor::-webkit-scrollbar-button {
     display: none;
     width: 0;
     height: 0;
@@ -394,7 +394,7 @@
   .composer-input {
     --composer-height: 110px;
   }
-  .composer-input textarea {
+  .composer-input .composer-editor {
     min-height: 40px;
   }
 }
@@ -467,7 +467,49 @@
   font-size: 12px;
 }
 @media (forced-colors: active) {
-  .composer-input textarea {
+  .composer-input .composer-editor {
     scrollbar-color: auto;
   }
+}
+.composer-editor {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  outline: none;
+  color: var(--text-primary);
+  caret-color: var(--text-primary);
+}
+.composer-editor:empty::before {
+  content: attr(data-placeholder);
+  color: var(--text-secondary);
+  pointer-events: none;
+}
+.composer-inline-link {
+  color: var(--accent-strong);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.composer-link-leading {
+  white-space: nowrap;
+}
+.composer-link-leading::before {
+  content: "";
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  margin-inline-end: 4px;
+  vertical-align: -1px;
+  background: currentColor;
+  mask: var(--platform-icon) center / contain no-repeat;
+}
+.composer-inline-link[data-platform="github"] {
+  --platform-icon: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%3E%3Cpath%20d%3D%22M12%20.5a12%2012%200%200%200-3.79%2023.38c.6.11.82-.26.82-.58v-2.23c-3.34.73-4.04-1.42-4.04-1.42-.55-1.39-1.33-1.76-1.33-1.76-1.09-.75.08-.73.08-.73%201.21.09%201.84%201.24%201.84%201.24%201.07%201.83%202.81%201.3%203.5.99.11-.78.42-1.3.76-1.6-2.67-.3-5.47-1.34-5.47-5.93%200-1.31.47-2.38%201.24-3.22-.13-.3-.54-1.52.12-3.18%200%200%201.01-.32%203.3%201.23a11.5%2011.5%200%200%201%206%200c2.29-1.55%203.3-1.23%203.3-1.23.66%201.66.25%202.88.12%203.18a4.64%204.64%200%200%201%201.24%203.22c0%204.6-2.8%205.62-5.48%205.92.43.37.82%201.1.82%202.22v3.3c0%20.32.22.7.83.58A12%2012%200%200%200%2012%20.5Z%22%2F%3E%3C%2Fsvg%3E");
+}
+.composer-inline-link[data-platform="figma"] .composer-link-leading::before {
+  background: url("/platform/figma.svg") center / contain no-repeat;
+  mask: none;
+}
+
+.composer-input .composer-editor:focus-visible {
+  outline: none;
+  box-shadow: none;
 }
