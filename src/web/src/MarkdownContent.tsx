@@ -9,6 +9,9 @@ import { CopyButton } from "./CopyButton";
 import { FileLink } from "./FileLink";
 import { FileLinkThread, markdownUrlTransform } from "./file-links";
 import "katex/dist/katex.min.css";
+import { MermaidDiagram } from "./MermaidDiagram";
+import { MarkdownImage } from "./MarkdownImage";
+import { remarkLinkBoundaries } from "./link-boundaries";
 
 function MarkdownPre({ children }: { children?: ReactNode }) {
   const pre = useRef<HTMLPreElement>(null);
@@ -25,6 +28,10 @@ function MarkdownPre({ children }: { children?: ReactNode }) {
           getText={() => pre.current?.textContent || ""}
         />
       </div>
+      {language === "mermaid" &&
+        isValidElement<{ children?: ReactNode }>(children) && (
+          <MermaidDiagram source={String(children.props.children || "")} />
+        )}
       <pre ref={pre} tabIndex={0} aria-label="代码">
         {children}
       </pre>
@@ -34,8 +41,18 @@ function MarkdownPre({ children }: { children?: ReactNode }) {
 function MarkdownTable({ children }: { children?: ReactNode }) {
   return <table tabIndex={0}>{children}</table>;
 }
-const components = { pre: MarkdownPre, table: MarkdownTable, a: FileLink };
-const remarkPlugins = [remarkGfm, remarkMath, remarkDisplayMath];
+const components = {
+  pre: MarkdownPre,
+  table: MarkdownTable,
+  a: FileLink,
+  img: MarkdownImage,
+};
+const remarkPlugins = [
+  remarkGfm,
+  remarkMath,
+  remarkDisplayMath,
+  remarkLinkBoundaries,
+];
 const rehypePlugins = [rehypeKatex];
 
 export function MarkdownContent({

@@ -51,19 +51,23 @@ await page.goto(process.env.SAMAYA_UI_TEST_URL || "http://127.0.0.1:8765");
 await expect(page.locator(".task-overview")).toBeVisible();
 await page.locator('[data-task-id="demo-0"].overview-task').click();
 await expect(page.locator(".command-record")).toHaveCount(5);
-const sequence = page.locator(".tool-sequence");
-await expect(sequence).toHaveCount(1);
-await expect(sequence).not.toHaveAttribute("open");
-await expect(sequence.locator(".tool-sequence-label")).toHaveText(
-  "正在进行 6 次工具调用",
+const work = page.locator(".work-process");
+const disclosure = work.locator(".work-disclosure");
+await expect(work).toHaveCount(1);
+await expect(disclosure).toHaveAttribute("aria-expanded", "false");
+const commands = work.locator(".work-activity").filter({ hasText: "执行命令" });
+await expect(commands.locator(":scope > summary")).toContainText(
+  "5 次 · 2 项异常",
 );
 expect(
-  await sequence
+  await commands
     .locator(":scope > summary")
     .evaluate((el) => el.getBoundingClientRect().height),
 ).toBe(32);
-await sequence.locator(":scope > summary").click();
-await expect(sequence).toHaveAttribute("open");
+await disclosure.click();
+await expect(disclosure).toHaveAttribute("aria-expanded", "true");
+await commands.locator(":scope > summary").click();
+await expect(commands).toHaveAttribute("open", "");
 for (const theme of ["vallum", "abyssus"]) {
   await page.evaluate(
     (value) => window.samayaTheme.setPreference(value),
@@ -133,6 +137,11 @@ const command = page.locator(".command-record").first();
 await command.locator("summary").click();
 await expect(command).toHaveAttribute("open");
 await expect(command.getByLabel("命令输出")).toContainText("原生输出");
+await work
+  .locator(".work-activity")
+  .filter({ hasText: "使用 Figma" })
+  .locator(":scope > summary")
+  .click();
 await page.locator(".mcp-tool > summary").click();
 await expect(page.locator(".mcp-content")).toContainText("工具结果");
 expect(calls).toHaveLength(0);

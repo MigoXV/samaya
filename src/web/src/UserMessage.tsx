@@ -6,6 +6,7 @@ import { formatFileSize } from "./composer-files";
 import { preserveMessagePosition } from "./reading-position";
 import { userMessageParts } from "./question-reply";
 import "./user-message.css";
+import { InlineLinks } from "./InlineLinks";
 
 export function UserMessage({ item }: { item: Item }) {
   const { text, files } = fileMessage(
@@ -104,7 +105,7 @@ function MessageText({ text, label = "你" }: { text: string; label?: string }) 
         className="prose user-message-text"
         data-collapsed={!expanded}
       >
-        {text}
+        <InlineLinks text={text} />
       </div>
       {overflow && (
         <button

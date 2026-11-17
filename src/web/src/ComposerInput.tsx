@@ -30,6 +30,8 @@ import type {
 } from "./composer-model";
 import "./composer.css";
 import { promptHistory, rememberPrompt } from "./prompt-history";
+import { ComposerEditor } from "./ComposerEditor";
+import { pastedTextFile } from "./pasted-text";
 
 type Candidate = {
   key: string;
@@ -738,7 +740,7 @@ export function ComposerInput({
             ))}
           </div>
         )}
-        <textarea
+        <ComposerEditor
           ref={input}
           aria-label={label}
           aria-autocomplete="list"
@@ -757,7 +759,16 @@ export function ComposerInput({
           }}
           onSelect={(e) => setCaret(e.currentTarget.selectionStart)}
           onPaste={(event) => {
-            if (!textOnly) void pasteImages(event);
+            if (textOnly) return;
+            const textFile = !event.clipboardData.files.length
+              ? pastedTextFile(event.clipboardData.getData("text/plain"))
+              : null;
+            if (textFile) {
+              event.preventDefault();
+              addSelected([textFile]);
+              return;
+            }
+            void pasteImages(event);
           }}
           placeholder={placeholder ?? (active ? "追加当前指令…" : "发送消息…")}
           onKeyDown={(e) => {

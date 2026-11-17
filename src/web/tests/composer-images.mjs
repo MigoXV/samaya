@@ -189,7 +189,7 @@ try {
   expect(
     await thumbnails.first().evaluate((image) => image.naturalWidth),
   ).toBeGreaterThan(0);
-  await expect(input).toHaveValue("检查截图");
+  await expect(input).toHaveText("检查截图");
   const layout = await page.locator(".composer-input").evaluate((el) => {
     const box = el.getBoundingClientRect();
     const thumbnail = el
@@ -246,17 +246,18 @@ try {
     page.getByRole("alert").filter({ hasText: "测试发送失败" }),
   ).toBeVisible();
   await expect(thumbnails).toHaveCount(1);
-  await expect(input).toHaveValue("检查截图");
+  await expect(input).toHaveText("检查截图");
   fail = false;
   await input.press("Enter");
   await expect
-    .poll(() => calls.filter((call) => call.action === "steer").length)
+    .poll(() => calls.filter((call) => call.action === "send" && call.body.threadId === "demo-5").length)
     .toBe(1);
-  const steered = calls.find((call) => call.action === "steer");
+  const steered = calls.find((call) => call.action === "send" && call.body.threadId === "demo-5");
+  expect(steered.body.expectedTurnId).toBe("turn-5");
   expect(steered.body.text).toBe("检查截图");
   expect(steered.body.images[0].url).toMatch(/^data:image\/png;base64,/);
   await expect(thumbnails).toHaveCount(0);
-  await expect(input).toHaveValue("");
+  await expect(input).toHaveText("");
   await expect(primary).toHaveAttribute("data-action", "stop");
   await expect(primary.locator("img")).toHaveAttribute(
     "src",
@@ -326,7 +327,7 @@ try {
   await page.evaluate(() => navigator.clipboard.writeText("普通文字粘贴"));
   await input.focus();
   await input.press("Control+V");
-  await expect(input).toHaveValue("普通文字粘贴");
+  await expect(input).toHaveText("普通文字粘贴");
   await input.fill("");
   await input.evaluate((el) => {
     const clipboard = new DataTransfer();
@@ -428,9 +429,9 @@ try {
   await expect(thumbnails).toHaveCount(1);
   await input.press("Enter");
   await expect
-    .poll(() => calls.filter((call) => call.action === "send").length)
+    .poll(() => calls.filter((call) => call.action === "send" && call.body.threadId === "demo-6").length)
     .toBe(1);
-  const sent = calls.find((call) => call.action === "send");
+  const sent = calls.find((call) => call.action === "send" && call.body.threadId === "demo-6");
   expect(sent.body.text).toBe("");
   expect(sent.body.images).toHaveLength(1);
   await expect(thumbnails).toHaveCount(0);
@@ -453,8 +454,8 @@ try {
     .poll(() => calls.filter((call) => call.action === "create").length)
     .toBe(1);
   await expect
-    .poll(() => calls.filter((call) => call.action === "send").length)
-    .toBe(2);
+    .poll(() => calls.filter((call) => call.action === "send" && call.body.threadId === "demo-created").length)
+    .toBe(1);
   expect(
     calls.filter((call) => call.action === "send").at(-1).body.images,
   ).toHaveLength(1);

@@ -17,9 +17,9 @@ export function fileDownloadUrl(threadId: string, path: string): string {
 }
 
 export function markdownUrlTransform(url: string, key: string): string {
-  // Only anchors can use local file references. Keep the original Markdown
-  // safety policy for image sources and every other URI scheme.
-  return key === "href" && isLocalFileLink(url)
+  // Local anchors and images are resolved through authenticated file endpoints.
+  // Keep the default policy for other URI schemes.
+  return (key === "href" || key === "src") && isLocalFileLink(url)
     ? url
     : defaultUrlTransform(url);
 }

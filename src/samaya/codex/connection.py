@@ -1,4 +1,4 @@
-"""One SDK connection to the independent daemon; no product state or persistence."""
+"""Main daemon connection and isolated app discovery; no product state or persistence."""
 
 from __future__ import annotations
 
@@ -16,6 +16,7 @@ from .adapter import Adapter
 
 logger = logging.getLogger(__name__)
 RPC_TIMEOUT = 60
+APP_LIST_TIMEOUT = 15
 RECONNECT_DELAY = 3
 
 
@@ -42,12 +43,17 @@ class Connection:
         self.connection_id = ""
         self.runner: asyncio.Task | None = None
         self.stopping = False
+        self.catalog_lock = asyncio.Lock()
+        self.catalog_tasks: set[asyncio.Task] = set()
 
     async def start(self) -> None:
         self.runner = asyncio.create_task(self._connect())
 
     async def close(self) -> None:
         self.stopping = True
+        for task in list(self.catalog_tasks):
+            task.cancel()
+        await asyncio.gather(*self.catalog_tasks, return_exceptions=True)
         if self.runner:
             self.runner.cancel()
         if self.adapter:
@@ -120,6 +126,18 @@ class Connection:
 
     async def rpc(self, method: str, params: dict | None = None) -> dict:
         adapter = self.connected()
+        if method == "app/list":
+            # App discovery can stall while the daemon contacts external services.
+            # Keep its blocking SDK waiter off the transport that owns live work.
+            task = asyncio.create_task(self._app_list(params))
+            self.catalog_tasks.add(task)
+            try:
+                return await asyncio.wait_for(task, APP_LIST_TIMEOUT)
+            except asyncio.TimeoutError as exc:
+                logger.warning("Codex app/list timed out; main connection preserved")
+                raise ConnectionError("应用目录查询超时，请稍后重试") from exc
+            finally:
+                self.catalog_tasks.discard(task)
         try:
             return await asyncio.wait_for(adapter.request(method, params), RPC_TIMEOUT)
         except asyncio.TimeoutError as exc:
@@ -146,3 +164,13 @@ class Connection:
             ) from exc
         except TransportClosedError as exc:
             raise ConnectionError("Codex 连接已断开；请等待恢复") from exc
+
+    async def _app_list(self, params: dict | None) -> dict:
+        async with self.catalog_lock:
+            adapter = Adapter(self.config.socket)
+            try:
+                await adapter.start()
+                return await adapter.request("app/list", params)
+            finally:
+                # Closing also releases the SDK's blocking response waiter on timeout.
+                await adapter.close()

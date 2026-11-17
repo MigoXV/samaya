@@ -3,13 +3,23 @@ import { useStatusEntries } from "./inline-status-store";
 import { InlineStatus } from "./InlineStatus";
 import { api } from "./api";
 import { ItemView } from "./components";
-import { ToolSequence } from "./ToolSequence";
-import { WorkingStatus } from "./WorkingStatus";
+import { WorkProcess } from "./WorkProcess";
+import { ConversationTime } from "./ConversationTime";
+import {
+  historyItem,
+  mergeHistoryItems,
+  isProcessItem,
+  lastNativeTime,
+  nativeTime,
+  workSegments,
+  userMessageTime,
+} from "./work-history";
+import type { WorkState } from "./work-history";
 import "./execution-display.css";
 import { preserveReadingPosition } from "./reading-position";
 import { HistoryPagination } from "./HistoryPagination";
 import type { HistoryPage } from "./HistoryPagination";
-import type { Item, Turn } from "./types";
+import type { Item, ItemEntry, Turn } from "./types";
 
 type Live = {
   text: string;
@@ -31,6 +41,7 @@ export function ExecutionHistory({
   turnStatus,
   turnStartedAt,
   working,
+  workState,
   tab,
 }: {
   tid: string;
@@ -38,6 +49,7 @@ export function ExecutionHistory({
   turnStatus?: string;
   turnStartedAt?: number | null;
   working: boolean;
+  workState?: WorkState;
   tab: string;
 }) {
   const [turns, setTurns] = useState<Turn[]>(() => {
@@ -64,6 +76,12 @@ export function ExecutionHistory({
     [historyNotice, setHistoryNotice] = useState(""),
     [turnsReady, setTurnsReady] = useState(historyCache.has(tid)),
     [retrySource, setRetrySource] = useState("latest");
+  const [timeline, setTimeline] = useState<Record<string, number | undefined>>(
+    {},
+  );
+  const reportTimeline = useCallback((id: string, at: number | undefined) => {
+    setTimeline((old) => (old[id] === at ? old : { ...old, [id]: at }));
+  }, []);
   const version = useRef(0),
     region = useRef<HTMLElement>(null),
     alive = useRef(true),
@@ -215,7 +233,7 @@ export function ExecutionHistory({
         }}
       />
       {tab === "work" && <InlineStatus tid={tid} turnId={null} />}
-      {[...turns.slice(0, visible)].reverse().map((t) => (
+      {[...turns.slice(0, visible)].reverse().map((t, index, ordered) => (
         <Fragment key={t.id}>
           <TurnHistory
             tid={tid}
@@ -224,6 +242,14 @@ export function ExecutionHistory({
             latest={t.id === turns[0]?.id}
             onPaging={reportPage}
             working={working && t.id === turnId}
+            workState={workState ?? (working ? "running" : "stale")}
+            previousAtMs={
+              index
+                ? (timeline[ordered[index - 1].id] ??
+                  lastNativeTime(ordered[index - 1], []))
+                : undefined
+            }
+            onTimeline={reportTimeline}
             startedAt={t.id === turnId ? turnStartedAt : undefined}
           />
         </Fragment>
@@ -243,6 +269,9 @@ function TurnHistory({
   working,
   startedAt,
   onPaging,
+  workState,
+  previousAtMs,
+  onTimeline,
 }: {
   tid: string;
   turn: Turn;
@@ -251,6 +280,9 @@ function TurnHistory({
   working: boolean;
   startedAt?: number | null;
   onPaging: (id: string, page: HistoryPage | null) => void;
+  workState: WorkState;
+  previousAtMs?: number;
+  onTimeline: (id: string, at: number | undefined) => void;
 }) {
   const cacheKey = `${tid}:${turn.id}`;
   const [items, setItems] = useState<Item[]>(
@@ -295,7 +327,7 @@ function TurnHistory({
       requests.current.add(controller);
       try {
         const r = await api<{
-          data: { item: Item }[];
+          data: ItemEntry[];
           nextCursor: string | null;
           samayaCursor?: number;
         }>(
@@ -308,17 +340,10 @@ function TurnHistory({
         if (more && r.nextCursor === more)
           throw new Error("历史游标未前进，请重试。");
         const page = r.data
-          .map((x) => completed.current.get(x.item.id) || x.item)
+          .map((x) => historyItem(x, completed.current.get(x.item.id)))
           .reverse();
         if (more) preserveReadingPosition(region.current);
-        setItems((old) =>
-          more
-            ? [...page.filter((i) => !old.some((o) => o.id === i.id)), ...old]
-            : [
-                ...old.map((i) => page.find((n) => n.id === i.id) || i),
-                ...page.filter((i) => !old.some((o) => o.id === i.id)),
-              ],
-        );
+        setItems((old) => mergeHistoryItems(old, page, !!more));
         if (turn.status !== "inProgress") {
           // Replace observed plan text only when its authoritative final item arrives.
           let changed = false;
@@ -421,7 +446,14 @@ function TurnHistory({
     const upsert = (item: Item) =>
       setItems((old) =>
         old.some((i) => i.id === item.id)
-          ? old.map((i) => (i.id === item.id ? item : i))
+          ? old.map((i) =>
+              i.id === item.id
+                ? {
+                    ...item,
+                    samayaTiming: { ...i.samayaTiming, ...item.samayaTiming },
+                  }
+                : i,
+            )
           : [...old, item],
       );
     const retainPlans = () => {
@@ -478,12 +510,18 @@ function TurnHistory({
         };
         setLive({ ...chunks.current });
       } else if (event.method === "item/started") {
-        if (!completed.current.has(p.item.id)) upsert(p.item);
+        if (!completed.current.has(p.item.id))
+          upsert(historyItem({ item: p.item, startedAtMs: p.startedAtMs }));
       } else if (event.method === "item/completed") {
         // Replace the same native item, rather than adding a second streamed message.
         version.current++;
-        completed.current.set(p.item.id, p.item);
-        upsert(p.item);
+        const item = historyItem({
+          item: p.item,
+          startedAtMs: p.startedAtMs,
+          completedAtMs: p.completedAtMs,
+        });
+        completed.current.set(p.item.id, item);
+        upsert(item);
         delete chunks.current[p.item.id];
         setLive({ ...chunks.current });
       } else if (event.method === "samaya/turnSummaryChanged") {
@@ -507,6 +545,9 @@ function TurnHistory({
       .filter(([id]) => !items.some((i) => i.id === id))
       .map(([id, v]) => ({ id, type: v.kind, status: "inProgress" }) as Item),
   ];
+  useEffect(() => {
+    onTimeline(turn.id, lastNativeTime(turn, items));
+  }, [onTimeline, turn, items]);
   const requirement = latest
     ? [...items].reverse().find((i) => i.type === "userMessage")
     : undefined;
@@ -517,7 +558,11 @@ function TurnHistory({
   let needsAuthor = true;
   for (const item of merged) {
     if (item.type === "userMessage") needsAuthor = true;
-    else if (item.type === "agentMessage" && needsAuthor) {
+    else if (
+      item.type === "agentMessage" &&
+      item.phase !== "commentary" &&
+      needsAuthor
+    ) {
       authorIds.add(item.id);
       needsAuthor = false;
     }
@@ -543,7 +588,8 @@ function TurnHistory({
   };
   for (const item of merged) {
     if (item.type === "userMessage") finishAnswer();
-    else if (item.type === "agentMessage") answer.push(item);
+    else if (item.type === "agentMessage" && item.phase !== "commentary")
+      answer.push(item);
   }
   finishAnswer();
   const statusEntries = useStatusEntries(tid);
@@ -568,6 +614,14 @@ function TurnHistory({
                 : item.aggregatedOutput,
           }
         : item;
+    const unfinishedAtEnd =
+      turn.status !== "inProgress" &&
+      observed.status === "inProgress" &&
+      isProcessItem(observed) &&
+      observed.type !== "agentMessage";
+    const displayed = unfinishedAtEnd
+      ? { ...observed, status: "unknown" }
+      : observed;
     return (
       <div
         key={item.id}
@@ -587,8 +641,13 @@ function TurnHistory({
             </small>
           </details>
         )}
+        {unfinishedAtEnd && (
+          <small className="work-history-notice">
+            本轮已结束；此调用最后记录为运行中，最终状态未提供。
+          </small>
+        )}
         <ItemView
-          item={observed}
+          item={displayed}
           threadId={tid}
           showAgentAuthor={authorIds.has(item.id)}
           agentCopyText={answerCopies.get(item.id)}
@@ -599,24 +658,84 @@ function TurnHistory({
       </div>
     );
   };
-  // Keep calls within their native conversational position and turn boundary.
-  const sections: { tools: boolean; items: Item[] }[] = [];
-  for (const item of merged) {
-    if (item.type === "reasoning") continue;
-    const tools =
-      tab === "work" &&
-      item.source !== "userShell" &&
-      !["userMessage", "agentMessage", "plan", "contextCompaction"].includes(
-        item.type,
-      );
-    const last = sections.at(-1);
-    if (tools && last?.tools && !statusAnchors.has(last.items.at(-1)!.id))
-      last.items.push(item);
-    else sections.push({ tools, items: [item] });
-  }
+  const segments = workSegments(merged);
+  let previousTime = previousAtMs;
+  let userIndex = 0;
+  const conversation = segments.map((segment, index) => {
+    const userTime = segment.user
+      ? userMessageTime(
+          segment.user,
+          userIndex === 0,
+          loaded && !cursor,
+          startedAt ?? turn.startedAt,
+        )
+      : undefined;
+    if (segment.user) userIndex++;
+    const previous = previousTime;
+    if (userTime !== undefined)
+      previousTime = Math.max(previousTime ?? 0, userTime);
+    for (const item of [
+      ...(segment.user ? [segment.user] : []),
+      ...segment.items,
+    ]) {
+      const at =
+        nativeTime(item.samayaTiming?.completedAtMs) ??
+        nativeTime(item.samayaTiming?.startedAtMs);
+      if (at !== undefined) previousTime = Math.max(previousTime ?? 0, at);
+    }
+    const process = segment.items.filter(isProcessItem);
+    const active =
+      latest && index === segments.length - 1 && turn.status === "inProgress";
+    const durationAvailable =
+      nativeTime(startedAt ?? turn.startedAt) !== undefined &&
+      nativeTime(turn.completedAt) !== undefined;
+    return (
+      <div className="conversation-exchange" key={segment.key}>
+        {segment.user && (
+          <>
+            <ConversationTime at={userTime} previous={previous} />
+            {renderItem(segment.user)}
+          </>
+        )}
+        {(process.length > 0 ||
+          active ||
+          (index === segments.length - 1 && durationAvailable)) && (
+          <WorkProcess
+            tid={tid}
+            turn={{ ...turn, startedAt: startedAt ?? turn.startedAt }}
+            scope={`${tid}:${turn.id}:${segment.key}`}
+            items={process}
+            renderItem={renderItem}
+            active={active}
+            state={
+              working
+                ? workState
+                : workState === "running"
+                  ? "stale"
+                  : workState
+            }
+            hasFinal={segment.items.some(
+              (item) => item.phase === "final_answer",
+            )}
+          />
+        )}
+        {segment.items.filter((item) => !isProcessItem(item)).map(renderItem)}
+        {[...(segment.user ? [segment.user] : []), ...segment.items]
+          .filter((item) => statusAnchors.has(item.id))
+          .map((item) => (
+            <InlineStatus
+              key={item.id}
+              tid={tid}
+              turnId={turn.id}
+              itemId={item.id}
+            />
+          ))}
+      </div>
+    );
+  });
   return (
     <section ref={region} className="turn-history" data-turn-id={turn.id}>
-      <div className="turn-divider">
+      <div className={tab === "work" ? "turn-divider sr-only" : "turn-divider"}>
         本轮 ·{" "}
         {(
           {
@@ -628,6 +747,11 @@ function TurnHistory({
         )[turn.status] || turn.status}
         <span className="sr-only">轮次 {turn.id}</span>
       </div>
+      {tab === "work" && turn.error?.message && (
+        <p role="alert" className="work-turn-error">
+          {turn.error.message}
+        </p>
+      )}
       {tab === "work" &&
         latest &&
         loaded &&
@@ -635,6 +759,20 @@ function TurnHistory({
         !cursor &&
         !merged.some((item) => item.source === "userShell") && (
           <small>当前记录未包含用户要求。</small>
+        )}
+      {tab === "work" &&
+        loaded &&
+        !cursor &&
+        turn.status === "completed" &&
+        merged.some(isProcessItem) &&
+        !merged.some(
+          (item) =>
+            (item.type === "agentMessage" && item.phase !== "commentary") ||
+            item.type === "plan",
+        ) && (
+          <p className="work-history-notice">
+            本轮已结束，记录未提供答复正文；可展开工作过程核对。
+          </p>
         )}
       {!loaded && !error && (
         <p className="history-local-loading">正在载入对话…</p>
@@ -673,35 +811,9 @@ function TurnHistory({
         </>
       )}
       {tab === "work" && <InlineStatus tid={tid} turnId={turn.id} />}
-      {sections.map((section) => (
-        <Fragment key={section.items[0].id}>
-          {section.tools ? (
-            <ToolSequence items={section.items}>
-              {section.items.map(renderItem)}
-            </ToolSequence>
-          ) : (
-            section.items.map(renderItem)
-          )}
-          {tab === "work" &&
-            section.items
-              .filter((item) => statusAnchors.has(item.id))
-              .map((item) => (
-                <InlineStatus
-                  key={item.id}
-                  tid={tid}
-                  turnId={turn.id}
-                  itemId={item.id}
-                />
-              ))}
-        </Fragment>
-      ))}
-      {tab === "work" && latest && working && turn.status === "inProgress" && (
-        <WorkingStatus
-          tid={tid}
-          turnId={turn.id}
-          startedAt={startedAt ?? turn.startedAt}
-        />
-      )}
+      {tab === "work"
+        ? conversation
+        : merged.filter((item) => item.type !== "reasoning").map(renderItem)}
     </section>
   );
 }

@@ -172,7 +172,7 @@ try {
     page.getByRole("alert").filter({ hasText: "附件发送失败" }),
   ).toBeVisible();
   await expect(cards).toHaveCount(2);
-  await expect(input).toHaveValue("检查这两个附件");
+  await expect(input).toHaveText("检查这两个附件");
   for (const theme of ["vallum", "abyssus"]) {
     await page.evaluate((t) => window.samayaTheme.setPreference(t), theme);
     for (const width of [1440, 390, 320]) {
@@ -213,11 +213,11 @@ try {
     .dispatchEvent("drop", { dataTransfer: transfer });
   await expect(cards).toHaveCount(1);
   await expect(cards.first()).toHaveAttribute("data-status", "ready");
-  await expect(input).toHaveValue("");
+  await expect(input).toHaveText("");
   await expect(send).toHaveAttribute("data-action", "send");
   await input.press("Enter");
   await expect(cards).toHaveCount(0);
-  expect(calls.find((c) => c.action === "steer").body.files).toHaveLength(1);
+  expect(calls.findLast((c) => c.action === "send").body.files).toHaveLength(1);
   await picker.setInputFiles(
     Array.from({ length: 6 }, (_, index) => ({
       name: `${index}.txt`,

@@ -35,7 +35,7 @@ export function ReadingSurface({
       // Native item boundaries remain stable when a prepended reply takes the author label.
       const candidates = [
         ...el.querySelectorAll<HTMLElement>(
-          "[data-item-id]:has(> .message), .tool-sequence > summary",
+          "[data-item-id]:has(> .message), .work-summary, .conversation-time",
         ),
         ...el.querySelectorAll<HTMLElement>(".turn-divider"),
       ];

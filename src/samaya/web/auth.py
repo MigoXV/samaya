@@ -96,6 +96,8 @@ def register_auth(application: FastAPI, config: Settings) -> None:
         )
         if request.url.path.startswith("/api"):
             response.headers["Cache-Control"] = "no-store"
+        if request.url.path.endswith("/files/preview"):
+            response.headers["Content-Security-Policy"] = "default-src 'none'; sandbox"
         return response
 
     @application.get("/api/auth")

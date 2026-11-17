@@ -83,3 +83,75 @@ async def test_stale_timeout_cannot_close_replacement_connection(tmp_path, monke
         await connection.rpc("thread/read", {"threadId": "t"})
     replacement.close.assert_not_awaited()
     assert connection.state == "connected"
+
+
+@pytest.mark.parametrize("mode", ["timeout", "success", "cancel", "shutdown"])
+async def test_app_catalog_isolated_from_live_connection(tmp_path, monkeypatch, mode):
+    requests = []
+    sockets = []
+    catalog_requested = asyncio.Event()
+
+    async def daemon(ws):
+        sockets.append(ws)
+        try:
+            async for raw in ws:
+                message = json.loads(raw)
+                method = message.get("method")
+                if method == "initialize":
+                    result = {"userAgent": "codex/0.163.0"}
+                elif method == "app/list":
+                    requests.append((ws, method))
+                    catalog_requested.set()
+                    if mode != "success":
+                        continue
+                    result = {"data": [], "nextCursor": None}
+                elif method == "thread/loaded/list":
+                    requests.append((ws, method))
+                    result = {"data": []}
+                else:
+                    continue
+                await ws.send(json.dumps({"id": message["id"], "result": result}))
+        except ConnectionClosed:
+            pass
+
+    socket = str(tmp_path / "daemon.sock")
+    async with unix_serve(daemon, socket):
+        disconnected = Mock()
+        connection = Connection(
+            Settings(socket=socket), AsyncMock(), AsyncMock(), disconnected
+        )
+        await connection.start()
+        try:
+            await asyncio.wait_for(connection.ready.wait(), 5)
+            # Allow process startup time; timeout must happen after catalog dispatch.
+            monkeypatch.setattr("samaya.codex.connection.APP_LIST_TIMEOUT", 2)
+            pending = asyncio.create_task(connection.rpc("app/list", {"limit": 100}))
+            await asyncio.wait_for(catalog_requested.wait(), 5)
+            assert await connection.rpc("thread/loaded/list", {"limit": 1}) == {
+                "data": []
+            }
+            if mode == "success":
+                assert await pending == {"data": [], "nextCursor": None}
+            elif mode == "timeout":
+                with pytest.raises(ConnectionError, match="应用目录查询超时"):
+                    await pending
+            elif mode == "cancel":
+                pending.cancel()
+                with pytest.raises(asyncio.CancelledError):
+                    await pending
+            else:
+                await connection.close()
+                with pytest.raises(asyncio.CancelledError):
+                    await pending
+            if mode != "shutdown":
+                assert await connection.rpc("thread/loaded/list", {"limit": 1}) == {
+                    "data": []
+                }
+                assert connection.generation == 1
+                assert connection.state == "connected"
+                disconnected.assert_not_called()
+            assert requests[0][0] is not requests[1][0]
+            assert not connection.catalog_tasks
+            await asyncio.wait_for(sockets[1].wait_closed(), 3)
+        finally:
+            await asyncio.wait_for(connection.close(), 5)
