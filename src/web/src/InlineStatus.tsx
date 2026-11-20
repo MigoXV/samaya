@@ -1,3 +1,4 @@
+import { serviceTierLabel } from "./service-tier";
 import { useStatusEntries } from "./inline-status-store";
 
 const compactNumber = new Intl.NumberFormat("en-US", {
@@ -109,10 +110,8 @@ export function InlineStatus({
             <>
               <p>
                 模型 {d.model || "未提供"} · 思考强度{" "}
-                {d.reasoningEffort || "默认"} · Fast{" "}
-                {d.serviceTier === "fast" || d.serviceTier === "priority"
-                  ? "开启"
-                  : "关闭"}
+                {d.reasoningEffort || "默认"} · 速度{" "}
+                {serviceTierLabel(d.serviceTier)}
               </p>
               <p className="status-cwd">工作区 {d.cwd}</p>
               <StatusMeter

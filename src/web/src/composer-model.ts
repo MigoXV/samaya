@@ -36,11 +36,12 @@ export function inputTrigger(text: string, caret: number) {
     (left.split("\n").at(-1)!.match(/`/g) || []).length % 2
   )
     return null;
-  const slash = /^\/([\w:-]*)$/.exec(left);
+  const lineStart = left.lastIndexOf("\n") + 1;
+  const slash = /^\/([\w:-]*)$/.exec(left.slice(lineStart));
   if (slash)
     return {
       mode: "/" as const,
-      start: left.indexOf("/"),
+      start: lineStart,
       end: caret,
       query: slash[1],
     };

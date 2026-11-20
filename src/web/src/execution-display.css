@@ -152,6 +152,7 @@
 .work-activity-hints {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   gap: 4px 8px;
   padding-left: 24px;
 }
@@ -168,7 +169,13 @@
   font-size: 12px;
   line-height: 20px;
 }
-.work-activity-hints > a:hover {
+.task-detail .work-activity-hints > button {
+  min-height: 24px;
+  background: transparent;
+  font-size: 12px;
+  line-height: 20px;
+}
+.work-activity-hints > :is(a, button):hover {
   color: var(--text-primary);
 }
 .conversation-time {
@@ -184,7 +191,8 @@
   color: var(--text-primary);
 }
 @supports (background-clip: text) or (-webkit-background-clip: text) {
-  .work-state-label.is-working {
+  .work-state-label.is-working,
+  .work-activity-label.is-active-tool {
     background: linear-gradient(
       105deg,
       var(--text-secondary) 35%,
@@ -207,7 +215,8 @@
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  .work-state-label.is-working {
+  .work-state-label.is-working,
+  .work-activity-label.is-active-tool {
     animation: none;
     background: none;
     color: var(--text-secondary);
@@ -235,7 +244,8 @@
   font-size: 12px;
 }
 @media (forced-colors: active) {
-  .work-state-label.is-working {
+  .work-state-label.is-working,
+  .work-activity-label.is-active-tool {
     animation: none;
     background: none;
     color: CanvasText;

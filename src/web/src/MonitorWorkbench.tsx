@@ -2772,18 +2772,22 @@ function TaskComposer({
       );
     }
   };
-  function consumeCommandDraft(source = draft, refs = references) {
+  function consumeCommandDraft(range?: { start: number; end: number }) {
+    const source = draft;
     if (
-      !source.startsWith("/") ||
+      (!range && !source.startsWith("/")) ||
       sessionStorage.getItem("samaya.draft." + id) !== source
     )
       return;
-    sessionStorage.setItem("samaya.draft." + id, "");
-    sessionStorage.setItem("samaya.references." + id, "[]");
-    setDraft((current) => (current === source ? "" : current));
-    setReferences((current) => current.filter((r) => !refs.includes(r)));
+    const remaining = range ? source.slice(0, range.start) + source.slice(range.end) : "";
+    sessionStorage.setItem("samaya.draft." + id, remaining);
+    setDraft((current) => (current === source ? remaining : current));
+    if (!range) {
+      sessionStorage.setItem("samaya.references." + id, "[]");
+      setReferences((current) => current.filter((r) => !references.includes(r)));
+    }
   }
-  function invoke(item: SlashCommand, args: string) {
+  function invoke(item: SlashCommand, args: string, range?: { start: number; end: number }) {
     const name = item.alias || item.name;
     let finished = false;
     const finish = () => {
@@ -2793,10 +2797,10 @@ function TaskComposer({
         record.thread.cwd,
         "/" + item.name + (args ? " " + args : ""),
       );
-      consumeCommandDraft();
+      consumeCommandDraft(range);
     };
     if (name === "rename" && item.enabled) {
-      consumeCommandDraft();
+      consumeCommandDraft(range);
       setLocalError("");
       setRename({ value: args || record.thread.name || "" });
       return;
@@ -2824,10 +2828,11 @@ function TaskComposer({
     }
     if (name === "init") {
       finish();
-      setDraft(
-        "检查当前项目，生成或完善根目录 AGENTS.md，保留已有有效约定。" +
-          (args ? "\n" + args : ""),
-      );
+      const prompt = "检查当前项目，生成或完善根目录 AGENTS.md，保留已有有效约定。";
+      setDraft(range
+        ? draft.slice(0, range.start) + prompt + draft.slice(range.end)
+        : prompt + (args ? "\n" + args : ""));
+
       return;
     }
     if (name === "copy") {
