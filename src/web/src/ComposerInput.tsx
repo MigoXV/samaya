@@ -80,7 +80,11 @@ export function ComposerInput({
   active?: boolean;
   disabled?: boolean;
   onSubmit: () => void;
-  onCommand: (c: SlashCommand, args: string) => void;
+  onCommand: (
+    c: SlashCommand,
+    args: string,
+    range?: { start: number; end: number },
+  ) => void;
   onStop?: () => void;
   label?: string;
   placeholder?: string;
@@ -468,10 +472,13 @@ export function ComposerInput({
   }
   function choose(c: Candidate) {
     if (c.command) {
-      if (browse(c.command)) return;
+      if (!c.enabled) return;
+      const range =
+        trigger?.mode === "/" && trigger.start > 0 ? trigger : undefined;
+      if (browse(c.command, range)) return;
       setDismissed(true);
       setManual(null);
-      onCommand(c.command, slashInput(value)?.args || "");
+      onCommand(c.command, slashInput(value)?.args || "", range);
       return;
     }
     if (!c.enabled) return;
@@ -495,13 +502,14 @@ export function ComposerInput({
       );
     });
   }
-  function browse(c: SlashCommand) {
+  function browse(c: SlashCommand, range?: { start: number; end: number }) {
     if (c.name !== "skills" && c.name !== "apps") return false;
-    if (value.startsWith("/")) onChange("");
+    if (range) onChange(value.slice(0, range.start) + value.slice(range.end));
+    else if (value.startsWith("/")) onChange("");
     rememberPrompt(cwd, "/" + c.name);
     setManual(c.name);
     setSelected(0);
-    setCaret(0);
+    setCaret(range?.start ?? 0);
     setDismissed(true);
     input.current?.focus();
     return true;

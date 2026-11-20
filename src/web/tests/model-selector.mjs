@@ -33,7 +33,10 @@ try {
         (value) => ({ value, label: value }),
       ),
       defaultEffort: "medium",
-      serviceTiers: [{ id: "priority", name: "Fast" }],
+      serviceTiers: [
+        { id: "priority", name: "Fast" },
+        { id: "ultrafast", name: "Ultrafast" },
+      ],
     },
     {
       model: "model-b",
@@ -202,7 +205,7 @@ try {
   expect(panel.width).toBe(260);
   expect(toolbarBox.y - panel.y - panel.height).toBe(8);
   const assets = await page
-    .locator(".model-selector img")
+    .locator(".model-selector img:visible")
     .evaluateAll((nodes) =>
       nodes.map((n) => ({
         loaded: n.complete && n.naturalWidth > 0,
@@ -236,10 +239,9 @@ try {
   expect(selections.at(-1).body.args.value).toBe("medium");
   await expect(page.locator(".panel-fast")).toBeEnabled();
   await page.locator(".panel-fast").click();
-  await expect(page.locator(".panel-fast")).toHaveAttribute(
-    "aria-pressed",
-    "true",
-  );
+  const fastOption = page.getByRole("menuitemradio", { name: /快速/ });
+  await fastOption.click();
+  await expect(fastOption).toHaveAttribute("aria-checked", "true");
   expect(selections.at(-1).body.command).toBe("fast");
   await expect(trigger).toBeEnabled();
   selections.length = 0;
@@ -317,13 +319,17 @@ try {
   const beforeUnsupported = selections.length;
   await fastEntry.click();
   await expect(page.locator(".model-menu")).toContainText(
-    "当前模型未提供 Fast 档位",
+    "当前模型仅提供标准速度。",
   );
-  await page.locator(".panel-fast").click();
+  await expect(
+    page.getByRole("menuitemradio", { name: /标准/ }),
+  ).toBeDisabled();
   expect(selections.length).toBe(beforeUnsupported);
   await page.keyboard.press("Escape");
   await expect(fastEntry).toBeFocused();
-  await expect(input).toHaveValue("保留我的草稿");
+  await expect
+    .poll(() => input.evaluate((el) => el.value))
+    .toBe("保留我的草稿");
   expect(selections[0].body).toEqual({
     threadId: "demo-6",
     command: "model",
@@ -346,13 +352,15 @@ try {
   await page.getByRole("button", { name: "重新读取", exact: true }).click();
   await expect(page.locator(".model-menu")).toContainText("模型目录暂不可用");
   const beforeReadFailure = selections.length;
-  await page.locator(".panel-fast").click();
+  await expect(
+    page.getByRole("menuitemradio", { name: /标准/ }),
+  ).toBeDisabled();
   expect(selections.length).toBe(beforeReadFailure);
   await expect(fastEntry).not.toHaveAttribute("title", /正在读取/);
   failCatalog = false;
   await page.getByRole("button", { name: "重新读取", exact: true }).click();
   await expect(page.locator(".model-menu")).toContainText(
-    "当前模型未提供 Fast 档位",
+    "当前模型仅提供标准速度。",
   );
   await page.keyboard.press("Escape");
   await input.fill("第一行\n第二行");
@@ -442,18 +450,30 @@ try {
     "inProgress",
   );
   await expect(trigger).toHaveAttribute("aria-busy", "false");
+  await fastEntry.click();
+  const speed = page.getByRole("dialog", { name: "响应速度" });
+  const standard = speed.getByRole("menuitemradio", { name: /标准/ });
+  const fast = speed.getByRole("menuitemradio", { name: /快速/ });
+  const ultra = speed.getByRole("menuitemradio", { name: /超快/ });
+  await expect(standard).toBeFocused();
+  await page.keyboard.press("End");
+  await expect(ultra).toBeFocused();
+  await page.keyboard.press("Enter");
+  await expect(ultra).toHaveAttribute("aria-checked", "true");
+  expect(selections.at(-1).body.args.value).toBe("ultrafast");
+  await fast.click();
+  await expect(fast).toHaveAttribute("aria-checked", "true");
+  expect(selections.at(-1).body.args.value).toBe("priority");
   pendingRead = true;
   failCatalog = true;
-  await expect(page.locator(".fast-toggle").first()).toBeEnabled();
   const beforePending = selections.length;
-  await page.locator(".fast-toggle").first().click();
-  await expect(page.locator(".model-menu")).toContainText("等待同步");
-  await expect(page.locator(".panel-fast")).toBeEnabled();
-  await page.locator(".panel-fast").click();
+  await standard.click();
+  await expect(speed).toContainText("等待同步");
+  await expect(ultra).toBeDisabled();
   expect(selections.length).toBe(beforePending + 1);
   failCatalog = false;
   await page.getByRole("button", { name: "重新读取", exact: true }).click();
-  await expect(page.locator(".panel-fast")).toBeEnabled();
+  await expect(standard).toHaveAttribute("aria-checked", "true");
   expect(selections.length).toBe(beforePending + 1);
   await page.keyboard.press("Escape");
   state.records.find((r) => r.thread.id === "demo-6").error = "连接待恢复";

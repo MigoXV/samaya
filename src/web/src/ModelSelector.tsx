@@ -1,6 +1,8 @@
 import { useEffect, useId, useRef, useState } from "react";
+import { Check } from "lucide-react";
 import { api } from "./api";
 import type { Receipt } from "./types";
+import { serviceTierLabel } from "./service-tier";
 import "./model-selector.css";
 
 type Option = { value: string; label: string };
@@ -62,7 +64,9 @@ export function ModelSelector({
   inspectReceipts: () => void;
 }) {
   const [open, setOpen] = useState(false);
-  const [view, setView] = useState<"reasoning" | "model">("reasoning");
+  const [view, setView] = useState<"reasoning" | "model" | "speed">(
+    "reasoning",
+  );
   const [settings, setSettings] = useState<ModelSettings | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -184,12 +188,11 @@ export function ModelSelector({
     effort ||
     "选择强度";
   const index = options.findIndex((o) => o.value === effort);
-  const fastTier = selected?.serviceTiers.find(
-    (t) => t.id === "fast" || t.id === "priority",
+  const currentTier = current?.serviceTier ?? serviceTier ?? "default";
+  const tiers = (selected?.serviceTiers ?? []).filter(
+    (tier) => tier.id !== "default",
   );
-  const fast =
-    (current?.serviceTier ?? serviceTier) === "priority" ||
-    (current?.serviceTier ?? serviceTier) === "fast";
+  const speedOptions = [{ id: "default", name: "标准" }, ...tiers];
   const locked =
     disabled ||
     busy ||
@@ -208,7 +211,6 @@ export function ModelSelector({
         !settings,
     );
   }, [loading, saving, awaitingSync, error, settings, onPendingChange]);
-  const canToggleFast = !locked && !!fastTier;
   const updating = !disabled && (loading || saving);
   const fastReason = disabled
     ? "连接或任务状态暂不允许修改设置。"
@@ -226,13 +228,9 @@ export function ModelSelector({
                 ? "当前任务不接受直接修改设置。"
                 : !selected
                   ? "当前模型不在可用目录中，请选择模型。"
-                  : !fastTier
-                    ? "当前模型未提供 Fast 档位。"
-                    : "Fast：" +
-                      (fast ? "已开启" : "已关闭") +
-                      (fastTier.description
-                        ? ` · ${fastTier.description}`
-                        : "");
+                  : !tiers.length
+                    ? "当前模型仅提供标准速度。"
+                    : "";
   function focusModelView() {
     setView("model");
     requestAnimationFrame(() => {
@@ -312,6 +310,15 @@ export function ModelSelector({
         setRetry((n) => n + 1);
       }
       if (command === "model") focusReasoningView();
+      if (command === "fast" && receipt.result?.modelSettings) {
+        requestAnimationFrame(() =>
+          root.current
+            ?.querySelector<HTMLButtonElement>(
+              '.speed-menu [aria-checked="true"]',
+            )
+            ?.focus(),
+        );
+      }
     } catch (e) {
       setError(String(e));
       setOpen(true);
@@ -357,20 +364,31 @@ export function ModelSelector({
       <button
         type="button"
         className={`quiet fast-toggle ${inPanel ? "panel-fast" : ""}`}
-        aria-label="Fast 模式"
+        aria-label={`选择响应速度，当前${serviceTierLabel(currentTier, tiers.find((tier) => tier.id === currentTier)?.name)}`}
         disabled={saving}
-        aria-pressed={fast}
-        title={canToggleFast ? fastReason : `${fastReason} 点击查看状态。`}
-        aria-haspopup={canToggleFast ? undefined : "dialog"}
-        aria-controls={!canToggleFast && open ? id : undefined}
+        data-speed={currentTier}
+        title={fastReason || `响应速度 · ${serviceTierLabel(currentTier)}`}
+        aria-haspopup="dialog"
+        aria-expanded={open && view === "speed"}
+        aria-controls={open && view === "speed" ? id : undefined}
         onClick={(e) => {
-          if (!inPanel) returnFocus.current = e.currentTarget;
-          if (canToggleFast) {
-            void choose("fast", fast ? "default" : fastTier!.id);
-          } else {
-            setView("reasoning");
-            setOpen(true);
+          returnFocus.current = inPanel ? trigger.current : e.currentTarget;
+          if (open && view === "speed") {
+            setOpen(false);
+            return;
           }
+          setView("speed");
+          setOpen(true);
+          requestAnimationFrame(() => {
+            const selectedOption =
+              root.current?.querySelector<HTMLButtonElement>(
+                '.speed-menu [aria-checked="true"]:not(:disabled)',
+              );
+            (
+              selectedOption ??
+              root.current?.querySelector<HTMLElement>(".speed-menu")
+            )?.focus();
+          });
         }}
       >
         <img
@@ -404,7 +422,8 @@ export function ModelSelector({
           (returnFocus.current || trigger.current)?.focus();
         }
         if (
-          view === "model" &&
+          open &&
+          view !== "reasoning" &&
           ["ArrowDown", "ArrowUp", "Home", "End"].includes(e.key)
         ) {
           e.preventDefault();
@@ -439,12 +458,12 @@ export function ModelSelector({
           aria-label={`选择模型与推理强度，当前${modelLabel}，${effortLabel}`}
           title={`${modelLabel} · ${effortLabel}`}
           aria-haspopup="dialog"
-          aria-expanded={open}
-          aria-controls={open ? id : undefined}
+          aria-expanded={open && view !== "speed"}
+          aria-controls={open && view !== "speed" ? id : undefined}
           aria-busy={updating}
           onClick={() => {
             returnFocus.current = trigger.current;
-            setOpen(!open);
+            setOpen(!open || view === "speed");
             setView("reasoning");
             setError("");
           }}
@@ -469,13 +488,52 @@ export function ModelSelector({
       )}
       {open && (
         <div
-          className={`model-menu ${view === "reasoning" ? "reasoning-menu" : "model-list"}`}
+          className={`model-menu ${view === "reasoning" ? "reasoning-menu" : view === "speed" ? "speed-menu" : "model-list"}`}
           id={id}
           role="dialog"
-          aria-label="模型与推理强度"
+          aria-label={view === "speed" ? "响应速度" : "模型与推理强度"}
+          tabIndex={view === "speed" ? -1 : undefined}
           aria-busy={loading || saving}
         >
-          {view === "reasoning" ? (
+          {view === "speed" ? (
+            <>
+              <div role="menu" aria-label="可用档位">
+                {speedOptions.map((tier) => (
+                  <button
+                    key={tier.id}
+                    type="button"
+                    role="menuitemradio"
+                    aria-checked={tier.id === currentTier}
+                    disabled={
+                      locked ||
+                      !selected ||
+                      (tiers.length === 0 && currentTier === "default")
+                    }
+                    onClick={() => void choose("fast", tier.id)}
+                  >
+                    <span>
+                      {serviceTierLabel(tier.id, tier.name)}
+                      <small>
+                        {"description" in tier && tier.description
+                          ? tier.description
+                          : tier.id === "default"
+                            ? "默认速度"
+                            : tier.id === "ultrafast"
+                              ? "优先缩短响应时间"
+                              : "更快响应，可能增加用量"}
+                      </small>
+                    </span>
+                    {tier.id === currentTier && (
+                      <Check size={16} aria-hidden="true" />
+                    )}
+                  </button>
+                ))}
+              </div>
+              {fastReason && !error && !notice && (
+                <p role="status">{fastReason}</p>
+              )}
+            </>
+          ) : view === "reasoning" ? (
             <>
               <div className="reasoning-header">
                 {fastButton(true)}
@@ -575,7 +633,7 @@ export function ModelSelector({
               {!loading && !selected && settings && (
                 <p>当前模型不在可用目录中，请选择模型。</p>
               )}
-              {!loading && !saving && !canToggleFast && (
+              {!loading && !saving && fastReason && (
                 <p role="status">{fastReason}</p>
               )}
             </>

@@ -6,12 +6,10 @@ import { fixture, install, returnToOverview } from "./monitor-fixture.mjs";
 const ordinary = [
   " /fork",
   "\t/fork",
-  "\n/fork",
   "\u00a0/fork",
   "\u3000/fork",
   "\ufeff/fork",
   "请执行 /fork",
-  "普通文本\n/fork",
   " /unknown",
 ];
 for (const text of ordinary) {
@@ -20,6 +18,13 @@ for (const text of ordinary) {
 }
 assert.deepEqual(slashInput("/fork"), { name: "fork", args: "" });
 assert.equal(inputTrigger("/fork", 5)?.mode, "/");
+assert.equal(slashInput("普通文本\n/fork"), null);
+assert.deepEqual(inputTrigger("普通文本\n/fo", 8), {
+  mode: "/",
+  start: 5,
+  end: 8,
+  query: "fo",
+});
 assert.deepEqual(slashInput("/rename 新名称"), {
   name: "rename",
   args: "新名称",
@@ -113,7 +118,7 @@ try {
     );
     const n = calls.length;
     await page.locator(".composer-send").click();
-    await expect(input).toHaveValue("");
+    await expect.poll(() => input.evaluate((el) => el.value)).toBe("");
     expect(calls.length).toBe(n + 1);
     expect(["send", "steer"]).toContain(calls.at(-1).action);
     expect(calls.at(-1).body.text).toBe(text);
@@ -125,10 +130,10 @@ try {
   await expect(
     page.getByRole("alert").filter({ hasText: "请等待当前轮次结束" }),
   ).toBeVisible();
-  await expect(input).toHaveValue("/fork");
+  await expect.poll(() => input.evaluate((el) => el.value)).toBe("/fork");
   await expect(page.getByRole("dialog")).toHaveCount(0);
   failure = false;
-  for (const method of ["send", "enter", "option"]) {
+  for (const method of ["send", "enter", "option", "multiline"]) {
     // Restore a settled source turn, as a native fork requires an idle thread.
     const source = state.records.find((r) => r.thread.id === "demo-10");
     source.turn.status = "completed";
@@ -136,9 +141,9 @@ try {
     if (method !== "send") {
       await returnToOverview(page);
       await page.locator('[data-task-id="demo-10"].overview-task').click();
-      await expect(input).toHaveValue("");
+      await expect.poll(() => input.evaluate((el) => el.value)).toBe("");
     }
-    await input.fill("/fork");
+    await input.fill(method === "multiline" ? "保留这段草稿\n/fork" : "/fork");
     const n = calls.length;
     if (method === "send") await page.locator(".composer-send").click();
     else if (method === "enter") await input.press("Enter");
@@ -153,10 +158,10 @@ try {
       args: {},
       expectedTurnId: source.turn.id,
     });
-    await expect(input).toHaveValue("");
+    await expect.poll(() => input.evaluate((el) => el.value)).toBe("");
     expect(
       await page.evaluate(() => sessionStorage.getItem("samaya.draft.demo-10")),
-    ).toBe("");
+    ).toBe(method === "multiline" ? "保留这段草稿\n" : "");
     await expect(page.getByRole("dialog")).toHaveCount(0);
   }
   expect(contextRequests).toBe(0);

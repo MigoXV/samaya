@@ -52,6 +52,22 @@ try {
       startedAtMs: (start + 2) * 1000,
       completedAtMs: (start + 3) * 1000,
     },
+    ...[
+      "git status",
+      "git diff",
+      "pnpm build",
+      "git log",
+      "node check.mjs",
+      "pnpm lint",
+    ].map((command, i) => ({
+      item: {
+        id: `cmd-${i}`,
+        type: "commandExecution",
+        command,
+        status: "completed",
+        exitCode: 0,
+      },
+    })),
     {
       item: {
         id: "figma-1",
@@ -72,6 +88,7 @@ try {
         type: "mcpToolCall",
         server: "figma",
         tool: "use_figma",
+        appContext: { actionName: "核实主题令牌与布局高度影响" },
         status: "inProgress",
       },
     },
@@ -85,11 +102,14 @@ try {
       startedAtMs: (start + 4) * 1000,
     },
   ];
-  await context.route("**/api/threads/*/turns/*/items*", (route) =>
-    route.fulfill({
-      json: { data: entries.toReversed(), nextCursor: null, samayaCursor: 0 },
-    }),
-  );
+  const firstTurnEntries = entries;
+  await context.route("**/api/threads/*/turns/*/items*", (route) => {
+    const path = new URL(route.request().url()).pathname;
+    const pageEntries = path.endsWith("/new-turn/items") ? entries : firstTurnEntries;
+    return route.fulfill({
+      json: { data: pageEntries.toReversed(), nextCursor: null, samayaCursor: 0 },
+    });
+  });
   const page = await context.newPage();
   const errors = [];
   page.on("pageerror", (e) => errors.push(e.message));
@@ -117,6 +137,9 @@ try {
       .locator(".is-working")
       .evaluate((el) => getComputedStyle(el).animationName),
   ).toBe("work-shimmer");
+  const activeTool = work.locator(".is-active-tool");
+  await expect(activeTool).toHaveText("核实主题令牌与布局高度影响");
+  await expect(activeTool).toHaveCSS("animation-name", "work-shimmer");
   await page.screenshot({ path: "../../.samaya/work-process/running.png" });
   await page.emulateMedia({ reducedMotion: "reduce" });
   expect(
@@ -124,6 +147,7 @@ try {
       .locator(".is-working")
       .evaluate((el) => getComputedStyle(el).animationName),
   ).toBe("none");
+  await expect(activeTool).toHaveCSS("animation-name", "none");
   await page.emulateMedia({ reducedMotion: "no-preference" });
   state.pendingRequests.push({
     key: "work-question",
@@ -137,6 +161,7 @@ try {
   });
   await broadcast();
   await expect(work.locator(".is-working")).toHaveCount(0);
+  await expect(activeTool).toHaveCount(0);
   await expect(disclosure).toContainText("等待你的答复");
   await expect(page.getByText("请选择范围。", { exact: true })).toBeVisible();
   state.pendingRequests = [];
@@ -153,7 +178,7 @@ try {
   await broadcast();
   const compactActivity = work
     .locator(".work-activity")
-    .filter({ hasText: "使用 Figma" });
+    .filter({ has: page.locator(".is-active-tool") });
   await compactActivity.locator(":scope > summary").click();
   await expect(disclosure).toHaveAttribute("aria-expanded", "true");
   await expect(compactActivity.locator(":scope > summary")).toBeFocused();
@@ -164,9 +189,21 @@ try {
   await expect(
     page.getByText("先核对已有布局。", { exact: true }),
   ).toBeVisible();
+  const more = work.getByRole("button", { name: "再看 4 项" });
+  const chipHeights = await more
+    .locator("..")
+    .locator(":scope > *")
+    .evaluateAll((chips) =>
+      chips.map((chip) => chip.getBoundingClientRect().height),
+    );
+  expect(chipHeights).toEqual([24, 24, 24, 24]);
+  await more.click();
+  await expect(
+    work.getByText("pnpm lint", { exact: true }).first(),
+  ).toBeVisible();
   const figma = work
     .locator(".work-activity")
-    .filter({ hasText: "使用 Figma" });
+    .filter({ hasText: "核实主题令牌与布局高度影响" });
   await expect(figma.locator(":scope > summary")).toContainText("2 次");
   if ((await figma.getAttribute("open")) === null)
     await figma.locator(":scope > summary").click();

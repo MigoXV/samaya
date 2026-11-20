@@ -243,7 +243,7 @@
 .composer-input .fast-toggle:hover {
   background: transparent;
 }
-.fast-toggle[aria-pressed="false"] img {
+.fast-toggle[data-speed="default"]:not([aria-expanded="true"]) img {
   opacity: 0.45;
 }
 .model-controls .model-trigger {
@@ -327,4 +327,45 @@
   border-radius: inherit;
   background: color-mix(in srgb, var(--button-bg) 25%, transparent);
   pointer-events: none;
+}
+
+.composer-input .fast-toggle[aria-expanded="true"],
+.composer-input .fast-toggle:not([data-speed="default"]) {
+  background: var(--surface-subtle);
+}
+.composer-input .fast-toggle[data-speed="ultrafast"] {
+  background: var(--accent);
+}
+[data-theme="abyssus"] .fast-toggle[data-speed="ultrafast"] img {
+  filter: none;
+}
+.speed-menu {
+  padding: 6px;
+}
+.speed-menu [role="menuitemradio"] {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  min-height: 46px;
+  padding: 8px 12px;
+  text-align: left;
+  border-radius: 8px;
+}
+.speed-menu [aria-checked="true"] {
+  background: var(--surface-subtle);
+}
+.speed-menu small {
+  display: block;
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 18px;
+  overflow-wrap: anywhere;
+}
+.speed-menu svg {
+  flex: none;
+}
+.speed-menu p {
+  margin: 8px 12px;
 }

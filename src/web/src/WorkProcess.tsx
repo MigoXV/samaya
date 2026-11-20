@@ -44,18 +44,27 @@ function ActivityGroup({
   renderItem,
   onInspect,
   aliasScope,
+  running,
 }: {
   activity: Activity;
   scope: string;
   renderItem: (item: Item) => ReactNode;
   onInspect: () => void;
   aliasScope: string;
+  running: boolean;
 }) {
   const [open, setOpen] = useDisclosure(
     `${scope}:activity:${activity.items[0].id}`,
     activity.items.map((item) => `samaya.activity.${aliasScope}:${item.id}`),
   );
   const ref = useRef<HTMLDetailsElement>(null);
+  const activeItem = running
+    ? [...activity.items].reverse().find((item) => item.status === "inProgress")
+    : undefined;
+  const context = activeItem?.appContext as
+    { actionName?: unknown } | undefined;
+  const actionName =
+    typeof context?.actionName === "string" ? context.actionName.trim() : "";
   const hints = activityHints(activity);
   const failures = activity.items.filter(itemFailed).length;
   const hintList = (expanded: boolean) =>
@@ -80,7 +89,7 @@ function ActivityGroup({
               setOpen(true);
             }}
           >
-            另 {hints.length - 3} 项
+            再看 {hints.length - 3} 项
           </button>
         )}
       </div>
@@ -104,7 +113,15 @@ function ActivityGroup({
           }}
         >
           <ActivityIcon activity={activity} />
-          <span>{activity.label}</span>
+          <span
+            className={
+              activeItem
+                ? "work-activity-label is-active-tool"
+                : "work-activity-label"
+            }
+          >
+            {actionName || activity.label}
+          </span>
           <span className="work-activity-count">
             {activity.items.length} 次{failures ? ` · ${failures} 项异常` : ""}
           </span>
@@ -268,6 +285,7 @@ export function WorkProcess({
       <ActivityGroup
         key={row.items[0].id}
         activity={row}
+        running={running && !hasFinal}
         scope={scope}
         renderItem={renderItem}
         onInspect={() => setOpen(true)}
