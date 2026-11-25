@@ -113,12 +113,16 @@
 
 /* Workspace identity stays visible while its conversations are collapsed. */
 .nav-workspaces {
+  position: relative;
   scrollbar-gutter: stable;
   min-height: 0;
   overflow-y: auto;
-  scrollbar-width: thin;
-  flex: 1;
+  flex: 0 1 auto;
   padding-top: 16px;
+  padding-inline-end: 8px;
+}
+.nav-workspaces:has(.hidden-workspace-list) {
+  flex-grow: 1;
 }
 .nav-workspaces .eyebrow {
   display: block;
@@ -162,7 +166,10 @@
   justify-content: center;
 }
 .nav-workspace-threads {
-  padding: 0 0 6px 21px;
+  display: grid;
+  gap: 2px;
+  padding-block: 4px 6px;
+  padding-inline-start: 12px;
 }
 .nav-workspace-threads .nav-conversation,
 .nav-workspace-threads > .nav-show-more {
@@ -177,6 +184,9 @@
   font-size: 12px;
   padding: 7px 9px;
 }
+.monitor-nav .nav-workspace-threads :is(.nav-conversation, .nav-show-more) {
+  padding-inline-start: 20px;
+}
 .nav-conversation-title {
   min-width: 0;
   overflow: hidden;
@@ -189,15 +199,15 @@
   color: var(--text-secondary);
   font-size: 11px;
 }
-.monitor-nav .nav-conversation-row.conversation-running {
+.monitor-nav .nav-conversation-row:is(.conversation-running, .conversation-awaiting) {
   background: var(--selected);
   color: var(--text-primary);
   border-color: transparent;
 }
-.nav-conversation-row.conversation-running .nav-conversation-status {
+.nav-conversation-row:is(.conversation-running, .conversation-awaiting) .nav-conversation-status {
   color: var(--text-primary);
 }
-.monitor-nav .nav-conversation-row.conversation-running:hover {
+.monitor-nav .nav-conversation-row:is(.conversation-running, .conversation-awaiting):hover {
   background: color-mix(in srgb, var(--selected) 80%, var(--hover));
 }
 .nav-workspace-threads > small {
@@ -208,7 +218,7 @@
   color: var(--text-primary);
 }
 .workspace-running > header,
-.workspace-running > .nav-workspace-heading {
+:is(.workspace-running, .workspace-awaiting) > .nav-workspace-heading {
   background: var(--selected);
 }
 .nav-workspace-heading {
@@ -217,7 +227,7 @@
 .nav-workspace-heading:hover {
   background: var(--hover);
 }
-.workspace-running > .nav-workspace-heading:hover {
+:is(.workspace-running, .workspace-awaiting) > .nav-workspace-heading:hover {
   background: color-mix(in srgb, var(--selected) 80%, var(--hover));
 }
 .monitor-shell .nav-workspaces button:hover {
@@ -248,7 +258,7 @@
 .inline-status p { margin: 0; line-height: 1.6; }
 .inline-status small { font-size: 11px; color: var(--text-primary); line-height: 18px; }
 .workspace-running > header :is(small, button, .workspace-create-label),
-.workspace-running > .nav-workspace-heading small {
+:is(.workspace-running, .workspace-awaiting) > .nav-workspace-heading small {
   color: var(--text-primary);
 }
 
@@ -362,16 +372,26 @@
 .nav-workspace-heading .nav-workspace-manage { display: flex; flex: 0 0 28px; width: 28px; height: 28px; padding: 4px; align-items: center; justify-content: center; opacity: 0; }
 .nav-workspace-heading:is(:hover, :focus-within) .nav-workspace-manage { opacity: 1; }
 .workspace-management-path { overflow-wrap: anywhere; color: var(--text-secondary); }
-.records-confirmation { margin-top: 24px; padding-top: 16px; border-top: 1px solid var(--border); }
-.records-confirmation h3 { font-size: 16px; margin: 0 0 12px; }
-.records-confirmation section { margin: 8px 0; }
 @media (hover: none), (max-width: 760px) { .monitor-nav .nav-workspace-heading .nav-workspace-manage { opacity: 1; } }
 .workspace-management .actions { align-items: center; gap: 12px; }
 .workspace-management .actions label { display: inline-flex; flex-direction: row; align-items: center; gap: 8px; }
 .workspace-management input[type="checkbox"] { width: 16px; height: 16px; min-height: 0; padding: 0; margin: 0; accent-color: var(--text-primary); }
 
-.plan-actions { margin: 16px 0; padding: 12px 16px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); }
-.plan-actions-buttons { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+.plan-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+  width: fit-content;
+  max-width: 100%;
+  margin: 16px 0;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: var(--surface);
+}
+.plan-actions-buttons { display: flex; gap: 4px; flex-wrap: wrap; min-width: 0; }
+.task-detail .plan-actions-buttons button.quiet { border: 0; }
+.plan-actions > p { flex-basis: 100%; margin: 0; }
 .permission-options { border: 0; padding: 0; margin: 0; display: grid; gap: 8px; }
 .permission-options label { display: flex; align-items: center; gap: 10px; min-height: 32px; }
 .permission-options input { width: auto; }
@@ -383,3 +403,20 @@
 .hidden-workspace-list { position: absolute; right: 0; top: 100%; z-index: 151; width: 208px; max-width: calc(100vw - 32px); max-height: 240px; overflow: auto; padding: 6px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); }
 .hidden-workspace-list button { display: block; width: 100%; min-height: 32px; padding: 4px 10px; text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .overview-workspace > header > .nav-workspace-manage { flex: 0 0 32px; width: 32px; min-height: 32px; padding: 8px; border: 0; background: transparent; color: var(--text-secondary); }
+
+.nav-running-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  vertical-align: middle;
+}
+.nav-running-indicator > svg {
+  flex-shrink: 0;
+  animation: nav-running-spin 1s linear infinite;
+}
+@keyframes nav-running-spin {
+  to { transform: rotate(360deg); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .nav-running-indicator > svg { animation: none; }
+}

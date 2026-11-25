@@ -4,7 +4,6 @@ import {
   PanelsTopLeft,
   Pin,
   Inbox,
-  History,
   Settings as SettingsIcon,
 } from "lucide-react";
 import { WorkspaceManagement } from "./WorkspaceManagement";
@@ -52,7 +51,7 @@ import {
   waitingUnknown,
 } from "./monitor";
 import type { Observation } from "./monitor";
-import type { Pending, Preview, Receipt, Status, Thread } from "./types";
+import type { Pending, Receipt, Status } from "./types";
 import "./monitor.css";
 import "./workspace-v5.css";
 import "./task-activity.css";
@@ -83,10 +82,14 @@ type View =
   | "pinned"
   | "overview"
   | "attention"
-  | "records"
+  | "workspace-management"
   | "settings"
   | "usage"
   | "changes";
+const WORKSPACE_MANAGEMENT_PATH = "/workspaces/manage";
+const legacyRecordsPath = (path: string) =>
+  path === "/sessions" || path === "/sessions/";
+
 const preferences = () => {
   try {
     return JSON.parse(sessionStorage.getItem("samaya.monitor.view") || "{}");
@@ -273,9 +276,17 @@ export function MonitorWorkbench({ logout }: { logout: () => void }) {
     error: syncError,
     refresh,
   } = useMonitor();
+  const [managedWorkspace, setManagedWorkspace] = useState(() => {
+    const url = new URL(location.href);
+    const savedWorkspace = url.searchParams.get("cwd") || "";
+    return url.pathname === WORKSPACE_MANAGEMENT_PATH ||
+      (legacyRecordsPath(url.pathname) && !url.searchParams.get("thread"))
+      ? savedWorkspace
+      : "";
+  });
   const [view, setView] = useState<View>(() =>
-    location.pathname.startsWith("/sessions")
-      ? "records"
+    managedWorkspace
+      ? "workspace-management"
       : location.pathname.startsWith("/settings/usage")
         ? "usage"
         : location.pathname.startsWith("/settings")
@@ -295,15 +306,21 @@ export function MonitorWorkbench({ logout }: { logout: () => void }) {
   const [selected, setSelected] = useState<string>(
       () =>
         new URL(location.href).searchParams.get("thread") ||
-        preferences().selected ||
+        (!legacyRecordsPath(location.pathname) && preferences().selected) ||
         "",
     ),
     [focus, setFocus] = useState(false);
-  const [managedWorkspace, setManagedWorkspace] = useState(() =>
-    location.pathname.startsWith("/sessions")
-      ? new URL(location.href).searchParams.get("cwd") || ""
-      : "",
-  );
+  useEffect(() => {
+    const url = new URL(location.href);
+    if (!legacyRecordsPath(url.pathname)) return;
+    if (url.searchParams.get("cwd") && !url.searchParams.get("thread")) {
+      url.pathname = WORKSPACE_MANAGEMENT_PATH;
+    } else {
+      url.pathname = "/";
+      url.searchParams.delete("cwd");
+    }
+    history.replaceState(null, "", url);
+  }, []);
   const [taskTab, setTaskTab] = useState("work");
   const [readerVisit, setReaderVisit] = useState(0);
   const [sidebarCommand, setSidebarCommand] = useState<{
@@ -663,6 +680,8 @@ export function MonitorWorkbench({ logout }: { logout: () => void }) {
       }
       setView("overview");
       const u = new URL(location.href);
+      u.pathname = "/";
+      u.searchParams.delete("cwd");
       u.searchParams.delete("workspace");
       u.searchParams.set("thread", id);
       history.replaceState(null, "", u);
@@ -695,8 +714,8 @@ export function MonitorWorkbench({ logout }: { logout: () => void }) {
       ),
     [],
   );
-  const navigate = (v: View) => {
-    setManagedWorkspace("");
+  const navigate = (v: View, workspace = "") => {
+    setManagedWorkspace(workspace);
     setDraftWorkspace("");
     setError("");
     setNotice("");
@@ -719,8 +738,8 @@ export function MonitorWorkbench({ logout }: { logout: () => void }) {
     history.replaceState(
       null,
       "",
-      v === "records"
-        ? "/sessions"
+      v === "workspace-management"
+        ? `${WORKSPACE_MANAGEMENT_PATH}?cwd=${encodeURIComponent(workspace)}`
         : v === "usage"
           ? "/settings/usage"
           : v === "settings"
@@ -1053,6 +1072,8 @@ export function MonitorWorkbench({ logout }: { logout: () => void }) {
     setNotice("");
     restoreWorkspace(path);
     const url = new URL(location.href);
+    url.pathname = "/";
+    url.searchParams.delete("cwd");
     url.searchParams.delete("thread");
     url.searchParams.set("workspace", path);
     history.replaceState(null, "", url);
@@ -1092,7 +1113,7 @@ export function MonitorWorkbench({ logout }: { logout: () => void }) {
         ? `新会话 · ${shortProject(draftWorkspace)} — Samaya`
         : workMode && selectedRecord
           ? `${threadTitle(selectedRecord.thread)} · ${projectName(selectedRecord.thread)} — Samaya`
-          : `${{ overview: "任务总览", pinned: "置顶任务", attention: "待我处理", settings: "设置与连接", usage: "使用情况", records: "会话记录", changes: "最近变化" }[view]} — Samaya`;
+          : `${{ overview: "任务总览", pinned: "置顶任务", attention: "待我处理", settings: "设置与连接", usage: "使用情况", "workspace-management": "工作区管理", changes: "最近变化" }[view]} — Samaya`;
   }, [view, workMode, draftWorkspace, selectedRecord]);
   useTaskNotifications(records, open);
   const recentProjects = orderedProjects
@@ -1100,9 +1121,7 @@ export function MonitorWorkbench({ logout }: { logout: () => void }) {
     .slice(0, 4);
   const manageWorkspace = (cwd: string) => {
     restoreWorkspace(cwd);
-    navigate("records");
-    setManagedWorkspace(cwd);
-    history.replaceState(null, "", "/sessions?cwd=" + encodeURIComponent(cwd));
+    navigate("workspace-management", cwd);
   };
   const selectOverviewProject = (path: string) => {
     const currentFilter = savedOverview.current.filter;
@@ -1143,7 +1162,7 @@ export function MonitorWorkbench({ logout }: { logout: () => void }) {
     : EMPTY;
   return (
     <div
-      className={`monitor-shell ${focus ? "focus-mode" : ""} ${workMode ? "task-is-open" : ""} ${taskNav ? "task-nav-open" : ""} ${overviewMode || (view === "records" && managedWorkspace) ? "overview-mode" : ""} ${view === "records" && managedWorkspace ? "workspace-management-mode" : ""} ${["settings", "usage"].includes(view) ? "settings-mode" : ""} `}
+      className={`monitor-shell ${focus ? "focus-mode" : ""} ${workMode ? "task-is-open" : ""} ${taskNav ? "task-nav-open" : ""} ${overviewMode || view === "workspace-management" ? "overview-mode" : ""} ${view === "workspace-management" ? "workspace-management-mode" : ""} ${["settings", "usage"].includes(view) ? "settings-mode" : ""} `}
     >
       <a className="skip-link" href="#monitor-main">
         跳到任务总览
@@ -1254,15 +1273,6 @@ export function MonitorWorkbench({ logout }: { logout: () => void }) {
               查看操作反馈
             </button>
           )}
-          <button onClick={() => navigate("records")}>
-            <History
-              size={16}
-              strokeWidth={1.5}
-              absoluteStrokeWidth
-              aria-hidden="true"
-            />
-            记录管理
-          </button>
           <button onClick={() => navigate("settings")}>
             <SettingsIcon
               size={16}
@@ -1318,9 +1328,7 @@ export function MonitorWorkbench({ logout }: { logout: () => void }) {
                 overview: "全部任务",
                 pinned: "置顶任务",
                 attention: "待我处理",
-                records: managedWorkspace
-                  ? `${shortProject(managedWorkspace)} · 工作区管理`
-                  : "记录管理",
+                "workspace-management": `${shortProject(managedWorkspace)} · 工作区管理`,
                 settings: "设置与连接",
                 usage: "使用情况",
                 changes: "最近变化",
@@ -2008,8 +2016,11 @@ export function MonitorWorkbench({ logout }: { logout: () => void }) {
                           )}
                         {taskTab === "work" && (
                           <PlanActions
-                            key={selected}
+                            key={`${selected}:${connected}`}
                             tid={selected}
+                            connected={connected}
+                            uncertain={!!selectedRecord.error}
+                            active={selectedRecord.turn?.status === "inProgress"}
                             editable={
                               selectedRecord.thread.canAcceptDirectInput !==
                               false
@@ -2120,40 +2131,30 @@ export function MonitorWorkbench({ logout }: { logout: () => void }) {
                     </>
                   ) : (
                     <p>
-                      此任务不在当前汇总中，可能已归档或删除。返回列表后可在记录管理中核对。
+                      此任务不在当前汇总中，可能已归档或删除。可从对应工作区的菜单打开「工作区管理」核对。
                     </p>
                   )}
                 </aside>
               )}
             </div>
           )}
-        {view === "records" &&
-          (managedWorkspace ? (
-            <WorkspaceManagement
-              key={managedWorkspace}
-              cwd={managedWorkspace}
-              connected={!!connected}
-              records={records}
-              back={() => navigate("overview")}
-              create={() => {
-                navigate("overview");
-                startWorkspaceDraft(managedWorkspace);
-              }}
-              open={(id) => {
-                navigate("overview");
-                open(id);
-              }}
-            />
-          ) : (
-            <Records
-              cwd=""
-              connected={!!connected}
-              open={(id) => {
-                navigate("overview");
-                open(id);
-              }}
-            />
-          ))}
+        {view === "workspace-management" && managedWorkspace && (
+          <WorkspaceManagement
+            key={managedWorkspace}
+            cwd={managedWorkspace}
+            connected={!!connected}
+            records={records}
+            back={() => navigate("overview")}
+            create={() => {
+              navigate("overview");
+              startWorkspaceDraft(managedWorkspace);
+            }}
+            open={(id) => {
+              navigate("overview");
+              open(id);
+            }}
+          />
+        )}
         {view === "settings" && (
           <SettingsView logout={logout} usage={() => navigate("usage")} />
         )}
@@ -3118,328 +3119,6 @@ function SettingsView({
     </section>
   );
 }
-function Records({
-  connected,
-  open,
-  cwd,
-}: {
-  connected: boolean;
-  open: (id: string) => void;
-  cwd: string;
-}) {
-  const [now] = useState(() => Date.now());
-  const [rows, setRows] = useState<Thread[]>([]),
-    [archived, setArchived] = useState(false),
-    [cursor, setCursor] = useState<string | null>(null),
-    [error, setError] = useState(""),
-    [selected, setSelected] = useState<string[]>([]),
-    [search, setSearch] = useState(""),
-    [older, setOlder] = useState(0),
-    [preview, setPreview] = useState<
-      { id: string; value?: Preview; error?: string }[] | null
-    >(null),
-    [action, setAction] = useState("archive"),
-    [results, setResults] = useState<string[]>([]),
-    [busy, setBusy] = useState(false);
-  const loadVersion = useRef(0);
-  const load = useCallback(
-    async (more?: string) => {
-      const version = ++loadVersion.current;
-      try {
-        const r = await api<{ data: Thread[]; nextCursor: string | null }>(
-          `/threads?archived=${archived}${cwd ? "&cwd=" + encodeURIComponent(cwd) : ""}${more ? "&cursor=" + encodeURIComponent(more) : ""}`,
-        );
-        if (version !== loadVersion.current) return;
-        const data = cwd
-          ? r.data.filter((t) => t.cwd === cwd && !t.parentThreadId)
-          : r.data;
-        setRows((old) => (more ? [...old, ...data] : data));
-        setCursor(r.nextCursor);
-        setError("");
-      } catch (e) {
-        if (version === loadVersion.current) setError(String(e));
-      }
-    },
-    [archived, cwd],
-  );
-  useEffect(() => {
-    queueMicrotask(() => void load());
-  }, [load]);
-  async function prepare(a: string) {
-    setAction(a);
-    setBusy(true);
-    const values = [];
-    for (const id of selected) {
-      try {
-        values.push({
-          id,
-          value: await api<Preview>(
-            `/threads/${encodeURIComponent(id)}/cleanup-preview`,
-          ),
-        });
-      } catch (e) {
-        values.push({ id, error: String(e) });
-      }
-    }
-    setPreview(values);
-    setBusy(false);
-  }
-  const visibleRows = rows.filter(
-    (t) =>
-      (!search ||
-        `${threadTitle(t)} ${t.cwd}`
-          .toLowerCase()
-          .includes(search.toLowerCase())) &&
-      (!older || now / 1000 - t.updatedAt > older * 86400),
-  );
-  return (
-    <section className="monitor-page workspace-management">
-      {cwd && <p className="workspace-management-path">{cwd}</p>}
-      <p>归档保留历史；删除不可恢复。执行中或仍有后台活动时，清理会被阻止。</p>
-      <div className="actions">
-        <label>
-          <input
-            type="checkbox"
-            disabled={busy || !!preview}
-            checked={archived}
-            onChange={(e) => {
-              setArchived(e.target.checked);
-              setSelected([]);
-            }}
-          />
-          已归档
-        </label>
-        <input
-          disabled={busy || !!preview}
-          aria-label="搜索记录"
-          placeholder="搜索已加载记录"
-          value={search}
-          onChange={(e) => {
-            setSearch(e.target.value);
-            setSelected([]);
-          }}
-        />
-        <label>
-          最近未活动
-          <select
-            disabled={busy || !!preview}
-            value={older}
-            onChange={(e) => {
-              setOlder(Number(e.target.value));
-              setSelected([]);
-            }}
-          >
-            <option value={0}>不限</option>
-            <option value={7}>7 天</option>
-            <option value={30}>30 天</option>
-            <option value={90}>90 天</option>
-          </select>
-        </label>
-      </div>
-      <p>
-        时间只用于筛选，不表示废弃。已加载 {rows.length} 条记录，已选{" "}
-        {selected.length} 条。
-      </p>
-      <div className="actions">
-        {cwd && (
-          <label>
-            <input
-              type="checkbox"
-              aria-label="全选当前列表"
-              disabled={busy || !!preview || !visibleRows.length}
-              checked={
-                !!visibleRows.length &&
-                visibleRows.every((t) => selected.includes(t.id))
-              }
-              onChange={(e) =>
-                setSelected(
-                  e.target.checked ? visibleRows.map((t) => t.id) : [],
-                )
-              }
-            />
-            全选
-          </label>
-        )}
-        <button
-          disabled={!connected || busy || !!preview || !selected.length}
-          onClick={() => void prepare(archived ? "unarchive" : "archive")}
-        >
-          {archived ? "恢复归档" : "归档"}
-        </button>
-        <button
-          disabled={!connected || busy || !!preview || !selected.length}
-          onClick={() => void prepare("delete")}
-        >
-          删除
-        </button>
-      </div>
-      {error && <p role="alert">{error}</p>}
-      {results.map((text, i) => (
-        <p className="workspace-operation-result" key={i}>
-          {text}
-        </p>
-      ))}
-      <div className="records-table">
-        <table>
-          <thead>
-            <tr>
-              <th>选择</th>
-              <th>任务 / 目录</th>
-              <th>最近活动</th>
-              <th>原始状态</th>
-            </tr>
-          </thead>
-          <tbody>
-            {visibleRows.map((t) => (
-              <tr key={t.id}>
-                <td>
-                  <input
-                    aria-label={`选择 ${threadTitle(t)}`}
-                    type="checkbox"
-                    disabled={busy || !!preview}
-                    checked={selected.includes(t.id)}
-                    onChange={(e) =>
-                      setSelected((old) =>
-                        e.target.checked
-                          ? [...old, t.id]
-                          : old.filter((id) => id !== t.id),
-                      )
-                    }
-                  />
-                </td>
-                <td>
-                  <button className="quiet" onClick={() => open(t.id)}>
-                    {threadTitle(t)}
-                  </button>
-                  <small>{t.cwd}</small>
-                </td>
-                <td>
-                  {new Date(t.updatedAt * 1000).toLocaleDateString("zh-CN")}
-                </td>
-                <td>{connected ? t.status.type : "状态待确认"}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-      {!visibleRows.length && <p>没有符合条件的对话</p>}
-      {cursor && (
-        <button disabled={busy || !!preview} onClick={() => void load(cursor)}>
-          加载更多记录
-        </button>
-      )}
-      {preview && (
-        <RecordsConfirmation
-          inline={!!cwd}
-          title={
-            action === "delete"
-              ? "永久删除确认"
-              : action === "archive"
-                ? "归档确认"
-                : "恢复归档确认"
-          }
-          close={() => {
-            if (!busy) setPreview(null);
-          }}
-        >
-          <p>
-            {action === "delete"
-              ? "永久删除以下会话及列出的子会话，记录无法恢复。"
-              : "仅处理列出的目标。不会自动中断任何执行。"}
-          </p>
-          {preview.map((p) => (
-            <section key={p.id}>
-              {p.error ? (
-                <p role="alert">
-                  {p.id}：无法核对影响范围：{p.error}
-                </p>
-              ) : (
-                p.value?.scope.map((t) => (
-                  <p key={t.id}>
-                    {t.name || t.id}
-                    <br />
-                    <code>{t.cwd}</code> · {t.status.type}
-                  </p>
-                ))
-              )}
-            </section>
-          ))}
-          <button
-            disabled={busy || !connected}
-            className="primary"
-            onClick={async () => {
-              setBusy(true);
-              const next = [];
-              for (const p of preview) {
-                const label = rows.find((t) => t.id === p.id)
-                  ? threadTitle(rows.find((t) => t.id === p.id)!)
-                  : p.id;
-                if (p.error || !p.value) {
-                  next.push(`${label}：未执行，影响范围未确认`);
-                  continue;
-                }
-                try {
-                  const r = await operation(action, {
-                    threadId: p.id,
-                    digest: p.value.digest,
-                  });
-                  const items = r?.result?.items as
-                    { id: string; state: string }[] | undefined;
-                  next.push(
-                    `${label}：${!r ? "失败或结果待确认，请核查回执" : items?.some((i) => i.state !== "succeeded") ? "部分失败：" + items.map((i) => i.id + " " + i.state).join("；") : "已确认"}`,
-                  );
-                } catch (e) {
-                  next.push(`${label}：${String(e)}`);
-                }
-              }
-              setResults(next);
-              setBusy(false);
-              setPreview(null);
-              setSelected([]);
-              await load();
-            }}
-          >
-            {busy
-              ? "逐项处理中…"
-              : "确认" +
-                (action === "delete"
-                  ? "删除"
-                  : action === "archive"
-                    ? "归档"
-                    : "恢复")}
-          </button>
-          <button disabled={busy} onClick={() => setPreview(null)}>
-            取消
-          </button>
-        </RecordsConfirmation>
-      )}
-    </section>
-  );
-}
-
-function RecordsConfirmation({
-  inline,
-  title,
-  close,
-  children,
-}: {
-  inline: boolean;
-  title: string;
-  close: () => void;
-  children: React.ReactNode;
-}) {
-  return inline ? (
-    <section className="records-confirmation" aria-label={title}>
-      <h3>{title}</h3>
-      {children}
-    </section>
-  ) : (
-    <Modal title={title} close={close}>
-      {children}
-    </Modal>
-  );
-}
-
 function WorkspaceDraft({
   cwd,
   value,

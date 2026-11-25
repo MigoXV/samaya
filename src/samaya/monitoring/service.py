@@ -11,6 +11,7 @@ import time
 from collections import defaultdict, deque
 
 from samaya.codex.connection import Connection
+from samaya.codex.title_generation import is_title_thread
 from samaya.decisions.service import Decisions
 from samaya.sessions.models import normalize
 from samaya.sessions.queries import SessionQueries
@@ -77,6 +78,15 @@ class Monitor:
 
     def turn_summary(self, tid: str, turn_id: str) -> dict:
         return self.projection.turn_summary(tid, turn_id)
+
+    def is_thread_removed(self, tid: str) -> bool:
+        return tid in self.projection.deleted or tid in self.projection.archived
+
+    def request_name_refresh(self, tid: str) -> None:
+        if not self.is_thread_removed(tid):
+            self.projection.touch(tid)
+            self.projection.refresh_queue.add(tid)
+            self.wake.set()
 
     def start(self):
         self.tasks = [
@@ -183,6 +193,9 @@ class Monitor:
                         "thread/read", {"threadId": tid, "includeTurns": False}
                     )
                 )["thread"]
+                # The daemon lists in-memory helpers among loaded IDs.
+                if is_title_thread(thread):
+                    return
                 thread = self.queries.with_settings(normalize(thread))
                 page = await self.queries.turns(tid, limit=1)
                 if page.get("historyAvailable") is False:

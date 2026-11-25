@@ -12,6 +12,7 @@ from samaya.store import Store
 
 from .models import active_turn
 from .queries import SessionQueries
+from .titles import SessionTitles
 
 logger = logging.getLogger(__name__)
 
@@ -23,8 +24,10 @@ class SessionActions:
         connection: Connection,
         store: Store,
         queries: SessionQueries,
+        titles: SessionTitles | None = None,
     ):
         self.catalog = None
+        self.titles = titles
         self.config, self.connection, self.store, self.queries = (
             config,
             connection,
@@ -167,6 +170,8 @@ class SessionActions:
                     await self.connection.rpc(
                         "thread/name/set", {"threadId": created_id, "name": b["name"]}
                     )
+                elif self.titles and not thread.get("name"):
+                    self.titles.register(created_id)
             except (CodexError, asyncio.TimeoutError, ConnectionError) as exc:
                 logger.warning(
                     "Thread created; setup incomplete: %s", type(exc).__name__
@@ -236,6 +241,8 @@ class SessionActions:
                 },
             )
             self.queries.fresh_threads.discard((self.connection.connection_id, tid))
+            if self.titles and (result.get("turn") or {}).get("id"):
+                self.titles.enqueue(thread, b.get("text") or "")
             return result
         if action == "steer":
             thread = (await self.queries.read(tid))["thread"]

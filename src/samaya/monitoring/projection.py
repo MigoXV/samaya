@@ -257,6 +257,7 @@ class Projection:
             method
             in (
                 "thread/started",
+                "thread/name/updated",
                 "thread/status/changed",
                 "turn/started",
                 "turn/completed",
@@ -294,6 +295,13 @@ class Projection:
                 return
             summary = self.turn_summary(tid, turn["id"])
             record.update(plan=summary.get("plan"), progressAt=now, eventAt=now)
+            self.records[tid] = record
+            return
+        if method == "thread/name/updated":
+            if "threadName" not in params:
+                return
+            thread["name"] = params["threadName"]
+            record["thread"] = thread
             self.records[tid] = record
             return
         if method == "thread/settings/updated":

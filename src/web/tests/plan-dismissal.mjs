@@ -101,6 +101,33 @@ try {
   await emit("turn/completed", "stay");
   await expect(panel).toBeVisible();
   await page.getByRole("button", { name: "留在计划模式", exact: true }).click();
+  await expect(
+    panel.getByRole("button", { name: "执行", exact: true }),
+  ).toBeEnabled();
+  await expect(panel.getByRole("button", { name: "留在计划模式" })).toHaveCount(
+    0,
+  );
+  const record = state.records.find((r) => r.thread.id === "demo-6");
+  record.turn = { id: "stay", status: "completed", items: [] };
+  await page.reload();
+  await expect(
+    panel.getByRole("button", { name: "执行", exact: true }),
+  ).toBeEnabled();
+  await expect(panel.getByRole("button", { name: "留在计划模式" })).toHaveCount(
+    0,
+  );
+  await expect(panel).toHaveCSS("border-top-width", "0px");
+  await page.setViewportSize({ width: 320, height: 844 });
+  const box = await panel.boundingBox();
+  expect(box.x + box.width).toBeLessThanOrEqual(320);
+  record.turn = { id: "newer", status: "completed", items: [] };
+  await page.reload();
+  await expect(editor).toBeVisible();
+  await expect
+    .poll(() =>
+      page.evaluate(() => localStorage.getItem("samaya.saved-plan.demo-6")),
+    )
+    .toBeNull();
   await expect(panel).toHaveCount(0);
   await context.close();
   console.log(

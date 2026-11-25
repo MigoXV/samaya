@@ -11,7 +11,7 @@ try {
   });
   const state = fixture(16);
   state.records.forEach((r) => (r.thread.model = "model-a"));
-  const { broadcast } = await install(context, state);
+  const { broadcast, calls } = await install(context, state);
   let failCatalog = false,
     failSave = false,
     pendingRead = false;
@@ -34,8 +34,8 @@ try {
       ),
       defaultEffort: "medium",
       serviceTiers: [
-        { id: "priority", name: "Fast" },
         { id: "ultrafast", name: "Ultrafast" },
+        { id: "priority", name: "Fast" },
       ],
     },
     {
@@ -48,6 +48,14 @@ try {
       })),
       defaultEffort: "medium",
       serviceTiers: [],
+    },
+    {
+      model: "model-c",
+      displayName: "Model C",
+      isDefault: false,
+      effortOptions: [{ value: "medium", label: "medium" }],
+      defaultEffort: "medium",
+      serviceTiers: [{ id: "fast", name: "Fast" }],
     },
   ];
   function settings(record) {
@@ -139,6 +147,7 @@ try {
   await page.locator('[data-task-id="demo-6"].overview-task').click();
   const input = page.getByLabel("补充当前任务", { exact: true });
   const trigger = page.locator(".model-trigger");
+  const fastEntry = page.getByRole("button", { name: /^切换响应速度/ });
   await expect(trigger.locator(".model-spinner")).toBeVisible();
   await page.setViewportSize({ width: 320, height: 844 });
   const loadingBounds = await page.evaluate(() => {
@@ -237,11 +246,14 @@ try {
   await page.getByRole("button", { name: "重置推理强度", exact: true }).click();
   await expect(trigger).toContainText("标准");
   expect(selections.at(-1).body.args.value).toBe("medium");
-  await expect(page.locator(".panel-fast")).toBeEnabled();
-  await page.locator(".panel-fast").click();
-  const fastOption = page.getByRole("menuitemradio", { name: /快速/ });
-  await fastOption.click();
-  await expect(fastOption).toHaveAttribute("aria-checked", "true");
+  await expect(fastEntry.locator("svg")).toHaveAttribute("fill", "none");
+  await fastEntry.click();
+  await expect(fastEntry).toHaveAccessibleName(/当前快速/);
+  await expect(fastEntry.locator("svg")).toHaveAttribute(
+    "fill",
+    "currentColor",
+  );
+  await expect(page.locator(".model-menu")).toHaveCount(0);
   expect(selections.at(-1).body.command).toBe("fast");
   await expect(trigger).toBeEnabled();
   selections.length = 0;
@@ -312,20 +324,17 @@ try {
   holdMonitor = false;
   releaseMonitor();
   await expect(page.getByText("操作已确认。", { exact: true })).toHaveCount(0);
-  // An unavailable tier remains inspectable and never submits a setting change.
+  // A standard-only model never submits a setting change.
   await page.keyboard.press("Escape");
-  const fastEntry = page.locator(".fast-toggle").first();
-  await expect(fastEntry).toBeEnabled();
+  await expect(fastEntry).toBeDisabled();
   const beforeUnsupported = selections.length;
-  await fastEntry.click();
-  await expect(page.locator(".model-menu")).toContainText(
-    "当前模型仅提供标准速度。",
+  await fastEntry.press("Enter");
+  await expect(fastEntry).toHaveAttribute(
+    "title",
+    /当前模型仅提供标准速度/,
   );
-  await expect(
-    page.getByRole("menuitemradio", { name: /标准/ }),
-  ).toBeDisabled();
+  await expect(page.locator(".model-menu")).toHaveCount(0);
   expect(selections.length).toBe(beforeUnsupported);
-  await page.keyboard.press("Escape");
   await expect(fastEntry).toBeFocused();
   await expect
     .poll(() => input.evaluate((el) => el.value))
@@ -348,13 +357,11 @@ try {
   await expect(trigger).toContainText("Model B");
   await page.keyboard.press("Escape");
   failCatalog = true;
-  await fastEntry.click();
+  await trigger.click();
   await page.getByRole("button", { name: "重新读取", exact: true }).click();
   await expect(page.locator(".model-menu")).toContainText("模型目录暂不可用");
   const beforeReadFailure = selections.length;
-  await expect(
-    page.getByRole("menuitemradio", { name: /标准/ }),
-  ).toBeDisabled();
+  await expect(fastEntry).toBeDisabled();
   expect(selections.length).toBe(beforeReadFailure);
   await expect(fastEntry).not.toHaveAttribute("title", /正在读取/);
   failCatalog = false;
@@ -414,9 +421,12 @@ try {
     );
     const modelBox = await trigger.boundingBox();
     const inputBox = await input.boundingBox();
+    const speedBox = await fastEntry.boundingBox();
     expect(inputBox.width).toBeGreaterThan(40);
     expect(inputBox.y + inputBox.height).toBeLessThanOrEqual(modelBox.y);
     expect(modelBox.x + modelBox.width).toBeLessThanOrEqual(width);
+    expect(speedBox.width).toBeGreaterThanOrEqual(24);
+    expect(speedBox.x + speedBox.width).toBeLessThanOrEqual(modelBox.x);
 
     await openModels();
     const box = await page.locator(".model-menu").boundingBox();
@@ -425,10 +435,6 @@ try {
     await page.screenshot({ path: out + "/mobile-" + width + ".png" });
     await page.keyboard.press("Escape");
   }
-  await trigger.click();
-  await expect(page.locator(".panel-fast")).toBeVisible();
-  await expect(page.locator(".model-controls > .fast-toggle")).toBeHidden();
-  await page.keyboard.press("Escape");
   await page.setViewportSize({ width: 1440, height: 960 });
   failSave = false;
   state.records.find((r) => r.thread.id === "demo-6").turn.status =
@@ -450,30 +456,55 @@ try {
     "inProgress",
   );
   await expect(trigger).toHaveAttribute("aria-busy", "false");
-  await fastEntry.click();
-  const speed = page.getByRole("dialog", { name: "响应速度" });
-  const standard = speed.getByRole("menuitemradio", { name: /标准/ });
-  const fast = speed.getByRole("menuitemradio", { name: /快速/ });
-  const ultra = speed.getByRole("menuitemradio", { name: /超快/ });
-  await expect(standard).toBeFocused();
-  await page.keyboard.press("End");
-  await expect(ultra).toBeFocused();
-  await page.keyboard.press("Enter");
-  await expect(ultra).toHaveAttribute("aria-checked", "true");
-  expect(selections.at(-1).body.args.value).toBe("ultrafast");
-  await fast.click();
-  await expect(fast).toHaveAttribute("aria-checked", "true");
+  await expect(fastEntry).toHaveAccessibleName(/当前标准/);
+  await page.setViewportSize({ width: 320, height: 844 });
+  holdSave = true;
+  releaseSave = undefined;
+  const beforeSpeed = selections.length;
+  await fastEntry.press("Enter");
+  await expect(fastEntry).toBeDisabled();
+  await expect(fastEntry).toBeFocused();
+  await fastEntry.press("Enter");
+  await expect.poll(() => typeof releaseSave).toBe("function");
+  expect(selections.length).toBe(beforeSpeed + 1);
+  holdSave = false;
+  releaseSave();
+  await expect(fastEntry).toHaveAccessibleName(/当前快速/);
   expect(selections.at(-1).body.args.value).toBe("priority");
+  await fastEntry.press("Space");
+  await expect(fastEntry).toHaveAccessibleName(/当前超快/);
+  const bolts = fastEntry.locator("svg path");
+  await expect(bolts).toHaveCount(2);
+  await expect(bolts.first()).toHaveAttribute("fill", "none");
+  expect(await bolts.first().getAttribute("d")).toBe(
+    await bolts.last().getAttribute("d"),
+  );
+  const [rear, front] = await bolts.evaluateAll((paths) =>
+    paths.map((path) => {
+      const { top, bottom } = path.getBoundingClientRect();
+      return { top, bottom, strokeWidth: getComputedStyle(path).strokeWidth };
+    }),
+  );
+  expect(rear).toEqual(front);
+  expect(selections.at(-1).body.args.value).toBe("ultrafast");
+  await expect(page.locator(".model-menu")).toHaveCount(0);
+  await fastEntry.click();
+  await expect(fastEntry).toHaveAccessibleName(/当前标准/);
+  expect(selections.at(-1).body.args.value).toBe("default");
+  await page.setViewportSize({ width: 1440, height: 960 });
   pendingRead = true;
   failCatalog = true;
   const beforePending = selections.length;
-  await standard.click();
-  await expect(speed).toContainText("等待同步");
-  await expect(ultra).toBeDisabled();
+  await fastEntry.click();
+  await expect(page.locator(".model-menu")).toContainText("等待同步");
+  await expect(page.locator(".model-menu [role='alert']")).toContainText(
+    "模型目录暂不可用",
+  );
+  await expect(fastEntry).toBeDisabled();
   expect(selections.length).toBe(beforePending + 1);
   failCatalog = false;
   await page.getByRole("button", { name: "重新读取", exact: true }).click();
-  await expect(standard).toHaveAttribute("aria-checked", "true");
+  await expect(fastEntry).toHaveAccessibleName(/当前快速/);
   expect(selections.length).toBe(beforePending + 1);
   await page.keyboard.press("Escape");
   state.records.find((r) => r.thread.id === "demo-6").error = "连接待恢复";
@@ -481,9 +512,11 @@ try {
   await expect(trigger).toBeDisabled();
   await expect(input).toBeDisabled();
   const beforeDisconnected = selections.length;
-  await fastEntry.click();
-  await expect(page.locator(".model-menu")).toContainText(
-    "连接或任务状态暂不允许修改设置",
+  await expect(fastEntry).toBeDisabled();
+  await fastEntry.press("Enter");
+  await expect(fastEntry).toHaveAttribute(
+    "title",
+    /连接或任务状态暂不允许修改设置/,
   );
   expect(selections.length).toBe(beforeDisconnected);
   state.records.find((r) => r.thread.id === "demo-6").error = null;
@@ -514,6 +547,34 @@ try {
   ).toBeEnabled();
   await expect(trigger).toContainText("Model A");
   expect(selections.length).toBe(beforeUncertain + 1);
+
+  await context.route("**/api/model-settings?**", (route) =>
+    route.fulfill({
+      json: settings({ thread: { model: "model-c", reasoningEffort: "medium" } }),
+    }),
+  );
+  await page.keyboard.press("Escape");
+  await page
+    .getByRole("button", { name: "在 Samaya 工作区新建会话", exact: true })
+    .click();
+  await expect(fastEntry).toHaveAccessibleName(/当前标准/);
+  await fastEntry.click();
+  await expect(fastEntry).toHaveAccessibleName(/当前快速/);
+  await fastEntry.click();
+  await expect(fastEntry).toHaveAccessibleName(/当前标准/);
+  await fastEntry.click();
+  await expect(fastEntry).toHaveAccessibleName(/当前快速/);
+  expect(selections.length).toBe(beforeUncertain + 1);
+  await page.getByLabel("新会话工作要求").fill("保留新会话的速度设置");
+  await page.getByRole("button", { name: "派发任务", exact: true }).click();
+  await expect
+    .poll(
+      () =>
+        calls.find(({ action }) => action === "create")?.body.modelSettings
+          ?.serviceTier,
+    )
+    .toBe("fast");
+  await expect(page).toHaveURL(/[?&]thread=demo-created(?:&|$)/);
   expect(errors).toEqual([]);
   console.log(
     "Model selection, failure recovery, draft retention, keyboard navigation and responsive composer passed.",

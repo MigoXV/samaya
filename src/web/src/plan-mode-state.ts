@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from "react";
+import { writeSavedPlan } from "./saved-plan";
 type ModeState = {
   current?: string;
   target?: string;
@@ -18,6 +19,7 @@ export function subscribePlanMode(listener: () => void) {
 }
 function write(tid: string, patch: Partial<ModeState>, advance = true) {
   const old = getPlanMode(tid);
+  if (patch.current && patch.current !== "plan") writeSavedPlan(tid, null);
   states.set(tid, { ...old, ...patch, version: old.version + Number(advance) });
   listeners.forEach((listener) => listener());
 }

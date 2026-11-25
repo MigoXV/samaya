@@ -1,5 +1,4 @@
 import { useEffect, useId, useRef, useState } from "react";
-import { Check } from "lucide-react";
 import { api } from "./api";
 import type { Receipt } from "./types";
 import { serviceTierLabel } from "./service-tier";
@@ -35,6 +34,8 @@ const effortLabels: Record<string, string> = {
   max: "极深",
   ultra: "极致",
 };
+const standardTier = { id: "default", name: "标准", description: "默认速度" };
+
 export function ModelSelector({
   tid,
   cwd,
@@ -64,9 +65,7 @@ export function ModelSelector({
   inspectReceipts: () => void;
 }) {
   const [open, setOpen] = useState(false);
-  const [view, setView] = useState<"reasoning" | "model" | "speed">(
-    "reasoning",
-  );
+  const [view, setView] = useState<"reasoning" | "model">("reasoning");
   const [settings, setSettings] = useState<ModelSettings | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -189,10 +188,22 @@ export function ModelSelector({
     "选择强度";
   const index = options.findIndex((o) => o.value === effort);
   const currentTier = current?.serviceTier ?? serviceTier ?? "default";
-  const tiers = (selected?.serviceTiers ?? []).filter(
-    (tier) => tier.id !== "default",
+  const tiers =
+    selected?.serviceTiers.filter((tier) => tier.id !== "default") ?? [];
+  const fastTier = tiers.find(({ id }) => id === "priority" || id === "fast");
+  const ultraTier = tiers.find(({ id }) => id === "ultrafast");
+  const nextTier =
+    currentTier === "default"
+      ? (fastTier ?? ultraTier)
+      : (currentTier === "priority" || currentTier === "fast") && ultraTier
+        ? ultraTier
+        : tiers.length
+          ? standardTier
+          : undefined;
+  const speedLabel = serviceTierLabel(
+    currentTier,
+    tiers.find(({ id }) => id === currentTier)?.name,
   );
-  const speedOptions = [{ id: "default", name: "标准" }, ...tiers];
   const locked =
     disabled ||
     busy ||
@@ -228,7 +239,7 @@ export function ModelSelector({
                 ? "当前任务不接受直接修改设置。"
                 : !selected
                   ? "当前模型不在可用目录中，请选择模型。"
-                  : !tiers.length
+                  : !nextTier
                     ? "当前模型仅提供标准速度。"
                     : "";
   function focusModelView() {
@@ -310,15 +321,6 @@ export function ModelSelector({
         setRetry((n) => n + 1);
       }
       if (command === "model") focusReasoningView();
-      if (command === "fast" && receipt.result?.modelSettings) {
-        requestAnimationFrame(() =>
-          root.current
-            ?.querySelector<HTMLButtonElement>(
-              '.speed-menu [aria-checked="true"]',
-            )
-            ?.focus(),
-        );
-      }
     } catch (e) {
       setError(String(e));
       setOpen(true);
@@ -359,49 +361,6 @@ export function ModelSelector({
     draftEffort.current = null;
     if (value !== null) void choose("reasoning", value);
   }
-  function fastButton(inPanel = false) {
-    return (
-      <button
-        type="button"
-        className={`quiet fast-toggle ${inPanel ? "panel-fast" : ""}`}
-        aria-label={`选择响应速度，当前${serviceTierLabel(currentTier, tiers.find((tier) => tier.id === currentTier)?.name)}`}
-        disabled={saving}
-        data-speed={currentTier}
-        title={fastReason || `响应速度 · ${serviceTierLabel(currentTier)}`}
-        aria-haspopup="dialog"
-        aria-expanded={open && view === "speed"}
-        aria-controls={open && view === "speed" ? id : undefined}
-        onClick={(e) => {
-          returnFocus.current = inPanel ? trigger.current : e.currentTarget;
-          if (open && view === "speed") {
-            setOpen(false);
-            return;
-          }
-          setView("speed");
-          setOpen(true);
-          requestAnimationFrame(() => {
-            const selectedOption =
-              root.current?.querySelector<HTMLButtonElement>(
-                '.speed-menu [aria-checked="true"]:not(:disabled)',
-              );
-            (
-              selectedOption ??
-              root.current?.querySelector<HTMLElement>(".speed-menu")
-            )?.focus();
-          });
-        }}
-      >
-        <img
-          src={
-            inPanel
-              ? "/figma/reasoning-lightning.svg"
-              : "/figma/model-lightning.svg"
-          }
-          alt=""
-        />
-      </button>
-    );
-  }
   return (
     <div
       className="model-selector"
@@ -414,7 +373,7 @@ export function ModelSelector({
         }
       }}
       onKeyDown={(e) => {
-        if (e.key === "Escape") {
+        if (open && e.key === "Escape") {
           e.stopPropagation();
           setOpen(false);
           setPreview(null);
@@ -449,7 +408,27 @@ export function ModelSelector({
       }}
     >
       <div className="model-controls" aria-busy={updating}>
-        {fastButton()}
+        <button
+          type="button"
+          className="quiet fast-toggle"
+          aria-label={`切换响应速度，当前${speedLabel}`}
+          aria-disabled={!!fastReason}
+          data-speed={currentTier}
+          title={
+            nextTier && !fastReason
+              ? `响应速度 · ${speedLabel}\n点击切换至${serviceTierLabel(nextTier.id, nextTier.name)}${nextTier.description ? ` · ${nextTier.description}` : ""}`
+              : `响应速度 · ${speedLabel}\n${fastReason}`
+          }
+          onClick={(e) => {
+            if (fastReason || !nextTier || pending.current) return;
+            returnFocus.current = e.currentTarget;
+            setOpen(false);
+            setView("reasoning");
+            void choose("fast", nextTier.id);
+          }}
+        >
+          <SpeedIcon tier={currentTier} />
+        </button>
         <button
           ref={trigger}
           className="quiet model-trigger"
@@ -458,14 +437,13 @@ export function ModelSelector({
           aria-label={`选择模型与推理强度，当前${modelLabel}，${effortLabel}`}
           title={`${modelLabel} · ${effortLabel}`}
           aria-haspopup="dialog"
-          aria-expanded={open && view !== "speed"}
-          aria-controls={open && view !== "speed" ? id : undefined}
+          aria-expanded={open}
+          aria-controls={open ? id : undefined}
           aria-busy={updating}
           onClick={() => {
             returnFocus.current = trigger.current;
-            setOpen(!open || view === "speed");
+            setOpen(!open);
             setView("reasoning");
-            setError("");
           }}
         >
           <span className="model-name">{modelLabel}</span>
@@ -488,55 +466,15 @@ export function ModelSelector({
       )}
       {open && (
         <div
-          className={`model-menu ${view === "reasoning" ? "reasoning-menu" : view === "speed" ? "speed-menu" : "model-list"}`}
+          className={`model-menu ${view === "reasoning" ? "reasoning-menu" : "model-list"}`}
           id={id}
           role="dialog"
-          aria-label={view === "speed" ? "响应速度" : "模型与推理强度"}
-          tabIndex={view === "speed" ? -1 : undefined}
+          aria-label="模型与推理强度"
           aria-busy={loading || saving}
         >
-          {view === "speed" ? (
-            <>
-              <div role="menu" aria-label="可用档位">
-                {speedOptions.map((tier) => (
-                  <button
-                    key={tier.id}
-                    type="button"
-                    role="menuitemradio"
-                    aria-checked={tier.id === currentTier}
-                    disabled={
-                      locked ||
-                      !selected ||
-                      (tiers.length === 0 && currentTier === "default")
-                    }
-                    onClick={() => void choose("fast", tier.id)}
-                  >
-                    <span>
-                      {serviceTierLabel(tier.id, tier.name)}
-                      <small>
-                        {"description" in tier && tier.description
-                          ? tier.description
-                          : tier.id === "default"
-                            ? "默认速度"
-                            : tier.id === "ultrafast"
-                              ? "优先缩短响应时间"
-                              : "更快响应，可能增加用量"}
-                      </small>
-                    </span>
-                    {tier.id === currentTier && (
-                      <Check size={16} aria-hidden="true" />
-                    )}
-                  </button>
-                ))}
-              </div>
-              {fastReason && !error && !notice && (
-                <p role="status">{fastReason}</p>
-              )}
-            </>
-          ) : view === "reasoning" ? (
+          {view === "reasoning" ? (
             <>
               <div className="reasoning-header">
-                {fastButton(true)}
                 <button
                   className="reasoning-model"
                   type="button"
@@ -633,9 +571,12 @@ export function ModelSelector({
               {!loading && !selected && settings && (
                 <p>当前模型不在可用目录中，请选择模型。</p>
               )}
-              {!loading && !saving && fastReason && (
-                <p role="status">{fastReason}</p>
-              )}
+              {!disabled &&
+                !loading &&
+                !saving &&
+                !error &&
+                !notice &&
+                fastReason && <p role="status">{fastReason}</p>}
             </>
           ) : (
             <>
@@ -712,6 +653,34 @@ export function ModelSelector({
         </div>
       )}
     </div>
+  );
+}
+
+function SpeedIcon({ tier }: { tier: string }) {
+  const standard = tier === "default";
+  const ultrafast = tier === "ultrafast";
+  const lightning = "m12 2.5-7 9h5l-1 6 8-9h-6z";
+  return (
+    <svg
+      aria-hidden="true"
+      width="20"
+      height="20"
+      viewBox="0 0 22 20"
+      fill={standard ? "none" : "currentColor"}
+      stroke={standard || ultrafast ? "currentColor" : undefined}
+      strokeWidth={ultrafast ? 1.25 : 1.5}
+      strokeLinejoin="round"
+    >
+      {ultrafast && (
+        <path
+          d={lightning}
+          transform="translate(2)"
+          fill="none"
+          strokeOpacity=".8"
+        />
+      )}
+      <path d={lightning} transform={ultrafast ? "translate(-2)" : undefined} />
+    </svg>
   );
 }
 

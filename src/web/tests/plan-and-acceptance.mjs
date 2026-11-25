@@ -9,6 +9,8 @@ try {
   state.pendingRequests = [];
   const record = state.records.find((r) => r.thread.id === "demo-5");
   record.thread.collaborationMode = { mode: "plan" };
+  record.thread.status = { type: "idle" };
+  record.turn.status = "completed";
   await install(context, state);
   const receipts = new Map(),
     posts = [];
@@ -67,7 +69,7 @@ try {
   await page.getByRole("button", { name: "留在计划模式" }).click();
   await expect(
     page.getByRole("button", { name: "清空上下文执行" }),
-  ).toHaveCount(0);
+  ).toBeVisible();
   await page.evaluate(() =>
     window.__emit(
       "message",
@@ -110,12 +112,13 @@ try {
   await expect(
     page.getByRole("button", { name: "清空上下文执行" }),
   ).toBeVisible();
+  record.turn = { id: "turn-7", status: "completed", items: [] };
   const base = process.env.SAMAYA_UI_TEST_URL || "http://127.0.0.1:8788";
   await page.goto(base + "/?thread=demo-6");
   await page.goto(base + "/?thread=demo-5");
   await expect(
     page.getByRole("button", { name: "清空上下文执行" }),
-  ).toHaveCount(0);
+  ).toBeEnabled();
   await page.goto(base + "/?thread=demo-6");
   const editor = page.getByRole("textbox", {
     name: "补充当前任务",
@@ -127,7 +130,7 @@ try {
   await expect
     .poll(() => posts.filter((p) => p.action === "send").length)
     .toBe(1);
-  await expect(editor).toHaveValue("");
+  await expect.poll(() => editor.evaluate((node) => node.value)).toBe("");
   await editor.fill("第二条");
   await expect(send).toBeEnabled();
   await send.click();
@@ -151,7 +154,9 @@ try {
       }),
     first,
   );
-  await expect(editor).toHaveValue("新的草稿");
+  await expect
+    .poll(() => editor.evaluate((node) => node.value))
+    .toBe("新的草稿");
   await page.getByRole("button", { name: /暂存内容，/ }).click();
   await expect(page.getByRole("region", { name: "暂存内容" })).toContainText(
     "第一条",

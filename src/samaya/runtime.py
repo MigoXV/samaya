@@ -3,6 +3,7 @@
 import asyncio
 
 from samaya.codex.connection import Connection
+from samaya.codex.title_generation import is_title_thread
 from samaya.composer.catalog import InputCatalog
 from samaya.composer.commands import CommandService
 from samaya.config import Settings
@@ -13,6 +14,7 @@ from samaya.monitoring.service import Monitor
 from samaya.operations import Operations
 from samaya.sessions.actions import SessionActions
 from samaya.sessions.queries import SessionQueries
+from samaya.sessions.titles import SessionTitles
 from samaya.signals import ChangeSignal
 from samaya.store import Store
 
@@ -28,17 +30,29 @@ class Runtime:
         self.decisions = Decisions(self.connection, self.publish)
         self.sessions = SessionQueries(self.connection, store, self.decisions)
         self.catalog = InputCatalog(config, self.connection, self.sessions)
-        self.actions = SessionActions(config, self.connection, store, self.sessions)
-        self.actions.catalog = self.catalog
-        self.commands = CommandService(self.catalog, self.actions)
         self.operations = Operations(store, self.dispatch, self.publish)
         self.monitor = Monitor(
             self.connection, self.sessions, self.decisions, store, self.changed
         )
+        self.hidden_title_threads: dict[str, None] = {}
+        self.titles = SessionTitles(
+            config.socket,
+            store,
+            lambda tid: self.operations.locks[tid],
+            self.monitor.is_thread_removed,
+            self.monitor.request_name_refresh,
+            self.hide_title_thread,
+        )
+        self.actions = SessionActions(
+            config, self.connection, store, self.sessions, self.titles
+        )
+        self.actions.catalog = self.catalog
+        self.commands = CommandService(self.catalog, self.actions)
 
     async def start(self) -> None:
         await self.connection.start()
         self.monitor.start()
+        self.titles.start()
         self.maintenance = asyncio.create_task(self.compact_replay())
 
     async def compact_replay(self) -> None:
@@ -49,6 +63,7 @@ class Runtime:
         if self.maintenance:
             self.maintenance.cancel()
             await asyncio.gather(self.maintenance, return_exceptions=True)
+        await self.titles.close()
         await self.monitor.close()
         await self.connection.close()
         await self.operations.close()
@@ -64,7 +79,24 @@ class Runtime:
         self.monitor.event({"method": "samaya/connection", "params": self.status()})
         self.decisions.disconnect()
 
+    def hide_title_thread(self, tid: str) -> None:
+        self.hidden_title_threads[tid] = None
+        if len(self.hidden_title_threads) > 256:
+            del self.hidden_title_threads[next(iter(self.hidden_title_threads))]
+
     async def receive(self, event: dict) -> None:
+        method, params = event.get("method"), event.get("params", {})
+        thread = params.get("thread") or {}
+        tid = params.get("threadId") or thread.get("id")
+        if tid and is_title_thread(thread):
+            self.hide_title_thread(tid)
+        if tid in self.hidden_title_threads:
+            return
+        if tid and (
+            method in ("thread/archived", "thread/deleted")
+            or (method == "thread/name/updated" and params.get("threadName"))
+        ):
+            self.titles.supersede(tid)
         self.sessions.observe_settings(event)
         if event.get("method") == "skills/changed":
             self.catalog.invalidate("skills")

@@ -60,6 +60,13 @@ class Adapter:
         response = await client.request(method, params, response_model=ProtocolObject)
         return response.model_dump(by_alias=True)
 
+    async def structured_turn_start(self, params: dict) -> dict:
+        # The SDK convenience call only forwards thread ID and input.
+        response = await self.sdk._client.request(
+            "turn/start", params, response_model=ProtocolObject
+        )
+        return response.model_dump(by_alias=True)
+
     async def event(self) -> dict:
         notification = await self.sdk._client.next_notification()
         if notification.method != "samaya/event":

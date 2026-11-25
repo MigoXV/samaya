@@ -151,14 +151,17 @@ def register_routes(application: FastAPI, config: Settings) -> None:
     async def turn_summary(tid: str, turn_id: str):
         return service().monitor.turn_summary(tid, turn_id)
 
-    @application.get("/api/threads")
-    async def threads(
+    @application.get("/api/workspaces/threads")
+    async def workspace_threads(
+        cwd: str = Query(min_length=1),
         archived: bool = False,
         cursor: str | None = None,
-        search: str | None = None,
-        cwd: str | None = None,
     ):
-        return await service().sessions.threads(archived, cursor, search, cwd)
+        if not cwd.strip():
+            raise HTTPException(422, "必须指定工作区目录")
+        return await service().sessions.threads(
+            archived=archived, cursor=cursor, cwd=cwd
+        )
 
     @application.get("/api/threads/{tid}")
     async def thread(tid: str, subscribe: bool = False):

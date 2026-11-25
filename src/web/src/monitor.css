@@ -70,6 +70,9 @@
   background: transparent;
   border-color: transparent;
 }
+.monitor-nav :is(button, .nav-workspace-heading, .nav-conversation-row, .hidden-workspace-list) {
+  border-radius: 3px;
+}
 .monitor-nav button[aria-current="page"],
 .monitor-nav button.selected {
   background: var(--selected);
@@ -81,7 +84,12 @@
   min-height: 40px;
 }
 .nav-bottom {
-  margin-top: auto;
+  flex-shrink: 0;
+  margin-top: 4px;
+  gap: 2px;
+}
+.nav-bottom > small {
+  padding-inline: 12px;
 }
 .nav-bottom .theme-select {
   max-width: 100%;
@@ -448,29 +456,6 @@
   border-radius: 0;
   background: transparent;
 }
-.records-table {
-  overflow: auto;
-}
-.records-table table {
-  width: 100%;
-  font-size: 14px;
-  border-collapse: collapse;
-}
-.records-table th,
-.records-table td {
-  padding: 8px;
-  text-align: left;
-  border-bottom: 1px solid var(--border);
-}
-.records-table small {
-  display: block;
-  overflow-wrap: anywhere;
-}
-.records-table button {
-  max-width: 500px;
-  text-align: left;
-  overflow-wrap: anywhere;
-}
 .history-view > details {
   border-bottom: 1px solid var(--border);
   padding: 12px 0;
@@ -749,9 +734,6 @@
   }
   .monitor-shell .actions {
     flex-wrap: wrap;
-  }
-  .monitor-page .records-table {
-    font-size: 13px;
   }
 }
 @media (prefers-reduced-motion: reduce) {
