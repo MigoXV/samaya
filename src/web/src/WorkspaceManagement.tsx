@@ -91,7 +91,7 @@ export function WorkspaceManagement({
       const version = ++request.current;
       try {
         const result = await api<{ data: Thread[]; nextCursor: string | null }>(
-          `/threads?archived=${archived}&cwd=${encodeURIComponent(cwd)}${more ? "&cursor=" + encodeURIComponent(more) : ""}`,
+          `/workspaces/threads?archived=${archived}&cwd=${encodeURIComponent(cwd)}${more ? "&cursor=" + encodeURIComponent(more) : ""}`,
         );
         if (version !== request.current) return;
         const incoming = result.data.filter(

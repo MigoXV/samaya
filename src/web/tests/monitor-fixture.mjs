@@ -420,8 +420,13 @@ export async function install(context, state) {
           : [],
         nextCursor: null,
       };
-    } else if (p === "/api/threads")
-      body = { data: state.records.map((r) => r.thread), nextCursor: null };
+    } else if (p === "/api/workspaces/threads")
+      body = {
+        data: state.records
+          .map((r) => r.thread)
+          .filter((t) => t.cwd === url.searchParams.get("cwd")),
+        nextCursor: null,
+      };
     else if (p.endsWith("/cleanup-preview")) {
       const id = p.split("/")[3];
       body = {

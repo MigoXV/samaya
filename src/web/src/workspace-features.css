@@ -113,11 +113,16 @@
 
 /* Workspace identity stays visible while its conversations are collapsed. */
 .nav-workspaces {
+  position: relative;
   scrollbar-gutter: stable;
   min-height: 0;
   overflow-y: auto;
-  flex: 1;
+  flex: 0 1 auto;
   padding-top: 16px;
+  padding-inline-end: 8px;
+}
+.nav-workspaces:has(.hidden-workspace-list) {
+  flex-grow: 1;
 }
 .nav-workspaces .eyebrow {
   display: block;
@@ -163,7 +168,8 @@
 .nav-workspace-threads {
   display: grid;
   gap: 2px;
-  padding: 4px 0 6px 21px;
+  padding-block: 4px 6px;
+  padding-inline-start: 12px;
 }
 .nav-workspace-threads .nav-conversation,
 .nav-workspace-threads > .nav-show-more {
@@ -177,6 +183,9 @@
   white-space: nowrap;
   font-size: 12px;
   padding: 7px 9px;
+}
+.monitor-nav .nav-workspace-threads :is(.nav-conversation, .nav-show-more) {
+  padding-inline-start: 20px;
 }
 .nav-conversation-title {
   min-width: 0;
@@ -363,9 +372,6 @@
 .nav-workspace-heading .nav-workspace-manage { display: flex; flex: 0 0 28px; width: 28px; height: 28px; padding: 4px; align-items: center; justify-content: center; opacity: 0; }
 .nav-workspace-heading:is(:hover, :focus-within) .nav-workspace-manage { opacity: 1; }
 .workspace-management-path { overflow-wrap: anywhere; color: var(--text-secondary); }
-.records-confirmation { margin-top: 24px; padding-top: 16px; border-top: 1px solid var(--border); }
-.records-confirmation h3 { font-size: 16px; margin: 0 0 12px; }
-.records-confirmation section { margin: 8px 0; }
 @media (hover: none), (max-width: 760px) { .monitor-nav .nav-workspace-heading .nav-workspace-manage { opacity: 1; } }
 .workspace-management .actions { align-items: center; gap: 12px; }
 .workspace-management .actions label { display: inline-flex; flex-direction: row; align-items: center; gap: 8px; }

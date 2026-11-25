@@ -16,7 +16,7 @@ try {
   ).length;
   const queries = [];
   let failNextList = false;
-  await context.route("**/api/threads?**", (route) => {
+  await context.route("**/api/workspaces/threads?**", (route) => {
     const u = new URL(route.request().url());
     queries.push(u.searchParams.get("cwd"));
     if (failNextList) {
@@ -72,12 +72,15 @@ try {
     .getByRole("button", { name: "Laya 工作区菜单", exact: true })
     .click();
   await p.getByRole("menuitem", { name: "工作区管理" }).click();
+  await expect(p).toHaveURL(/\/workspaces\/manage\?cwd=%2Fdemo%2FLaya$/);
   await expect(p.getByRole("heading", { level: 1 })).toHaveText("工作区管理");
   await expect(p.locator(".workspace-management-path")).toHaveText(
     "/demo/Laya",
   );
   await p.reload();
   await expect(p.getByRole("heading", { level: 1 })).toHaveText("工作区管理");
+  await p.goto(new URL("/sessions?cwd=%2Fdemo%2FLaya", p.url()).href);
+  await expect(p).toHaveURL(/\/workspaces\/manage\?cwd=%2Fdemo%2FLaya$/);
   const rows = p.locator(".wm-conversation");
   await expect(rows).toHaveCount(count);
   const headingBox = await p.locator(".wm-heading").boundingBox();

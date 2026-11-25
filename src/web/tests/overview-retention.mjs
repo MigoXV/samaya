@@ -72,6 +72,17 @@ await page.reload();
 await expect(page.locator(".task-overview")).toBeVisible();
 await expect(page.locator(".scope-trigger").first()).toContainText("Samaya");
 await expect(page.locator(".scope-trigger").nth(1)).toContainText("运行中");
+await page.goto(new URL("/sessions?thread=demo-6", page.url()).href);
+await expect(page).toHaveURL(/\/\?thread=demo-6$/);
+await expect(page.locator(".task-reading-heading")).toContainText(
+  state.records.find((r) => r.thread.id === "demo-6").thread.name,
+);
+await page.reload();
+await expect(page.locator(".task-reading-heading")).toBeVisible();
+await page.goto(new URL("/sessions", page.url()).href);
+await expect(page).toHaveURL(new URL("/", page.url()).href);
+await expect(page.locator(".task-overview")).toBeVisible();
+await expect(page.getByRole("heading", { name: "记录管理" })).toHaveCount(0);
 expect(calls).toHaveLength(0);
 expect(errors).toEqual([]);
 await browser.close();

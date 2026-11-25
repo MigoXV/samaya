@@ -152,14 +152,12 @@ class SessionQueries:
         self,
         archived: bool = False,
         cursor: str | None = None,
-        search: str | None = None,
         cwd: str | None = None,
     ) -> dict:
         result = await self.connection.connected().sdk.thread_list(
             archived=archived,
             cursor=cursor,
             limit=100,
-            search_term=search or None,
             source_kinds=list(ThreadSourceKind),
             sort_key=ThreadSortKey.updated_at,
             use_state_db_only=True,

@@ -491,13 +491,20 @@ def test_workspace_management_list_passes_exact_scope_and_cursor(web):
         runtime.sessions.threads = AsyncMock(
             return_value={"data": [], "nextCursor": None}
         )
+        assert client.get("/api/threads").status_code == 404
+        assert client.get("/api/workspaces/threads").status_code == 422
+        assert (
+            client.get("/api/workspaces/threads", params={"cwd": " "}).status_code
+            == 422
+        )
+        runtime.sessions.threads.assert_not_awaited()
         response = client.get(
-            "/api/threads",
+            "/api/workspaces/threads",
             params={"cwd": "/demo/Laya", "archived": "true", "cursor": "next-page"},
         )
         assert response.status_code == 200
         runtime.sessions.threads.assert_awaited_once_with(
-            True, "next-page", None, "/demo/Laya"
+            archived=True, cursor="next-page", cwd="/demo/Laya"
         )
 
 

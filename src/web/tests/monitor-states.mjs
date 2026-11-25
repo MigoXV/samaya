@@ -267,48 +267,6 @@ await scenario(
   },
 );
 await scenario(
-  "batch-partial-failure-is-itemized",
-  () => {},
-  async (p, s, c, context) => {
-    await p.goto(new URL("/sessions", p.url()).href);
-    await p
-      .getByRole("checkbox", {
-        name: "选择 [演示] 复核语音推理异常",
-        exact: true,
-      })
-      .check();
-    await p
-      .getByRole("checkbox", { name: "选择 [演示] 生成报告目录", exact: true })
-      .check();
-    await context.route("**/api/operations", async (route) => {
-      const op = route.request().postDataJSON();
-      await route.fulfill({
-        contentType: "application/json",
-        body: JSON.stringify({
-          operationId: op.operationId,
-          state: op.body.threadId === "demo-1" ? "failed" : "succeeded",
-          result:
-            op.body.threadId === "demo-1"
-              ? { message: "演示：仍有后台命令" }
-              : {},
-        }),
-      });
-    });
-    await p.getByRole("button", { name: "删除", exact: true }).click();
-    await p
-      .getByRole("dialog")
-      .getByRole("button", { name: "确认删除", exact: true })
-      .click();
-    await expect(
-      p.getByText("[演示] 复核语音推理异常：Error: 操作失败：演示：仍有后台命令", {
-        exact: true,
-      }),
-    ).toBeVisible();
-    await expect(p.getByText("[演示] 生成报告目录：已确认", { exact: true })).toBeVisible();
-  },
-);
-
-await scenario(
   "initial-connection-is-not-an-outage",
   (s) => {
     s.connection = "connecting";
