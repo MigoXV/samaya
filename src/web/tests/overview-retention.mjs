@@ -47,7 +47,8 @@ await page
   .getByRole("group", { name: "选择状态", exact: true })
   .getByRole("button", { name: "运行中", exact: true })
   .click();
-for (const name of ["设置与连接", "待我处理", "置顶任务", "记录管理"]) {
+await expect(nav("记录管理")).toHaveCount(0);
+for (const name of ["设置与连接", "待我处理", "置顶任务"]) {
   await page
     .locator(".monitor-nav")
     .getByRole("button", { name: new RegExp(`^${name}`) })

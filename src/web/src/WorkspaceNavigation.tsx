@@ -2,13 +2,29 @@ import { WorkspaceMenu, HiddenWorkspaces } from "./WorkspaceMenu";
 import { orderAt, type WorkspaceVisibility } from "./workspace-visibility";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Archive, ChevronRight, Ellipsis, Pencil, Trash2 } from "lucide-react";
-import { threadTitle } from "./monitor";
+import {
+  Archive,
+  ChevronRight,
+  Ellipsis,
+  LoaderCircle,
+  Pencil,
+  Trash2,
+} from "lucide-react";
+import { rootId, threadTitle } from "./monitor";
 import { workspaceActivity } from "./workspace-activity";
 import { api } from "./api";
 import { rememberPrompt } from "./prompt-history";
 import type { Pending, Preview } from "./types";
 import type { Observation } from "./monitor";
+
+function RunningIndicator() {
+  return (
+    <span className="nav-running-indicator">
+      <LoaderCircle size={14} aria-hidden="true" />
+      <span className="sr-only">运行中</span>
+    </span>
+  );
+}
 
 function saved(): Record<string, boolean> {
   try {
@@ -202,6 +218,11 @@ export function WorkspaceNavigation({
     );
   }, [expanded]);
   const activity = workspaceActivity(records, connected, requests);
+  const waiting = new Set(
+    connected
+      ? requests.map((request) => rootId(request.params.threadId, records))
+      : [],
+  );
   const orderedPaths = [...new Set(paths)].filter(
     (cwd) => !visibility.hidden.has(cwd),
   );
@@ -224,13 +245,22 @@ export function WorkspaceNavigation({
             (a, b) =>
               orderAt(b) - orderAt(a) || a.thread.id.localeCompare(b.thread.id),
           );
-        const count = activity.get(cwd)?.running.size || 0,
+        const count = [...(activity.get(cwd)?.running ?? [])].filter(
+            (id) => !waiting.has(id),
+          ).length,
+          hasWaiting = tasks.some((r) => waiting.has(r.thread.id)),
           uncertain = activity.get(cwd)?.uncertain.size || 0;
         const limit = limits[cwd] || 10;
         return (
           <section
             key={cwd}
-            className={count ? "workspace-running" : ""}
+            className={
+              count
+                ? "workspace-running"
+                : hasWaiting
+                  ? "workspace-awaiting"
+                  : ""
+            }
             data-sidebar-workspace={cwd}
           >
             <div className="nav-workspace-heading">
@@ -249,11 +279,18 @@ export function WorkspaceNavigation({
                 />
                 <span>{name}</span>
                 <small>
-                  {count
-                    ? `运行中 ${count}`
-                    : uncertain
-                      ? "待确认"
-                      : status(cwd).replace("运行中", "")}
+                  {count ? (
+                    <span title={`运行中 ${count}`}>
+                      <span className="sr-only">运行中 </span>
+                      {count}
+                    </span>
+                  ) : hasWaiting ? (
+                    status(cwd)
+                  ) : uncertain ? (
+                    "待确认"
+                  ) : (
+                    status(cwd).replace("运行中", "")
+                  )}
                 </small>
               </button>
               <WorkspaceMenu
@@ -277,9 +314,11 @@ export function WorkspaceNavigation({
                     key={r.thread.id}
                     className={
                       "nav-conversation-row " +
-                      (activity.get(cwd)?.running.has(r.thread.id)
-                        ? "conversation-running"
-                        : "")
+                      (waiting.has(r.thread.id)
+                        ? "conversation-awaiting"
+                        : activity.get(cwd)?.running.has(r.thread.id)
+                          ? "conversation-running"
+                          : "")
                     }
                     onContextMenu={(event) => {
                       if ((event.target as HTMLElement).closest("input"))
@@ -336,9 +375,14 @@ export function WorkspaceNavigation({
                         <span className="nav-conversation-title">
                           {threadTitle(r.thread)}
                         </span>
-                        {activity.get(cwd)?.running.has(r.thread.id) && (
+                        {(waiting.has(r.thread.id) ||
+                          activity.get(cwd)?.running.has(r.thread.id)) && (
                           <small className="nav-conversation-status">
-                            运行中
+                            {waiting.has(r.thread.id) ? (
+                              "待处理"
+                            ) : (
+                              <RunningIndicator />
+                            )}
                           </small>
                         )}
                       </button>

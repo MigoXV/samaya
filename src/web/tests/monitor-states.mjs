@@ -270,12 +270,7 @@ await scenario(
   "batch-partial-failure-is-itemized",
   () => {},
   async (p, s, c, context) => {
-    await p.getByRole("list").waitFor();
-    await p.getByRole("button", { name: "导航", exact: true }).click();
-    await p
-      .getByRole("dialog")
-      .getByRole("button", { name: "记录管理", exact: true })
-      .click();
+    await p.goto(new URL("/sessions", p.url()).href);
     await p
       .getByRole("checkbox", {
         name: "选择 [演示] 复核语音推理异常",

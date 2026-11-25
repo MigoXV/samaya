@@ -4,7 +4,6 @@ import {
   PanelsTopLeft,
   Pin,
   Inbox,
-  History,
   Settings as SettingsIcon,
 } from "lucide-react";
 import { WorkspaceManagement } from "./WorkspaceManagement";
@@ -1254,15 +1253,6 @@ export function MonitorWorkbench({ logout }: { logout: () => void }) {
               查看操作反馈
             </button>
           )}
-          <button onClick={() => navigate("records")}>
-            <History
-              size={16}
-              strokeWidth={1.5}
-              absoluteStrokeWidth
-              aria-hidden="true"
-            />
-            记录管理
-          </button>
           <button onClick={() => navigate("settings")}>
             <SettingsIcon
               size={16}
@@ -2008,8 +1998,11 @@ export function MonitorWorkbench({ logout }: { logout: () => void }) {
                           )}
                         {taskTab === "work" && (
                           <PlanActions
-                            key={selected}
+                            key={`${selected}:${connected}`}
                             tid={selected}
+                            connected={connected}
+                            uncertain={!!selectedRecord.error}
+                            active={selectedRecord.turn?.status === "inProgress"}
                             editable={
                               selectedRecord.thread.canAcceptDirectInput !==
                               false
@@ -2120,7 +2113,7 @@ export function MonitorWorkbench({ logout }: { logout: () => void }) {
                     </>
                   ) : (
                     <p>
-                      此任务不在当前汇总中，可能已归档或删除。返回列表后可在记录管理中核对。
+                      此任务不在当前汇总中，可能已归档或删除。可从对应工作区的菜单打开「工作区管理」核对。
                     </p>
                   )}
                 </aside>

@@ -10,7 +10,7 @@
     "preview": "vite preview",
     "typecheck": "tsc -b --pretty false",
     "test:browser": "pnpm run test:monitor && pnpm run test:reading && pnpm run test:composer && pnpm run test:figma && pnpm run test:scope && pnpm run test:workspace-features && pnpm run test:media && pnpm run test:links && pnpm run test:paste",
-    "test:monitor": "node tests/receipt-recovery.mjs && node tests/draft-recovery.mjs && node tests/approvals.mjs && node tests/direct-stop.mjs && node tests/monitor.mjs && node tests/monitor-states.mjs && node tests/monitor-contrast.mjs && node tests/task-activity.mjs",
+    "test:monitor": "node tests/receipt-recovery.mjs && node tests/draft-recovery.mjs && node tests/approvals.mjs && node tests/direct-stop.mjs && node tests/monitor.mjs && node tests/monitor-states.mjs && node tests/monitor-contrast.mjs && node tests/task-activity.mjs && node tests/sidebar-activity.mjs",
     "test:monitor:performance": "node tests/monitor-performance.mjs",
     "test:monitor:readonly": "node tests/monitor-runtime-readonly.mjs",
     "test:monitor:logs": "node tests/monitor-long-log.mjs",

@@ -37,6 +37,7 @@ class Store:
         CREATE TABLE IF NOT EXISTS ordering_turns(thread_id TEXT, turn_id TEXT, PRIMARY KEY(thread_id,turn_id));
         CREATE TABLE IF NOT EXISTS thread_activity(thread_id TEXT PRIMARY KEY, event_id INTEGER, observed REAL);
         CREATE TABLE IF NOT EXISTS watched(id TEXT PRIMARY KEY);
+        CREATE TABLE IF NOT EXISTS pending_thread_titles(thread_id TEXT PRIMARY KEY);
         CREATE TABLE IF NOT EXISTS token_usage(thread_id TEXT PRIMARY KEY, payload TEXT, observed REAL);
         """)
         self.db.execute("UPDATE operations SET state='uncertain' WHERE state='pending'")
@@ -164,6 +165,21 @@ class Store:
 
     def watched(self) -> list[str]:
         return [row[0] for row in self.db.execute("SELECT id FROM watched")]
+
+    def allow_title(self, thread_id: str) -> None:
+        with self.db:
+            self.db.execute(
+                "INSERT OR IGNORE INTO pending_thread_titles VALUES(?)", (thread_id,)
+            )
+
+    def claim_title(self, thread_id: str) -> bool:
+        with self.db:
+            return (
+                self.db.execute(
+                    "DELETE FROM pending_thread_titles WHERE thread_id=?", (thread_id,)
+                ).rowcount
+                == 1
+            )
 
     def close(self) -> None:
         self.db.close()
