@@ -4,6 +4,7 @@ from unittest.mock import AsyncMock
 
 import pytest
 from fastapi.testclient import TestClient
+from openai_codex.errors import JsonRpcError
 
 from samaya.config import Settings
 from samaya.runtime import Runtime
@@ -476,12 +477,85 @@ def test_usage_reads_account_limits_without_thread_or_mutation(web):
         assert client.get("/api/usage").status_code == 503
 
 
-def test_usage_requires_authentication(web):
+def test_usage_history_reads_account_scope_and_handles_older_daemons(web):
+    history = {
+        "summary": {"lifetimeTokens": 17, "peakDailyTokens": None},
+        "dailyUsageBuckets": [{"startDate": "2026-11-24", "tokens": 0}],
+        "threadUsage": {"unrequested": True},
+    }
+    app = create_app(web)
+    with TestClient(app) as client:
+        rpc = app.state.runtime.connection.rpc = AsyncMock(return_value=history)
+        response = client.get("/api/usage/history")
+        assert response.status_code == 200
+        data = response.json()
+        assert data.pop("updatedAt") > 0
+        assert data == {
+            "summary": history["summary"],
+            "dailyUsageBuckets": history["dailyUsageBuckets"],
+        }
+        rpc.assert_awaited_once_with("account/usage/read", {})
+        rpc.side_effect = JsonRpcError(-32601, "method not found")
+        assert client.get("/api/usage/history").status_code == 501
+
+
+@pytest.mark.parametrize("active_user", ["current", "different", None])
+def test_usage_account_only_includes_matching_profile(web, active_user):
+    async def read(method, params):
+        if method == "account/read":
+            assert params == {"refreshToken": False}
+            return {
+                "account": {
+                    "type": "chatgpt",
+                    "email": "active@example.com",
+                    "planType": "pro",
+                },
+                "userId": "current",
+            }
+        assert method == "accountSession/list"
+        assert params == {"refreshWorkspaceMetadata": False}
+        if active_user is None:
+            raise JsonRpcError(-32601, "method not found")
+        return {
+            "activeSessionId": "active",
+            "sessions": [
+                {"sessionId": "other", "isActive": False, "email": "other@example.com"},
+                {
+                    "sessionId": "active",
+                    "isActive": True,
+                    "userId": active_user,
+                    "email": "active@example.com",
+                    "displayName": "当前账号",
+                    "username": "active",
+                },
+            ],
+        }
+
+    with TestClient(create_app(web)) as client:
+        client.app.state.runtime.connection.rpc = AsyncMock(side_effect=read)
+        response = client.get("/api/usage/account")
+        assert response.status_code == 200
+        assert response.headers["Cache-Control"] == "no-store"
+        assert response.json() == {
+            "account": {
+                "type": "chatgpt",
+                "email": "active@example.com",
+                "planType": "pro",
+                "displayName": "当前账号" if active_user == "current" else None,
+                "username": "active" if active_user == "current" else None,
+            }
+        }
+
+
+@pytest.mark.parametrize(
+    "path", ["/api/usage", "/api/usage/account", "/api/usage/history"]
+)
+def test_usage_requires_authentication(web, path):
     web.token = "test-only-long-token"
     app = create_app(web)
     with TestClient(app) as client:
         app.state.runtime.connection.rpc = AsyncMock()
-        assert client.get("/api/usage").status_code == 401
+        assert client.get(path).status_code == 401
         app.state.runtime.connection.rpc.assert_not_called()
 
 

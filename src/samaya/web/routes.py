@@ -5,9 +5,11 @@ import time
 
 from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.responses import JSONResponse
+from openai_codex.errors import JsonRpcError
 from pydantic import BaseModel, Field
 from starlette.concurrency import run_in_threadpool
 
+from samaya.codex.usage import read_usage_account
 from samaya.composer.commands import registry
 from samaya.composer.files import UploadTooLarge, save_upload
 from samaya.composer.images import MAX_TOTAL_IMAGE_BYTES
@@ -97,6 +99,24 @@ def register_routes(application: FastAPI, config: Settings) -> None:
     async def usage():
         return {
             **await service().connection.rpc("account/rateLimits/read", {}),
+            "updatedAt": time.time(),
+        }
+
+    @application.get("/api/usage/account")
+    async def usage_account():
+        return await read_usage_account(service().connection)
+
+    @application.get("/api/usage/history")
+    async def usage_history():
+        try:
+            history = await service().connection.rpc("account/usage/read", {})
+        except JsonRpcError as exc:
+            if exc.code == -32601:
+                raise HTTPException(501, "当前 Codex 服务不支持读取历史用量") from exc
+            raise HTTPException(502, "暂时无法读取历史用量") from exc
+        return {
+            "summary": history.get("summary"),
+            "dailyUsageBuckets": history.get("dailyUsageBuckets"),
             "updatedAt": time.time(),
         }
 

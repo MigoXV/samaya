@@ -714,7 +714,13 @@ export function MonitorWorkbench({ logout }: { logout: () => void }) {
       ),
     [],
   );
-  const navigate = (v: View, workspace = "") => {
+  const navigate = (
+    v: View,
+    {
+      workspace = "",
+      usageThread = "",
+    }: { workspace?: string; usageThread?: string } = {},
+  ) => {
     setManagedWorkspace(workspace);
     setDraftWorkspace("");
     setError("");
@@ -741,7 +747,7 @@ export function MonitorWorkbench({ logout }: { logout: () => void }) {
       v === "workspace-management"
         ? `${WORKSPACE_MANAGEMENT_PATH}?cwd=${encodeURIComponent(workspace)}`
         : v === "usage"
-          ? "/settings/usage"
+          ? `/settings/usage${usageThread ? `?thread=${encodeURIComponent(usageThread)}` : ""}`
           : v === "settings"
             ? "/settings"
             : "/",
@@ -1121,7 +1127,7 @@ export function MonitorWorkbench({ logout }: { logout: () => void }) {
     .slice(0, 4);
   const manageWorkspace = (cwd: string) => {
     restoreWorkspace(cwd);
-    navigate("workspace-management", cwd);
+    navigate("workspace-management", { workspace: cwd });
   };
   const selectOverviewProject = (path: string) => {
     const currentFilter = savedOverview.current.filter;
@@ -1162,7 +1168,7 @@ export function MonitorWorkbench({ logout }: { logout: () => void }) {
     : EMPTY;
   return (
     <div
-      className={`monitor-shell ${focus ? "focus-mode" : ""} ${workMode ? "task-is-open" : ""} ${taskNav ? "task-nav-open" : ""} ${overviewMode || view === "workspace-management" ? "overview-mode" : ""} ${view === "workspace-management" ? "workspace-management-mode" : ""} ${["settings", "usage"].includes(view) ? "settings-mode" : ""} `}
+      className={`monitor-shell ${focus ? "focus-mode" : ""} ${workMode ? "task-is-open" : ""} ${taskNav ? "task-nav-open" : ""} ${overviewMode || view === "workspace-management" ? "overview-mode" : ""} ${view === "workspace-management" ? "workspace-management-mode" : ""} ${view === "settings" ? "settings-mode" : ""} ${view === "usage" ? "usage-mode" : ""} `}
     >
       <a className="skip-link" href="#monitor-main">
         跳到任务总览
@@ -1185,7 +1191,7 @@ export function MonitorWorkbench({ logout }: { logout: () => void }) {
         }
       >
         <div className="monitor-brand">
-          <img src="/figma/samaya-symbol.svg" alt="" />
+          <img src="/figma/samaya-symbol-abyssus.svg" alt="" />
           Samaya
           <button
             type="button"
@@ -2119,6 +2125,10 @@ export function MonitorWorkbench({ logout }: { logout: () => void }) {
                               setDialog("create");
                             } else if (name === "resume") setSearchOpen(true);
                             else if (name === "theme") navigate("settings");
+                            else if (name === "usage")
+                              navigate("usage", {
+                                usageThread: selectedRecord.thread.id,
+                              });
                             else if (name === "agent" || name === "subagents")
                               setDialog("agents");
                             else {
@@ -2161,7 +2171,11 @@ export function MonitorWorkbench({ logout }: { logout: () => void }) {
         {view === "usage" && (
           <UsageView
             connected={!!connected}
-            settings={() => navigate("settings")}
+            back={() => {
+              const thread = new URLSearchParams(location.search).get("thread");
+              if (thread) open(thread);
+              else navigate("settings");
+            }}
           />
         )}
         {view === "changes" && (
@@ -2872,6 +2886,7 @@ function TaskComposer({
         "project",
         "local",
         "theme",
+        "usage",
         "agent",
         "subagents",
       ].includes(name)
@@ -3098,7 +3113,7 @@ function SettingsView({
       <section className="settings-section">
         <h3>使用情况</h3>
         <div className="usage-row">
-          <span className="usage-caption">查看套餐、剩余额度和重置时间</span>
+          <span className="usage-caption">查看账号、Token 活动和剩余额度</span>
           <button className="usage-link" onClick={usage}>
             查看使用情况 →
           </button>

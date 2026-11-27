@@ -58,13 +58,25 @@
 .user-message-images {
   display: flex;
   flex-wrap: wrap;
+  align-items: flex-start;
   justify-content: flex-end;
   gap: 8px;
   max-width: min(544px, 88%);
   margin-left: auto;
   margin-bottom: 8px;
 }
+.user-message-images .user-message-image-preview {
+  display: block;
+  max-width: 100%;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  cursor: zoom-in;
+}
 .user-message-images img {
+  display: block;
   width: 160px;
   max-width: 100%;
   max-height: 160px;

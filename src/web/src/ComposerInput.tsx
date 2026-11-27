@@ -16,7 +16,7 @@ import type { InputImage } from "./composer-images";
 import { api } from "./api";
 import { fileScope, queueFiles, useFileDraft } from "./composer-files";
 import { FileAttachments } from "./FileAttachments";
-import { Modal } from "./components";
+import { ImagePreview } from "./ImagePreview";
 import {
   hasReference,
   inputTrigger,
@@ -594,13 +594,11 @@ export function ComposerInput({
         }}
       />
       {previewImage && (
-        <Modal
-          title="图片预览"
-          className="image-preview-dialog"
+        <ImagePreview
+          src={previewImage.url}
+          alt={previewImage.name}
           close={() => setPreviewImage(null)}
-        >
-          <img src={previewImage.url} alt={previewImage.name} />
-        </Modal>
+        />
       )}
       {readingImages && <small role="status">正在读取图片…</small>}
       {imageError && (
@@ -679,7 +677,10 @@ export function ComposerInput({
                   type="button"
                   className="composer-image-preview"
                   aria-label={`放大查看图片 ${index + 1}`}
-                  onClick={() => setPreviewImage(image)}
+                  onClick={(event) => {
+                    event.currentTarget.focus({ preventScroll: true });
+                    setPreviewImage(image);
+                  }}
                 >
                   <img
                     src={image.url}

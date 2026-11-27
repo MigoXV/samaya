@@ -5,20 +5,26 @@ import { fileMessage } from "./file-message";
 import { formatFileSize } from "./composer-files";
 import { preserveMessagePosition } from "./reading-position";
 import { userMessageParts } from "./question-reply";
+import { ImagePreview } from "./ImagePreview";
 import "./user-message.css";
 import { InlineLinks } from "./InlineLinks";
 
 export function UserMessage({ item }: { item: Item }) {
+  const [preview, setPreview] = useState<{ src: string; alt: string } | null>(
+    null,
+  );
   const { text, files } = fileMessage(
     item.content?.map((c) => c.text || "").join("\n") || item.text || "",
   );
   const parts = userMessageParts(text);
   const images =
-    item.content?.filter(
-      (content) =>
-        content.type === "image" &&
-        /^data:image\/(png|jpeg|webp|gif);base64,/.test(content.url || ""),
-    ) || [];
+    item.content?.flatMap(({ type, url }) =>
+      type === "image" &&
+      url &&
+      /^data:image\/(png|jpeg|webp|gif);base64,/.test(url)
+        ? [url]
+        : [],
+    ) ?? [];
   return (
     <>
       {!!files.length && (
@@ -38,11 +44,26 @@ export function UserMessage({ item }: { item: Item }) {
       )}
       {!!images.length && (
         <div className="user-message-images" aria-label="已发送图片">
-          {images.map((image, index) => (
-            <img key={index} src={image.url} alt={`已发送图片 ${index + 1}`} />
-          ))}
+          {images.map((src, index) => {
+            const alt = `已发送图片 ${index + 1}`;
+            return (
+              <button
+                key={index}
+                type="button"
+                className="user-message-image-preview"
+                aria-label={`放大查看${alt}`}
+                onClick={(event) => {
+                  event.currentTarget.focus({ preventScroll: true });
+                  setPreview({ src, alt });
+                }}
+              >
+                <img src={src} alt={alt} />
+              </button>
+            );
+          })}
         </div>
       )}
+      {preview && <ImagePreview {...preview} close={() => setPreview(null)} />}
       {parts.map((part, index) =>
         part.type === "text" ? (
           <MessageText

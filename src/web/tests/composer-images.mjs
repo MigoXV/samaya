@@ -4,6 +4,7 @@ import { fixture, install, returnToOverview } from "./monitor-fixture.mjs";
 
 let png =
   "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAAFElEQVR4AWJiYGD4D8IgBpBmYAAAAAD//7vS9wEAAAAGSURBVAMAGDACA6ybwrYAAAAASUVORK5CYII=";
+const secondImage = png;
 const browser = await chromium.launch({ args: ["--no-sandbox"] });
 mkdirSync("../../.samaya/composer-images", { recursive: true });
 try {
@@ -43,7 +44,7 @@ try {
               type: "userMessage",
               content: [
                 { type: "image", url: png },
-                { type: "image", url: png },
+                { type: "image", url: secondImage },
               ],
             },
           },
@@ -125,9 +126,10 @@ try {
   await expect(
     page.getByRole("img", { name: "已发送图片 1" }).first(),
   ).toBeVisible();
-  async function expectSentImagesRightAligned() {
+  const historicalTurn = page.locator('[data-turn-id="turn-5"]');
+  async function expectSentImagesRightAligned(turn) {
     for (const id of ["image-message", "images-only-message"]) {
-      const item = page.locator(`[data-item-id="${id}"]`);
+      const item = turn.locator(`[data-item-id="${id}"]`);
       const positions = await item.evaluate((el) => {
         const row = el.querySelector(".user-message-images");
         const images = [...row.querySelectorAll("img")];
@@ -165,7 +167,41 @@ try {
       expect(positions.contained).toBe(true);
     }
   }
-  await expectSentImagesRightAligned();
+  await expectSentImagesRightAligned(historicalTurn);
+  const reader = page.locator(".detail-scroll");
+  const sentPreview = page.getByRole("dialog", {
+    name: "图片预览",
+    exact: true,
+  });
+  const sentImage = (turn, id, index) =>
+    turn
+      .locator(`[data-item-id="${id}"]`)
+      .getByRole("button", { name: `放大查看已发送图片 ${index}`, exact: true });
+  const single = sentImage(historicalTurn, "image-message", 1);
+  await single.scrollIntoViewIfNeeded();
+  const position = await reader.evaluate((el) => el.scrollTop);
+  await single.click();
+  await expect(sentPreview.getByRole("img")).toHaveAttribute("src", png);
+  expect(
+    await sentPreview
+      .getByRole("img")
+      .evaluate((image) => image.getBoundingClientRect().width),
+  ).toBeGreaterThan(500);
+  await page.keyboard.press("Escape");
+  await expect(sentPreview).toHaveCount(0);
+  await expect(single).toBeFocused();
+  expect(
+    Math.abs((await reader.evaluate((el) => el.scrollTop)) - position),
+  ).toBeLessThan(1);
+
+  await page.reload();
+  const second = sentImage(historicalTurn, "images-only-message", 2);
+  await second.focus();
+  await page.keyboard.press("Enter");
+  await expect(sentPreview.getByRole("img")).toHaveAttribute("src", secondImage);
+  await sentPreview.getByRole("button", { name: "关闭对话框" }).click();
+  await expect(sentPreview).toHaveCount(0);
+  await expect(second).toBeFocused();
   async function pasteImage(target = input) {
     await target.focus();
     await page.evaluate(async (url) => {
@@ -240,15 +276,16 @@ try {
   await returnToOverview(page);
   await page.locator('[data-task-id="demo-5"].overview-task').click();
   await expect(thumbnails).toHaveCount(1);
+  await expect(input).toHaveText("检查截图");
   fail = true;
-  await input.press("Enter");
+  await primary.click();
   await expect(
     page.getByRole("alert").filter({ hasText: "测试发送失败" }),
   ).toBeVisible();
   await expect(thumbnails).toHaveCount(1);
   await expect(input).toHaveText("检查截图");
   fail = false;
-  await input.press("Enter");
+  await primary.click();
   await expect
     .poll(() => calls.filter((call) => call.action === "send" && call.body.threadId === "demo-5").length)
     .toBe(1);
@@ -268,6 +305,34 @@ try {
       .locator("img")
       .evaluate((image) => image.getBoundingClientRect().width),
   ).toBe(18);
+  const newTurn = page.locator('[data-turn-id="new-turn"]');
+  await expect(newTurn.locator('[data-item-id="image-message"]')).toBeVisible();
+  await page.evaluate(
+    (url) =>
+      window.__emit(
+        "message",
+        {
+          method: "item/completed",
+          params: {
+            threadId: "demo-5",
+            turnId: "new-turn",
+            item: {
+              id: "live-sent-image",
+              type: "userMessage",
+              content: [{ type: "image", url }],
+            },
+          },
+        },
+        100,
+      ),
+    png,
+  );
+  const latest = sentImage(newTurn, "live-sent-image", 1);
+  await expect(latest).toBeVisible();
+  await latest.click();
+  await expect(sentPreview.getByRole("img")).toHaveAttribute("src", png);
+  await page.keyboard.press("Escape");
+  await expect(latest).toBeFocused();
   const emptyCalls = calls.length;
   await input.press("Enter");
   expect(calls.length).toBe(emptyCalls);
@@ -374,6 +439,7 @@ try {
     page.getByRole("alert").filter({ hasText: "最多添加 5 张" }),
   ).toBeVisible();
   await expect(thumbnails).toHaveCount(5);
+  const narrowImage = sentImage(newTurn, "image-message", 1);
   for (const theme of ["vallum", "abyssus"]) {
     await page.mouse.move(0, 0);
     await page.evaluate(
@@ -391,7 +457,17 @@ try {
       theme === "abyssus" ? "rgb(159, 196, 226)" : "rgb(37, 42, 42)",
     );
     await page.setViewportSize({ width: 320, height: 900 });
-    await expectSentImagesRightAligned();
+    await expectSentImagesRightAligned(newTurn);
+    await narrowImage.click();
+    await expect(sentPreview.getByRole("img")).toBeVisible();
+    const bounds = await sentPreview.boundingBox();
+    expect(bounds.x).toBeGreaterThanOrEqual(0);
+    expect(bounds.x + bounds.width).toBeLessThanOrEqual(320);
+    expect(bounds.y).toBeGreaterThanOrEqual(0);
+    expect(bounds.y + bounds.height).toBeLessThanOrEqual(900);
+    await page.keyboard.press("Escape");
+    await expect(sentPreview).toHaveCount(0);
+    await expect(narrowImage).toBeFocused();
     expect(
       await page.evaluate(() => document.documentElement.scrollWidth),
     ).toBeLessThanOrEqual(320);

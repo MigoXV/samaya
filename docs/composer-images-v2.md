@@ -23,6 +23,8 @@
 
 补充 [现状对照](https://www.figma.com/design/TZOGfIsv1ESAQckxwg4lpa?node-id=240-5242) 与 [右对齐设计](https://www.figma.com/design/TZOGfIsv1ESAQckxwg4lpa?node-id=240-5251)：已发送图片跟随用户正文靠右，容器沿用正文的最大宽度（544px / 88%），多张图片按顺序排列并在窄屏换行。保留 160px 图片预览及原始比例。输入框内的待发送附件继续从左侧排列。
 
+点击已发送的缩略图可在同一会话中查看对应原图。大图预览与输入框共用，关闭按钮和 Esc 都会返回原缩略图，保留历史阅读位置。Figma 的[白垣图片消息](https://www.figma.com/design/TZOGfIsv1ESAQckxwg4lpa?node-id=444-15661)和[苍渊图片消息](https://www.figma.com/design/TZOGfIsv1ESAQckxwg4lpa?node-id=240-5251)已连到各自的大图预览。
+
 ## 输入器分层与紧凑模型面板
 
 桌面和手机统一采用正文在上、工具行在下的结构，空输入高度分别为 118px 和 110px，圆角 24px；加号靠左，默认／计划、模型与强度、发送／停止靠右。模式只显示名称，取消快捷键文字和下拉箭头，原有 Shift+Tab 切换功能保留。正文铺满可用宽度，最高 min(168px, 33dvh)，超限只滚动正文；使用 4px、透明轨道和低对比圆角滑块，工具行始终可见。
