@@ -17,6 +17,7 @@ from .adapter import Adapter
 logger = logging.getLogger(__name__)
 RPC_TIMEOUT = 60
 APP_LIST_TIMEOUT = 15
+USAGE_HISTORY_TIMEOUT = 15
 RECONNECT_DELAY = 3
 
 
@@ -44,16 +45,17 @@ class Connection:
         self.runner: asyncio.Task | None = None
         self.stopping = False
         self.catalog_lock = asyncio.Lock()
-        self.catalog_tasks: set[asyncio.Task] = set()
+        self.usage_lock = asyncio.Lock()
+        self.isolated_tasks: set[asyncio.Task] = set()
 
     async def start(self) -> None:
         self.runner = asyncio.create_task(self._connect())
 
     async def close(self) -> None:
         self.stopping = True
-        for task in list(self.catalog_tasks):
+        for task in list(self.isolated_tasks):
             task.cancel()
-        await asyncio.gather(*self.catalog_tasks, return_exceptions=True)
+        await asyncio.gather(*self.isolated_tasks, return_exceptions=True)
         if self.runner:
             self.runner.cancel()
         if self.adapter:
@@ -129,15 +131,13 @@ class Connection:
         if method == "app/list":
             # App discovery can stall while the daemon contacts external services.
             # Keep its blocking SDK waiter off the transport that owns live work.
-            task = asyncio.create_task(self._app_list(params))
-            self.catalog_tasks.add(task)
-            try:
-                return await asyncio.wait_for(task, APP_LIST_TIMEOUT)
-            except asyncio.TimeoutError as exc:
-                logger.warning("Codex app/list timed out; main connection preserved")
-                raise ConnectionError("应用目录查询超时，请稍后重试") from exc
-            finally:
-                self.catalog_tasks.discard(task)
+            return await self._isolated_read(
+                method, params, self.catalog_lock, APP_LIST_TIMEOUT, "应用目录查询"
+            )
+        if method == "account/usage/read":
+            return await self._isolated_read(
+                method, params, self.usage_lock, USAGE_HISTORY_TIMEOUT, "历史用量读取"
+            )
         try:
             return await asyncio.wait_for(adapter.request(method, params), RPC_TIMEOUT)
         except asyncio.TimeoutError as exc:
@@ -165,12 +165,32 @@ class Connection:
         except TransportClosedError as exc:
             raise ConnectionError("Codex 连接已断开；请等待恢复") from exc
 
-    async def _app_list(self, params: dict | None) -> dict:
-        async with self.catalog_lock:
-            adapter = Adapter(self.config.socket)
-            try:
-                await adapter.start()
-                return await adapter.request("app/list", params)
-            finally:
-                # Closing also releases the SDK's blocking response waiter on timeout.
-                await adapter.close()
+    async def _isolated_read(
+        self,
+        method: str,
+        params: dict | None,
+        lock: asyncio.Lock,
+        timeout: int,
+        label: str,
+    ) -> dict:
+        async def read():
+            async with lock:
+                adapter = Adapter(self.config.socket)
+                try:
+                    await adapter.start()
+                    return await adapter.request(method, params)
+                finally:
+                    # Closing releases the SDK waiter even when the request times out.
+                    await adapter.close()
+
+        task = asyncio.create_task(read())
+        self.isolated_tasks.add(task)
+        try:
+            return await asyncio.wait_for(task, timeout)
+        except asyncio.TimeoutError as exc:
+            logger.warning("Codex %s timed out; main connection preserved", method)
+            raise ConnectionError(f"{label}超时，请稍后重试") from exc
+        except TransportClosedError as exc:
+            raise ConnectionError(f"{label}连接已断开，请稍后重试") from exc
+        finally:
+            self.isolated_tasks.discard(task)

@@ -181,7 +181,7 @@ export function useTaskNotifications(
               : "任务已完成，查看结果。",
           tag: `samaya-${key}`,
           data: { threadId },
-          icon: "/figma/samaya-symbol.svg",
+          icon: "/figma/samaya-app-icon.svg",
         };
         try {
           const registration =

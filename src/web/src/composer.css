@@ -347,19 +347,6 @@
   background: var(--surface);
   color: var(--text-primary);
 }
-.image-preview-dialog {
-  width: min(1200px, calc(100vw - 32px));
-  max-width: calc(100vw - 32px);
-  max-height: 90dvh;
-}
-.image-preview-dialog > img {
-  display: block;
-  max-width: 100%;
-  max-height: calc(90dvh - 96px);
-  object-fit: contain;
-  margin: 0 auto;
-}
-
 /* Only the text scrolls; controls and thumbnails remain outside its viewport. */
 .composer-input .composer-editor {
   scrollbar-width: thin;
